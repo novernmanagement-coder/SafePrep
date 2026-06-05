@@ -9,6 +9,8 @@
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.geraldmiller.safeprep
+        certificate: Safe_Prep_Certificate
+        provisioning_profile: Safe_Prep_21
     scripts:
       - name: Get Flutter packages
         script: flutter pub get
