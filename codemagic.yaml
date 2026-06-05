@@ -2,6 +2,8 @@
   ios-release:
     name: iOS Release
     instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: Codemagic
     environment:
       flutter: stable
       ios_signing:
