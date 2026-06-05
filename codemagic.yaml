@@ -9,11 +9,11 @@
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.geraldmiller.safeprep
-        certificate: Safe_Prep_Certificate
-        provisioning_profile: Safe_Prep_21
     scripts:
       - name: Get Flutter packages
         script: flutter pub get
+      - name: Set up code signing
+        script: keychain initialize && app-store-connect fetch-signing-files com.geraldmiller.safeprep --type IOS_APP_STORE --create && keychain add-certificates && xcode-project use-profiles
       - name: Build IPA
         script: flutter build ipa --release
     artifacts:
