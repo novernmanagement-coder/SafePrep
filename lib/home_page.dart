@@ -12,6 +12,9 @@ import 'sixty_second_refresh_page.dart';
 import 'about_proctors_page.dart';
 import 'final_exam_intro_page.dart';
 import 'peace_of_mind_page.dart';
+import 'mock/mock_homepage.dart';
+import 'mock/mock_dashboard_screen.dart';
+import 'mock/mock_final_exam_grade_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -500,13 +503,11 @@ class _HomePageState extends State<HomePage> {
         final starMin = i * 20.0;
         final starMax = (i + 1) * 20.0;
         double fillFraction = 0.0;
-
         if (score >= starMax) {
           fillFraction = 1.0;
         } else if (score > starMin) {
           fillFraction = (score - starMin) / 20.0;
         }
-
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 2),
           child: _buildPartialStar(fillFraction),
@@ -611,7 +612,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // ── Full trophy section ───────────────────────────────────
   Widget _buildTrophySection() {
     if (_milestones.isEmpty) return const SizedBox();
 
@@ -662,7 +662,6 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
           const SizedBox(height: 14),
-
           Row(
             children: [
               Expanded(
@@ -678,9 +677,7 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
           ),
-
           const SizedBox(height: 10),
-
           Row(
             children: [
               Expanded(
@@ -706,9 +703,7 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
           ),
-
           const SizedBox(height: 10),
-
           IntrinsicHeight(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -894,6 +889,69 @@ class _HomePageState extends State<HomePage> {
                   child: Column(
                     spacing: AppSizes.cardSpacing,
                     children: [
+                      // ── TEMP — screenshot mocks, REMOVE before release build ──
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              height: AppSizes.primaryButtonHeight,
+                              child: ElevatedButton(
+                                onPressed: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const MockHomePage(),
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                  foregroundColor: Colors.white,
+                                ),
+                                child: const Text('Shot 1'),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: SizedBox(
+                              height: AppSizes.primaryButtonHeight,
+                              child: ElevatedButton(
+                                onPressed: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const MockDashboardScreen(),
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                  foregroundColor: Colors.white,
+                                ),
+                                child: const Text('Shot 2'),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: SizedBox(
+                              height: AppSizes.primaryButtonHeight,
+                              child: ElevatedButton(
+                                onPressed: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const MockFinalExamGradePage(),
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                  foregroundColor: Colors.white,
+                                ),
+                                child: const Text('Shot 3'),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      // ── END TEMP ──
                       Column(
                         spacing: 2,
                         children: [
