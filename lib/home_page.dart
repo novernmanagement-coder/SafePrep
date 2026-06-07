@@ -12,9 +12,6 @@ import 'sixty_second_refresh_page.dart';
 import 'about_proctors_page.dart';
 import 'final_exam_intro_page.dart';
 import 'peace_of_mind_page.dart';
-import 'mock/mock_homepage.dart';
-import 'mock/mock_dashboard_screen.dart';
-import 'mock/mock_final_exam_grade_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -87,7 +84,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // ── Trophy & Readiness Section ───────────────────────────
   static const Color _goldDark = Color(0xFFC8A84B);
   static const Color _goldLight = Color(0xFFFFF3C4);
   static const Color _goldText = Color(0xFF8B6914);
@@ -889,69 +885,6 @@ class _HomePageState extends State<HomePage> {
                   child: Column(
                     spacing: AppSizes.cardSpacing,
                     children: [
-                      // ── TEMP — screenshot mocks, REMOVE before release build ──
-                      Row(
-                        children: [
-                          Expanded(
-                            child: SizedBox(
-                              height: AppSizes.primaryButtonHeight,
-                              child: ElevatedButton(
-                                onPressed: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const MockHomePage(),
-                                  ),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red,
-                                  foregroundColor: Colors.white,
-                                ),
-                                child: const Text('Shot 1'),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: SizedBox(
-                              height: AppSizes.primaryButtonHeight,
-                              child: ElevatedButton(
-                                onPressed: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const MockDashboardScreen(),
-                                  ),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red,
-                                  foregroundColor: Colors.white,
-                                ),
-                                child: const Text('Shot 2'),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: SizedBox(
-                              height: AppSizes.primaryButtonHeight,
-                              child: ElevatedButton(
-                                onPressed: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        const MockFinalExamGradePage(),
-                                  ),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red,
-                                  foregroundColor: Colors.white,
-                                ),
-                                child: const Text('Shot 3'),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      // ── END TEMP ──
                       Column(
                         spacing: 2,
                         children: [

@@ -15,7 +15,7 @@ class SplashPage extends StatefulWidget {
 }
 
 class _SplashPageState extends State<SplashPage> {
-  static const bool _debugBypassPreview = true;
+  static const bool _debugBypassPreview = false;
   static const bool _debugShowPreview = false;
 
   @override
