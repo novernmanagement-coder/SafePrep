@@ -4,10 +4,15 @@ import 'app_state_persistence.dart';
 import 'csv_loader.dart';
 import 'iap_service.dart';
 import 'splash_page.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Initialize Firebase
+  await Firebase.initializeApp();
+  FirebaseAnalytics.instance.logAppOpen();
   // Load persisted user state first
   await AppStatePersistence.load();
 
@@ -39,10 +44,7 @@ class SafePrepApp extends StatelessWidget {
       builder: (context, child) {
         return Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: 390,
-              maxHeight: 844,
-            ),
+            constraints: const BoxConstraints(maxWidth: 390, maxHeight: 844),
             child: child!,
           ),
         );
