@@ -6,6 +6,7 @@ import '../splash_page.dart';
 import 'preview_shared.dart';
 import 'preview_cinematic_splash.dart';
 import 'preview_reel_overlay.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 
 class PreviewRevealPage extends StatefulWidget {
   const PreviewRevealPage({super.key});
@@ -51,6 +52,7 @@ class _PreviewRevealPageState extends State<PreviewRevealPage>
   Future<void> _runEntrance() async {
     await Future.delayed(const Duration(milliseconds: 300));
     await _growController.forward();
+    FirebaseAnalytics.instance.logEvent(name: 'paywall_reached');
   }
 
   @override

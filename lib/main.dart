@@ -10,9 +10,12 @@ import 'package:firebase_analytics/firebase_analytics.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase
-  await Firebase.initializeApp();
-  FirebaseAnalytics.instance.logAppOpen();
+  // Initialize Firebase — iOS and Android only
+  if (Platform.isIOS || Platform.isAndroid) {
+    await Firebase.initializeApp();
+    FirebaseAnalytics.instance.logAppOpen();
+  }
+
   // Load persisted user state first
   await AppStatePersistence.load();
 

@@ -5,6 +5,7 @@ import '../app_state.dart';
 import '../app_state_persistence.dart';
 import 'preview_reveal_page.dart';
 import 'computing_curriculum_page.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 
 class PreviewAssessmentPage extends StatefulWidget {
   const PreviewAssessmentPage({super.key});
@@ -162,6 +163,12 @@ class _PreviewAssessmentPageState extends State<PreviewAssessmentPage> {
     AppStatePersistence.save();
 
     final answered = _selectedAnswers.where((a) => a != -1).length;
+
+    // Firebase Analytics
+    FirebaseAnalytics.instance.logEvent(
+      name: 'assessment_submitted',
+      parameters: {'questions_answered': answered},
+    );
 
     final coveredCategories = <String>{};
     final answeredPerCategory = <String, int>{};

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../constants.dart';
 import '../app_state.dart';
 import '../readiness_engine.dart';
-import 'preview_cinematic_splash.dart';
 
 class PreviewReelOverlay extends StatefulWidget {
   final VoidCallback onBuy;
