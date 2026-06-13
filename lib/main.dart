@@ -4,17 +4,11 @@ import 'app_state_persistence.dart';
 import 'csv_loader.dart';
 import 'iap_service.dart';
 import 'splash_page.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_analytics/firebase_analytics.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase — iOS and Android only
-  if (Platform.isIOS || Platform.isAndroid) {
-    await Firebase.initializeApp();
-    FirebaseAnalytics.instance.logAppOpen();
-  }
+  // Firebase temporarily disabled — re-enable after iOS 26 compatibility confirmed
 
   // Load persisted user state first
   await AppStatePersistence.load();
