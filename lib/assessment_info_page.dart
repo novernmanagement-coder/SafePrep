@@ -49,22 +49,29 @@ class _AssessmentInfoPageState extends State<AssessmentInfoPage> {
                       ),
                       child: Row(
                         children: [
-                          Text('Safe',
-                              style: TextStyle(
-                                fontSize: AppFonts.header,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.bodyText,
-                              )),
+                          Text(
+                            'Safe',
+                            style: TextStyle(
+                              fontSize: AppFonts.header,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.bodyText,
+                            ),
+                          ),
                           const SizedBox(width: 6),
-                          Image.asset('Assets/splash.png',
-                              width: 36, height: 36),
+                          Image.asset(
+                            'Assets/splash.png',
+                            width: 36,
+                            height: 36,
+                          ),
                           const SizedBox(width: 6),
-                          Text('Prep™',
-                              style: TextStyle(
-                                fontSize: AppFonts.header,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.bodyText,
-                              )),
+                          Text(
+                            'Prep™',
+                            style: TextStyle(
+                              fontSize: AppFonts.header,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.bodyText,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -114,8 +121,10 @@ class _AssessmentInfoPageState extends State<AssessmentInfoPage> {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Text(
                         'This assessment contains 40 questions. You may go back and change your answers before submitting.',
-                        style:
-                            TextStyle(fontSize: 14, color: AppColors.bodyText),
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppColors.bodyText,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                     ),
@@ -126,14 +135,16 @@ class _AssessmentInfoPageState extends State<AssessmentInfoPage> {
                         onPressed: () => Navigator.push(
                           context,
                           MaterialPageRoute(
-                              builder: (_) => const AssessmentPageV2()),
+                            builder: (_) => const AssessmentPageV2(),
+                          ),
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primaryButton,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(
-                                AppSizes.buttonCornerRadius),
+                              AppSizes.buttonCornerRadius,
+                            ),
                           ),
                         ),
                         child: const Text('Start Assessment'),
@@ -149,21 +160,30 @@ class _AssessmentInfoPageState extends State<AssessmentInfoPage> {
                 child: Column(
                   spacing: AppSizes.footerSpacing,
                   children: [
-                    Text(AppStrings.footerLine1,
-                        style: TextStyle(
-                            fontSize: AppFonts.footer,
-                            color: AppColors.footerText),
-                        textAlign: TextAlign.center),
-                    Text(AppStrings.footerLine2,
-                        style: TextStyle(
-                            fontSize: AppFonts.footer,
-                            color: AppColors.footerText),
-                        textAlign: TextAlign.center),
-                    Text(AppStrings.footerLine3,
-                        style: TextStyle(
-                            fontSize: AppFonts.footer,
-                            color: AppColors.starMotifBlue),
-                        textAlign: TextAlign.center),
+                    Text(
+                      AppStrings.footerLine1,
+                      style: TextStyle(
+                        fontSize: AppFonts.footer,
+                        color: AppColors.footerText,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    Text(
+                      AppStrings.footerLine2,
+                      style: TextStyle(
+                        fontSize: AppFonts.footer,
+                        color: AppColors.footerText,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    Text(
+                      AppStrings.footerLine3,
+                      style: TextStyle(
+                        fontSize: AppFonts.footer,
+                        color: AppColors.starMotifBlue,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
                   ],
                 ),
               ),

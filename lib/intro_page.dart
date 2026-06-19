@@ -65,165 +65,191 @@ class _IntroductoryPageState extends State<IntroductoryPage>
     );
   }
 
+  void _goToHomePage() {
+    _saveName();
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const HomePage()),
+    );
+  }
+
   void _showWelcomeModal() {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => Dialog(
+      builder: (dialogContext) => Dialog(
         backgroundColor: Colors.transparent,
-        child: Container(
-          padding: const EdgeInsets.all(28),
-          decoration: BoxDecoration(
-            color: const Color(0xFF0A0A0F),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFD4AF37), width: 1.5),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header
-              const Text(
-                'SafePrep™',
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFFD4AF37),
-                  letterSpacing: 1.5,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 6),
-              Container(width: 40, height: 1.5, color: const Color(0xFFD4AF37)),
-              const SizedBox(height: 20),
-
-              // Body
-              const Text(
-                'You have 30 minutes to explore everything — no restrictions, no limits.',
-                style: TextStyle(
-                  fontSize: 15,
-                  color: Color(0xFFF0EDE8),
-                  height: 1.6,
-                  fontWeight: FontWeight.w500,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                'Browse wherever you like — however, we recommend starting out by tapping "Create my personalized curriculum" on the home page.',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Color(0x99F0EDE8),
-                  height: 1.6,
-                  fontStyle: FontStyle.italic,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 10),
-              const Text(
-                'When your trial ends, we\'ll make it easy to unlock full access.',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Color(0x77F0EDE8),
-                  height: 1.6,
-                  fontStyle: FontStyle.italic,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 20),
-
-              // Icon callout
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFD4AF37).withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: const Color(0xFFD4AF37).withValues(alpha: 0.3),
-                    width: 1,
+        child: SingleChildScrollView(
+          child: Container(
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0A0A0F),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFD4AF37), width: 1.5),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                const Text(
+                  'SafePrep™',
+                  style: TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFFD4AF37),
+                    letterSpacing: 1.5,
                   ),
+                  textAlign: TextAlign.center,
                 ),
-                child: Row(
-                  children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      padding: const EdgeInsets.all(6),
-                      child: Image.asset(
-                        'Assets/splash.png',
-                        width: 28,
-                        height: 28,
-                      ),
+                const SizedBox(height: 6),
+                Container(
+                  width: 40,
+                  height: 1.5,
+                  color: const Color(0xFFD4AF37),
+                ),
+                const SizedBox(height: 20),
+
+                // Body
+                const Text(
+                  'You have 30 minutes to explore everything — no restrictions, no limits.',
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Color(0xFFF0EDE8),
+                    height: 1.6,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'Browse wherever you like — however, we recommend starting out by tapping "Create my personalized curriculum" on the home page.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Color(0x99F0EDE8),
+                    height: 1.6,
+                    fontStyle: FontStyle.italic,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'When your trial ends, we\'ll make it easy to unlock full access.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Color(0x77F0EDE8),
+                    height: 1.6,
+                    fontStyle: FontStyle.italic,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+
+                // Icon callout
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD4AF37).withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: const Color(0xFFD4AF37).withValues(alpha: 0.3),
+                      width: 1,
                     ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        'This icon is always your way back to the Home Page.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFFD4AF37),
-                          height: 1.5,
-                          fontWeight: FontWeight.w600,
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.all(6),
+                        child: Image.asset(
+                          'Assets/splash.png',
+                          width: 28,
+                          height: 28,
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'This icon is always your way back to the Home Page.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFFD4AF37),
+                            height: 1.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
 
-              const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-              // Got it button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1A1A14),
-                    foregroundColor: const Color(0xFFF0EDE8),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(40),
-                      side: BorderSide(
-                        color: const Color(0xFFD4AF37).withValues(alpha: 0.4),
+                // Got it button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(dialogContext);
+                      _goToHomePage();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1A1A14),
+                      foregroundColor: const Color(0xFFF0EDE8),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(40),
+                        side: BorderSide(
+                          color: const Color(0xFFD4AF37).withValues(alpha: 0.4),
+                        ),
+                      ),
+                      elevation: 2,
+                    ),
+                    child: const Text(
+                      'Got it',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    elevation: 2,
-                  ),
-                  child: const Text(
-                    'Got it',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                   ),
                 ),
-              ),
 
-              const SizedBox(height: 10),
+                const SizedBox(height: 10),
 
-              // Unlock for free now button — also goes to HomePage
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFD4AF37),
-                    foregroundColor: const Color(0xFF0A0A0F),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(40),
+                // Unlock for free now button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(dialogContext);
+                      _goToHomePage();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD4AF37),
+                      foregroundColor: const Color(0xFF0A0A0F),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(40),
+                      ),
+                      elevation: 6,
                     ),
-                    elevation: 6,
-                  ),
-                  child: const Text(
-                    '🔓  Unlock for free now',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                    child: const Text(
+                      '🔓  Unlock for free now',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
