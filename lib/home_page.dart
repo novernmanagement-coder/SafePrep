@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'constants.dart';
 import 'app_state.dart';
 import 'csv_loader.dart';
@@ -24,6 +25,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final AppState _state = AppState();
+  final FirebaseAnalytics _analytics = FirebaseAnalytics.instance;
   String _currentFact = '';
   List<MilestoneModel> _milestones = [];
 
@@ -32,16 +34,46 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _loadFacts();
     _loadMilestones();
+    _logHomeViewed();
 
     // Start trial timer for non-unlocked users
     if (!_state.hasUnlockedApp) {
       TrialTimerService.instance.onTrialExpired = _onTrialExpired;
       TrialTimerService.instance.start();
+      _logTrialStarted();
     }
+  }
+
+  Future<void> _logHomeViewed() async {
+    try {
+      await _analytics.logEvent(
+        name: 'home_viewed',
+        parameters: {'is_unlocked': _state.hasUnlockedApp ? 'true' : 'false'},
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _logTrialStarted() async {
+    try {
+      await _analytics.logEvent(name: 'trial_started');
+    } catch (_) {}
+  }
+
+  Future<void> _logTrialExpired() async {
+    try {
+      await _analytics.logEvent(name: 'trial_expired');
+    } catch (_) {}
+  }
+
+  Future<void> _logCurriculumTapped() async {
+    try {
+      await _analytics.logEvent(name: 'curriculum_tapped');
+    } catch (_) {}
   }
 
   void _onTrialExpired() {
     if (!mounted) return;
+    _logTrialExpired();
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => const PreviewCinematicSplash()),
@@ -370,8 +402,9 @@ class _HomePageState extends State<HomePage> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: List.generate(4, (i) {
-                          if (i >= earnedSlots.length)
+                          if (i >= earnedSlots.length) {
                             return const SizedBox(width: 26);
+                          }
                           return Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 2),
                             child: Container(
@@ -398,8 +431,9 @@ class _HomePageState extends State<HomePage> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: List.generate(4, (i) {
                             final idx = i + 4;
-                            if (idx >= earnedSlots.length)
+                            if (idx >= earnedSlots.length) {
                               return const SizedBox(width: 26);
+                            }
                             return Padding(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 2,
@@ -905,12 +939,34 @@ class _HomePageState extends State<HomePage> {
                       Column(
                         spacing: 2,
                         children: [
-                          _buildButton(
-                            'Create my personalized curriculum',
-                            () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const AssessmentInfoPage(),
+                          SizedBox(
+                            width: double.infinity,
+                            height: AppSizes.primaryButtonHeight,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                _logCurriculumTapped();
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const AssessmentInfoPage(),
+                                  ),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primaryButton,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    AppSizes.buttonCornerRadius,
+                                  ),
+                                ),
+                              ),
+                              child: const Text(
+                                'Create my personalized curriculum',
+                                style: TextStyle(
+                                  fontSize: AppFonts.button,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                           ),
@@ -919,6 +975,7 @@ class _HomePageState extends State<HomePage> {
                             style: TextStyle(
                               fontSize: 11,
                               color: AppColors.subtleText,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ],

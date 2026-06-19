@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import '../iap_service.dart';
 import '../app_state.dart';
 import '../trial_timer_service.dart';
@@ -32,6 +33,8 @@ class _PreviewCinematicSplashState extends State<PreviewCinematicSplash>
 
   bool _isPurchasing = false;
   String? _errorMessage;
+
+  final FirebaseAnalytics _analytics = FirebaseAnalytics.instance;
 
   static const Color _gold = Color(0xFFD4AF37);
   static const Color _darkBg = Color(0xFF0A0A0F);
@@ -81,8 +84,42 @@ class _PreviewCinematicSplashState extends State<PreviewCinematicSplash>
       curve: Curves.easeOutBack,
     ).drive(Tween(begin: 0.0, end: 1.0));
 
+    _logPaywallViewed();
     _runSequence();
   }
+
+  // ── Analytics ─────────────────────────────────────────────
+
+  Future<void> _logPaywallViewed() async {
+    try {
+      await _analytics.logEvent(
+        name: 'paywall_viewed',
+        parameters: {
+          'source': _isReturningUser ? 'trial_expired' : 'fresh_launch',
+        },
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _logPurchaseInitiated(String tier) async {
+    try {
+      await _analytics.logEvent(
+        name: 'purchase_initiated',
+        parameters: {'tier': tier},
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _logPurchaseCompleted(String tier) async {
+    try {
+      await _analytics.logEvent(
+        name: 'purchase_completed',
+        parameters: {'tier': tier},
+      );
+    } catch (_) {}
+  }
+
+  // ─────────────────────────────────────────────────────────
 
   Animation<double> _staggeredFade(double start, double end) {
     return CurvedAnimation(
@@ -109,6 +146,7 @@ class _PreviewCinematicSplashState extends State<PreviewCinematicSplash>
   }
 
   Future<void> _onBuy() async {
+    _logPurchaseInitiated('lifetime');
     setState(() {
       _isPurchasing = true;
       _errorMessage = null;
@@ -117,16 +155,17 @@ class _PreviewCinematicSplashState extends State<PreviewCinematicSplash>
     if (!mounted) return;
     setState(() => _isPurchasing = false);
     if (result == IAPResult.initiated) {
-      _waitForConfirmation();
+      _waitForConfirmation('lifetime');
     } else {
       setState(() => _errorMessage = result.userMessage);
     }
   }
 
-  void _waitForConfirmation() {
+  void _waitForConfirmation(String tier) {
     Future.delayed(const Duration(seconds: 1), () async {
       if (!mounted) return;
       if (AppState().hasUnlockedApp) {
+        _logPurchaseCompleted(tier);
         await TrialTimerService.instance.resetTrial();
         if (!mounted) return;
         Navigator.pushAndRemoveUntil(
@@ -135,7 +174,7 @@ class _PreviewCinematicSplashState extends State<PreviewCinematicSplash>
           (route) => false,
         );
       } else {
-        _waitForConfirmation();
+        _waitForConfirmation(tier);
       }
     });
   }
@@ -429,9 +468,11 @@ class _PreviewCinematicSplashState extends State<PreviewCinematicSplash>
           label: '\$4.99  —  7 Days Access',
           sublabel: 'Try it out',
           isHighlighted: false,
+          tier: 'seven_day',
           onTap: _isPurchasing
               ? null
               : () async {
+                  _logPurchaseInitiated('seven_day');
                   setState(() {
                     _isPurchasing = true;
                     _errorMessage = null;
@@ -440,7 +481,7 @@ class _PreviewCinematicSplashState extends State<PreviewCinematicSplash>
                   if (!mounted) return;
                   setState(() => _isPurchasing = false);
                   if (result == IAPResult.initiated) {
-                    _waitForConfirmation();
+                    _waitForConfirmation('seven_day');
                   } else {
                     setState(() => _errorMessage = result.userMessage);
                   }
@@ -453,9 +494,11 @@ class _PreviewCinematicSplashState extends State<PreviewCinematicSplash>
           label: '\$8.99  —  14 Days Access',
           sublabel: 'Study deeper',
           isHighlighted: false,
+          tier: 'fourteen_day',
           onTap: _isPurchasing
               ? null
               : () async {
+                  _logPurchaseInitiated('fourteen_day');
                   setState(() {
                     _isPurchasing = true;
                     _errorMessage = null;
@@ -464,7 +507,7 @@ class _PreviewCinematicSplashState extends State<PreviewCinematicSplash>
                   if (!mounted) return;
                   setState(() => _isPurchasing = false);
                   if (result == IAPResult.initiated) {
-                    _waitForConfirmation();
+                    _waitForConfirmation('fourteen_day');
                   } else {
                     setState(() => _errorMessage = result.userMessage);
                   }
@@ -477,6 +520,7 @@ class _PreviewCinematicSplashState extends State<PreviewCinematicSplash>
           label: '\$9.99  —  Lifetime Access',
           sublabel: 'Best value  •  Yours forever  ★',
           isHighlighted: true,
+          tier: 'lifetime',
           onTap: _isPurchasing ? null : _onBuy,
         ),
 
@@ -511,6 +555,7 @@ class _PreviewCinematicSplashState extends State<PreviewCinematicSplash>
     required String label,
     required String sublabel,
     required bool isHighlighted,
+    required String tier,
     required VoidCallback? onTap,
   }) {
     return SizedBox(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'constants.dart';
 import 'csv_loader.dart';
 import 'app_state.dart';
@@ -18,6 +19,7 @@ class CategoryStudyPage extends StatefulWidget {
 
 class _CategoryStudyPageState extends State<CategoryStudyPage> {
   final AppState _state = AppState();
+  final FirebaseAnalytics _analytics = FirebaseAnalytics.instance;
   List<CurriculumModel> _queue = [];
   int _currentIndex = 0;
   bool _loaded = false;
@@ -44,7 +46,48 @@ class _CategoryStudyPageState extends State<CategoryStudyPage> {
       _queue = all;
       _loaded = true;
     });
+    _logStudyStarted();
   }
+
+  // ── Analytics ─────────────────────────────────────────────
+
+  Future<void> _logStudyStarted() async {
+    try {
+      await _analytics.logEvent(
+        name: 'study_started',
+        parameters: {
+          'category': widget.category,
+          'mode': _mode,
+          'card_count': _queue.length,
+        },
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _logStudyCompleted() async {
+    try {
+      await _analytics.logEvent(
+        name: 'study_completed',
+        parameters: {'category': widget.category, 'mode': _mode},
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _logStudyAbandoned() async {
+    try {
+      await _analytics.logEvent(
+        name: 'study_abandoned',
+        parameters: {
+          'category': widget.category,
+          'mode': _mode,
+          'cards_viewed': _currentIndex,
+          'total_cards': _queue.length,
+        },
+      );
+    } catch (_) {}
+  }
+
+  // ─────────────────────────────────────────────────────────
 
   List<String> _buildKeyPoints(CurriculumModel content) {
     if (content.keyPoints.isNotEmpty) {
@@ -65,6 +108,7 @@ class _CategoryStudyPageState extends State<CategoryStudyPage> {
 
   void _goNext() {
     if (_currentIndex == _queue.length - 1) {
+      _logStudyCompleted();
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -411,6 +455,13 @@ class _CategoryStudyPageState extends State<CategoryStudyPage> {
                 height: AppSizes.primaryButtonHeight,
                 child: ElevatedButton(
                   onPressed: () {
+                    final allCardsViewed =
+                        _queue.isEmpty || _currentIndex >= _queue.length - 1;
+                    if (allCardsViewed) {
+                      _logStudyCompleted();
+                    } else {
+                      _logStudyAbandoned();
+                    }
                     _state.markCategoryStudied(widget.category);
                     AppStatePersistence.save();
                     Navigator.pushReplacement(

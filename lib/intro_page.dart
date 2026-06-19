@@ -3,7 +3,6 @@ import 'home_page.dart';
 import 'constants.dart';
 import 'app_state.dart';
 import 'app_state_persistence.dart';
-import 'preview/preview_cinematic_splash.dart';
 
 class IntroductoryPage extends StatefulWidget {
   const IntroductoryPage({super.key});
@@ -204,19 +203,11 @@ class _IntroductoryPageState extends State<IntroductoryPage>
 
               const SizedBox(height: 10),
 
-              // Unlock for free now button
+              // Unlock for free now button — also goes to HomePage
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const PreviewCinematicSplash(),
-                      ),
-                    );
-                  },
+                  onPressed: () => Navigator.pop(context),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFD4AF37),
                     foregroundColor: const Color(0xFF0A0A0F),
