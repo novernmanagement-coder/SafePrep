@@ -57,20 +57,12 @@ class _IntroductoryPageState extends State<IntroductoryPage>
     });
   }
 
-  void _onIconTapped() {
-    _saveName();
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const HomePage()),
-    );
-  }
-
   void _goToHomePage() {
     _saveName();
-    Navigator.pushReplacement(
+    Navigator.of(
       context,
-      MaterialPageRoute(builder: (_) => const HomePage()),
-    );
+      rootNavigator: true,
+    ).pushReplacement(MaterialPageRoute(builder: (_) => const HomePage()));
   }
 
   void _showWelcomeModal() {
@@ -194,10 +186,7 @@ class _IntroductoryPageState extends State<IntroductoryPage>
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(dialogContext);
-                      _goToHomePage();
-                    },
+                    onPressed: _goToHomePage,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF1A1A14),
                       foregroundColor: const Color(0xFFF0EDE8),
@@ -226,10 +215,7 @@ class _IntroductoryPageState extends State<IntroductoryPage>
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(dialogContext);
-                      _goToHomePage();
-                    },
+                    onPressed: _goToHomePage,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFD4AF37),
                       foregroundColor: const Color(0xFF0A0A0F),
@@ -279,7 +265,7 @@ class _IntroductoryPageState extends State<IntroductoryPage>
                   Column(
                     children: [
                       GestureDetector(
-                        onTap: _onIconTapped,
+                        onTap: _goToHomePage,
                         child: Container(
                           decoration: BoxDecoration(
                             color: Colors.white,
