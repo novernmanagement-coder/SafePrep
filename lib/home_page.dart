@@ -12,6 +12,8 @@ import 'sixty_second_refresh_page.dart';
 import 'about_proctors_page.dart';
 import 'final_exam_intro_page.dart';
 import 'peace_of_mind_page.dart';
+import 'trial_timer_service.dart';
+import 'preview/preview_cinematic_splash.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -30,6 +32,21 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _loadFacts();
     _loadMilestones();
+
+    // Start trial timer for non-unlocked users
+    if (!_state.hasUnlockedApp) {
+      TrialTimerService.instance.onTrialExpired = _onTrialExpired;
+      TrialTimerService.instance.start();
+    }
+  }
+
+  void _onTrialExpired() {
+    if (!mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const PreviewCinematicSplash()),
+      (route) => false,
+    );
   }
 
   void _checkUnlockTrophy() {

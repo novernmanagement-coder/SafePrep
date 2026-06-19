@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../iap_service.dart';
 import '../app_state.dart';
+import '../trial_timer_service.dart';
 import 'preview_assessment_page.dart';
 import '../home_page.dart';
 
@@ -123,9 +124,10 @@ class _PreviewCinematicSplashState extends State<PreviewCinematicSplash>
   }
 
   void _waitForConfirmation() {
-    Future.delayed(const Duration(seconds: 1), () {
+    Future.delayed(const Duration(seconds: 1), () async {
       if (!mounted) return;
       if (AppState().hasUnlockedApp) {
+        await TrialTimerService.instance.resetTrial();
         if (!mounted) return;
         Navigator.pushAndRemoveUntil(
           context,
@@ -163,7 +165,7 @@ class _PreviewCinematicSplashState extends State<PreviewCinematicSplash>
               ),
             ),
             TextSpan(
-              text: 'SafePrep\u2122 Español',
+              text: 'SafePrep™ Español',
               style: TextStyle(
                 fontSize: 11,
                 color: _gold.withValues(alpha: 0.7),
@@ -303,7 +305,7 @@ class _PreviewCinematicSplashState extends State<PreviewCinematicSplash>
                                   color: _gold.withValues(alpha: 0.05),
                                 ),
                                 child: Text(
-                                  'The SafePrep\u2122 Assessment is a mini-quiz designed specifically to diagnose your current ServSafe aptitude. Answer as many or as few questions as you like, we will do the rest.',
+                                  'The SafePrep™ Assessment is a mini-quiz designed specifically to diagnose your current ServSafe aptitude. Answer as many or as few questions as you like, we will do the rest.',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     fontSize: 13,
@@ -493,7 +495,7 @@ class _PreviewCinematicSplashState extends State<PreviewCinematicSplash>
         TextButton(
           onPressed: _startOver,
           child: Text(
-            '\u2190  Start over',
+            '←  Start over',
             style: TextStyle(
               fontSize: 13,
               color: _softWhite.withValues(alpha: 0.35),

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'home_page.dart';
 import 'constants.dart';
 import 'app_state.dart';
+import 'app_state_persistence.dart';
+import 'preview/preview_cinematic_splash.dart';
 
 class IntroductoryPage extends StatefulWidget {
   const IntroductoryPage({super.key});
@@ -27,6 +29,11 @@ class _IntroductoryPageState extends State<IntroductoryPage>
     _bobbingAnimation = Tween<double>(begin: 0, end: -10).animate(
       CurvedAnimation(parent: _bobbingController, curve: Curves.easeInOut),
     );
+
+    // Show welcome modal on every launch for trial users
+    if (!AppState().hasUnlockedApp) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _showWelcomeModal());
+    }
   }
 
   @override
@@ -40,6 +47,7 @@ class _IntroductoryPageState extends State<IntroductoryPage>
     final name = _nameController.text.trim();
     if (name.isNotEmpty) {
       AppState().userName = name;
+      AppStatePersistence.save();
     }
   }
 
@@ -58,13 +66,186 @@ class _IntroductoryPageState extends State<IntroductoryPage>
     );
   }
 
+  void _showWelcomeModal() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(28),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0A0A0F),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFD4AF37), width: 1.5),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              const Text(
+                'SafePrep™',
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFFD4AF37),
+                  letterSpacing: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 6),
+              Container(width: 40, height: 1.5, color: const Color(0xFFD4AF37)),
+              const SizedBox(height: 20),
+
+              // Body
+              const Text(
+                'You have 30 minutes to explore everything — no restrictions, no limits.',
+                style: TextStyle(
+                  fontSize: 15,
+                  color: Color(0xFFF0EDE8),
+                  height: 1.6,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Browse wherever you like — however, we recommend starting out by tapping "Create my personalized curriculum" on the home page.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Color(0x99F0EDE8),
+                  height: 1.6,
+                  fontStyle: FontStyle.italic,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'When your trial ends, we\'ll make it easy to unlock full access.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Color(0x77F0EDE8),
+                  height: 1.6,
+                  fontStyle: FontStyle.italic,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+
+              // Icon callout
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD4AF37).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: const Color(0xFFD4AF37).withValues(alpha: 0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.all(6),
+                      child: Image.asset(
+                        'Assets/splash.png',
+                        width: 28,
+                        height: 28,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'This icon is always your way back to the Home Page.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFFD4AF37),
+                          height: 1.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Got it button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1A1A14),
+                    foregroundColor: const Color(0xFFF0EDE8),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(40),
+                      side: BorderSide(
+                        color: const Color(0xFFD4AF37).withValues(alpha: 0.4),
+                      ),
+                    ),
+                    elevation: 2,
+                  ),
+                  child: const Text(
+                    'Got it',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              // Unlock for free now button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const PreviewCinematicSplash(),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFD4AF37),
+                    foregroundColor: const Color(0xFF0A0A0F),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(40),
+                    ),
+                    elevation: 6,
+                  ),
+                  child: const Text(
+                    '🔓  Unlock for free now',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final hasResults = AppState().hasTakenAssessment;
 
     final resultsMessage = hasResults
-        ? 'We already have your assessment results on file \u2014 your personalized curriculum is built and ready to go.\n\nIf you\u2019d prefer to start fresh, you can retake the assessment anytime from the home page.'
-        : 'Head to the home page to take your free diagnostic assessment \u2014 we\u2019ll build your personalized curriculum from there.';
+        ? 'We already have your assessment results on file — your personalized curriculum is built and ready to go.\n\nIf you\'d prefer to start fresh, you can retake the assessment anytime from the home page.'
+        : 'Head to the home page to take your free diagnostic assessment — we\'ll build your personalized curriculum from there.';
 
     return Scaffold(
       backgroundColor: AppColors.primaryButton,
@@ -114,11 +295,12 @@ class _IntroductoryPageState extends State<IntroductoryPage>
                       ),
                       const SizedBox(height: 6),
                       const Text(
-                        'Tap the icon to go to the Home Page',
+                        'Tap the icon above — it\'s always your way back to the Home Page',
                         style: TextStyle(
                           fontSize: AppFonts.caption,
-                          color: Colors.white70,
+                          color: Colors.white,
                           fontStyle: FontStyle.italic,
+                          fontWeight: FontWeight.w600,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -139,7 +321,7 @@ class _IntroductoryPageState extends State<IntroductoryPage>
 
                   // Core message
                   const Text(
-                    'You just made the smartest move toward passing your ServSafe\u00ae exam.\n\nSafePrep\u2122 was built for one purpose \u2014 to get you ready. Not with generic questions and guesswork, but with a system that learns you, adapts to you, and builds a curriculum around your results.\n\nYou\u2019re not just studying. You\u2019re preparing.',
+                    'You just made the smartest move toward passing your ServSafe® exam.\n\nSafePrep™ was built for one purpose — to get you ready. Not with generic questions and guesswork, but with a system that learns you, adapts to you, and builds a curriculum around your results.\n\nYou\'re not just studying. You\'re preparing.',
                     style: TextStyle(
                       fontSize: AppFonts.body,
                       color: Colors.white70,

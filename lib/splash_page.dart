@@ -16,7 +16,7 @@ class SplashPage extends StatefulWidget {
 
 class _SplashPageState extends State<SplashPage> {
   static const bool _debugBypassPreview = false;
-  static const bool _debugShowPreview = true;
+  static const bool _debugShowPreview = false;
 
   @override
   void initState() {
@@ -36,6 +36,7 @@ class _SplashPageState extends State<SplashPage> {
       state.reset();
       await AppStatePersistence.delete();
     }
+    if (!mounted) return;
 
     if (_debugShowPreview) {
       Navigator.pushReplacement(
@@ -48,6 +49,7 @@ class _SplashPageState extends State<SplashPage> {
     if (_debugBypassPreview) {
       state.hasUnlockedApp = true;
       state.purchaseType = PurchaseType.lifetime;
+      if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const HomePage()),
@@ -58,6 +60,7 @@ class _SplashPageState extends State<SplashPage> {
     if (state.hasUnlockedApp && state.isExpired) {
       state.hasUnlockedApp = false;
       AppStatePersistence.save();
+      if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const PreviewCinematicSplash()),
@@ -70,11 +73,13 @@ class _SplashPageState extends State<SplashPage> {
         state.clearCurriculumProgress();
         state.hasSeenIntro = true;
         AppStatePersistence.save();
+        if (!mounted) return;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const IntroductoryPage()),
         );
       } else {
+        if (!mounted) return;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const HomePage()),
@@ -83,9 +88,12 @@ class _SplashPageState extends State<SplashPage> {
       return;
     }
 
+    // Trial mode — always show intro page until purchased
+    // TrialTimerService will fire the paywall at 30 minutes
+    if (!mounted) return;
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => const PreviewCinematicSplash()),
+      MaterialPageRoute(builder: (_) => const IntroductoryPage()),
     );
   }
 
@@ -102,7 +110,7 @@ class _SplashPageState extends State<SplashPage> {
             const Text(
               'Designed for you in every detail.',
               style: TextStyle(
-                color: const Color(0xFFD4AF37),
+                color: Color(0xFFD4AF37),
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
                 letterSpacing: 0.5,

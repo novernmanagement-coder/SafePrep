@@ -1,9 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'app_state.dart';
 import 'app_state_persistence.dart';
 import 'csv_loader.dart';
 import 'iap_service.dart';
 import 'splash_page.dart';
+import 'trial_timer_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12,6 +14,11 @@ void main() async {
 
   // Load persisted user state first
   await AppStatePersistence.load();
+
+  // Init trial timer for non-unlocked users
+  if (!AppState().hasUnlockedApp) {
+    await TrialTimerService.instance.init();
+  }
 
   // Sync CSVs from GitHub in the background.
   // Won't block launch — if offline, bundled/cached files are used.
