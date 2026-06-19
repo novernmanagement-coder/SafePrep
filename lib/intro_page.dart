@@ -59,10 +59,13 @@ class _IntroductoryPageState extends State<IntroductoryPage>
 
   void _goToHomePage() {
     _saveName();
-    Navigator.of(
-      context,
-      rootNavigator: true,
-    ).pushReplacement(MaterialPageRoute(builder: (_) => const HomePage()));
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (!mounted) return;
+      Navigator.of(
+        context,
+        rootNavigator: true,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => const HomePage()));
+    });
   }
 
   void _showWelcomeModal() {
