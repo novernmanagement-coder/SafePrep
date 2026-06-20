@@ -15,7 +15,7 @@ void main() async {
   try {
     await MixpanelService.instance.init();
   } catch (e) {
-    debugPrint('Mixpanel init skipped: $e');
+    print('Mixpanel init skipped: $e');
   }
 
   // Load persisted user state first
