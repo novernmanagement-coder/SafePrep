@@ -1,34 +1,64 @@
-import 'package:mixpanel_flutter/mixpanel_flutter.dart';
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'app_state.dart';
+import 'app_state_persistence.dart';
+import 'csv_loader.dart';
+import 'iap_service.dart';
+import 'splash_page.dart';
+import 'trial_timer_service.dart';
+import 'mixpanel_service.dart';
 
-class MixpanelService {
-  static final MixpanelService instance = MixpanelService._();
-  MixpanelService._();
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
 
-  Mixpanel? _mixpanel;
-
-  static const String _token = 'f0e261315481';
-
-  Future<void> init() async {
-    _mixpanel = await Mixpanel.init(_token, trackAutomaticEvents: true);
+  // Initialize Mixpanel
+  try {
+    await MixpanelService.instance.init();
+  } catch (e) {
+    debugPrint('Mixpanel init skipped: $e');
   }
 
-  void track(String event, {Map<String, dynamic>? properties}) {
-    try {
-      _mixpanel?.track(event, properties: properties);
-    } catch (e) {
-      // Silent fail — never crash the app over analytics
-    }
+  // Load persisted user state first
+  await AppStatePersistence.load();
+
+  // Init trial timer for non-unlocked users
+  if (!AppState().hasUnlockedApp) {
+    await TrialTimerService.instance.init();
   }
 
-  void identify(String userId) {
-    try {
-      _mixpanel?.identify(userId);
-    } catch (e) {}
+  // Sync CSVs from GitHub in the background.
+  // Won't block launch — if offline, bundled/cached files are used.
+  CsvUpdater.syncIfNeeded();
+
+  // Initialize IAP service — iOS and Android only
+  if (Platform.isIOS || Platform.isAndroid) {
+    await IAPService.instance.initialize();
   }
 
-  void reset() {
-    try {
-      _mixpanel?.reset();
-    } catch (e) {}
+  runApp(const SafePrepApp());
+}
+
+class SafePrepApp extends StatelessWidget {
+  const SafePrepApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'SafePrep',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0077C8)),
+        useMaterial3: true,
+      ),
+      home: const SplashPage(),
+      builder: (context, child) {
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 390, maxHeight: 844),
+            child: child!,
+          ),
+        );
+      },
+    );
   }
 }
