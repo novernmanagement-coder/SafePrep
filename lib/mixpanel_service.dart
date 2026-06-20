@@ -6,7 +6,7 @@ class MixpanelService {
 
   Mixpanel? _mixpanel;
 
-  static const String _token = 'f0e261315481';
+  static const String _token = 'f0e26131548137dd7fb8522bd6b88536';
 
   Future<void> init() async {
     _mixpanel = await Mixpanel.init(_token, trackAutomaticEvents: true);

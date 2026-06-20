@@ -6,7 +6,7 @@ import 'home_page.dart';
 import 'intro_page.dart';
 import 'preview/preview_cinematic_splash.dart';
 
-// BUILD 26 — version 1.3.5+3 — Full page curriculum, navigation fix, fresh dashboard on first load
+// BUILD 26 — version 1.3.5+4 — Full page curriculum, navigation fix, fresh dashboard on first load
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
 
