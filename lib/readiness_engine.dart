@@ -43,7 +43,6 @@ class ReadinessEngine {
 
     double finalScore;
     if (state.extraCreditPoints == 0.0) {
-      // Assessment only — cap at 88
       finalScore = (score + ec).clamp(0.0, 88.0);
     } else if (score < 85.0) {
       finalScore = (score + ec).clamp(0.0, 80.0);
@@ -59,6 +58,15 @@ class ReadinessEngine {
         finalScore = finalScore < examScore.toDouble()
             ? finalScore
             : examScore.toDouble();
+      }
+    }
+
+    // Trial mode caps
+    if (!state.hasUnlockedApp) {
+      if (!state.hasTakenAssessment) {
+        finalScore = finalScore.clamp(0.0, 49.0);
+      } else {
+        finalScore = finalScore.clamp(0.0, 68.0);
       }
     }
 

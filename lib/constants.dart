@@ -136,7 +136,8 @@ class AppStrings {
 class AppConstants {
   // Exam Engine
   static const int totalQuestions = 90;
-  static const int diagnosticQuestions = 20;
+  static const int diagnosticQuestions = 20; // trial
+  static const int diagnosticQuestionsFull = 40; // paid
   static const int passingScorePercent = 85;
   static const int expertThreshold = 95;
   static const int upgradePromptThreshold = 60;

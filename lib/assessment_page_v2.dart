@@ -46,7 +46,11 @@ class _AssessmentPageV2State extends State<AssessmentPageV2> {
     final all = await QuestionLoader.loadAll(shuffle: false);
     final selected = <QuestionModel>[];
     final usedIds = <String>{};
-    const target = AppConstants.diagnosticQuestions;
+
+    // Trial users get 20 questions, paid users get 40
+    final target = AppState().hasUnlockedApp
+        ? AppConstants.diagnosticQuestionsFull
+        : AppConstants.diagnosticQuestions;
 
     final categoryCounts = <String, int>{};
     int allocated = 0;
@@ -158,6 +162,7 @@ class _AssessmentPageV2State extends State<AssessmentPageV2> {
       properties: {
         'score': result.overallScore,
         'question_count': _questions.length,
+        'is_unlocked': state.hasUnlockedApp,
       },
     );
 
@@ -183,7 +188,8 @@ class _AssessmentPageV2State extends State<AssessmentPageV2> {
 
     AppStatePersistence.save();
 
-    if (result.overallScore >= 95) {
+    // Expert Club only for paid users on full 40-question assessment
+    if (state.hasUnlockedApp && result.overallScore >= 95) {
       final dialogResult = await ExpertClubDialog.show(context, state.userName);
       if (!mounted) return;
       if (dialogResult == ExpertClubResult.takeExam) {
