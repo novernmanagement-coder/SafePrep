@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_analytics/firebase_analytics.dart';
 import 'constants.dart';
 import 'app_state.dart';
 import 'csv_loader.dart';
@@ -25,7 +24,6 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final AppState _state = AppState();
-  final FirebaseAnalytics _analytics = FirebaseAnalytics.instance;
   String _currentFact = '';
   List<MilestoneModel> _milestones = [];
 
@@ -34,46 +32,20 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _loadFacts();
     _loadMilestones();
-    _logHomeViewed();
 
     // Start trial timer for non-unlocked users
     if (!_state.hasUnlockedApp) {
-      TrialTimerService.instance.onTrialExpired = _onTrialExpired;
-      TrialTimerService.instance.start();
-      _logTrialStarted();
+      if (!TrialTimerService.instance.isExpired) {
+        TrialTimerService.instance.onTrialExpired = _onTrialExpired;
+        TrialTimerService.instance.start();
+      } else {
+        _onTrialExpired();
+      }
     }
-  }
-
-  Future<void> _logHomeViewed() async {
-    try {
-      await _analytics.logEvent(
-        name: 'home_viewed',
-        parameters: {'is_unlocked': _state.hasUnlockedApp ? 'true' : 'false'},
-      );
-    } catch (_) {}
-  }
-
-  Future<void> _logTrialStarted() async {
-    try {
-      await _analytics.logEvent(name: 'trial_started');
-    } catch (_) {}
-  }
-
-  Future<void> _logTrialExpired() async {
-    try {
-      await _analytics.logEvent(name: 'trial_expired');
-    } catch (_) {}
-  }
-
-  Future<void> _logCurriculumTapped() async {
-    try {
-      await _analytics.logEvent(name: 'curriculum_tapped');
-    } catch (_) {}
   }
 
   void _onTrialExpired() {
     if (!mounted) return;
-    _logTrialExpired();
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => const PreviewCinematicSplash()),
@@ -944,7 +916,6 @@ class _HomePageState extends State<HomePage> {
                             height: AppSizes.primaryButtonHeight,
                             child: ElevatedButton(
                               onPressed: () {
-                                _logCurriculumTapped();
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
