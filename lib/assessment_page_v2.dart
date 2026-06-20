@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_analytics/firebase_analytics.dart';
 import 'constants.dart';
 import 'home_page.dart';
 import 'dashboard_page.dart';
@@ -18,7 +17,6 @@ class AssessmentPageV2 extends StatefulWidget {
 }
 
 class _AssessmentPageV2State extends State<AssessmentPageV2> {
-  final FirebaseAnalytics _analytics = FirebaseAnalytics.instance;
   List<QuestionModel> _questions = [];
   List<int> _selectedAnswers = [];
   int _currentIndex = 0;
@@ -40,39 +38,7 @@ class _AssessmentPageV2State extends State<AssessmentPageV2> {
   void initState() {
     super.initState();
     _loadQuestions();
-    _logAssessmentStarted();
   }
-
-  // ── Analytics ─────────────────────────────────────────────
-
-  Future<void> _logAssessmentStarted() async {
-    try {
-      await _analytics.logEvent(name: 'assessment_started');
-    } catch (_) {}
-  }
-
-  Future<void> _logAssessmentCompleted(int score) async {
-    try {
-      await _analytics.logEvent(
-        name: 'assessment_completed',
-        parameters: {'score': score, 'question_count': _questions.length},
-      );
-    } catch (_) {}
-  }
-
-  Future<void> _logAssessmentAbandoned() async {
-    try {
-      await _analytics.logEvent(
-        name: 'assessment_abandoned',
-        parameters: {
-          'questions_answered': _currentIndex,
-          'total_questions': _questions.length,
-        },
-      );
-    } catch (_) {}
-  }
-
-  // ─────────────────────────────────────────────────────────
 
   Future<void> _loadQuestions() async {
     final all = await QuestionLoader.loadAll(shuffle: false);
@@ -185,22 +151,16 @@ class _AssessmentPageV2State extends State<AssessmentPageV2> {
       TestType.diagnostic,
     );
 
-    _logAssessmentCompleted(result.overallScore);
-
-    // Save category scores — do NOT call markCategoryStudied here
-    // Curriculum credit only comes from actually studying curriculum content
     for (final kvp in result.categoryScores.entries) {
       state.saveCategoryQuizScore(kvp.key, kvp.value);
     }
 
     state.testHistory.add(result);
 
-    // Award DiagnosticCompleted trophy
     if (!state.earnedTrophyIds.contains('DiagnosticCompleted')) {
       state.addEarnedMilestone('DiagnosticCompleted', 'Optimized Path Chosen');
     }
 
-    // Update readiness score
     state.readinessScore = ReadinessEngine.calculate(state);
     state.readinessCoachMessage = ReadinessEngine.coachMessage(
       state,
@@ -293,20 +253,16 @@ class _AssessmentPageV2State extends State<AssessmentPageV2> {
             child: Column(
               spacing: 12,
               children: [
-                // Header
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       GestureDetector(
-                        onTap: () {
-                          _logAssessmentAbandoned();
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(builder: (_) => const HomePage()),
-                          );
-                        },
+                        onTap: () => Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (_) => const HomePage()),
+                        ),
                         child: Row(
                           children: [
                             Text(
