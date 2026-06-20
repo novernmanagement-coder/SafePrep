@@ -23,7 +23,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   final AppState _state = AppState();
   String _currentFact = '';
   List<MilestoneModel> _milestones = [];
@@ -31,8 +31,14 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadFacts();
     _loadMilestones();
+
+    MixpanelService.instance.track(
+      'session_start',
+      properties: {'is_unlocked': _state.hasUnlockedApp},
+    );
 
     MixpanelService.instance.track(
       'home_viewed',
@@ -48,6 +54,19 @@ class _HomePageState extends State<HomePage> {
       } else {
         _onTrialExpired();
       }
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      MixpanelService.instance.track('session_end');
     }
   }
 
