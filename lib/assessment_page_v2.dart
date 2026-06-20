@@ -8,6 +8,7 @@ import 'app_state_persistence.dart';
 import 'expert_club_dialog.dart';
 import 'final_exam_intro_page.dart';
 import 'readiness_engine.dart';
+import 'mixpanel_service.dart';
 
 class AssessmentPageV2 extends StatefulWidget {
   const AssessmentPageV2({super.key});
@@ -38,6 +39,7 @@ class _AssessmentPageV2State extends State<AssessmentPageV2> {
   void initState() {
     super.initState();
     _loadQuestions();
+    MixpanelService.instance.track('assessment_started');
   }
 
   Future<void> _loadQuestions() async {
@@ -151,6 +153,14 @@ class _AssessmentPageV2State extends State<AssessmentPageV2> {
       TestType.diagnostic,
     );
 
+    MixpanelService.instance.track(
+      'assessment_completed',
+      properties: {
+        'score': result.overallScore,
+        'question_count': _questions.length,
+      },
+    );
+
     for (final kvp in result.categoryScores.entries) {
       state.saveCategoryQuizScore(kvp.key, kvp.value);
     }
@@ -259,10 +269,19 @@ class _AssessmentPageV2State extends State<AssessmentPageV2> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       GestureDetector(
-                        onTap: () => Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (_) => const HomePage()),
-                        ),
+                        onTap: () {
+                          MixpanelService.instance.track(
+                            'assessment_abandoned',
+                            properties: {
+                              'questions_answered': _currentIndex,
+                              'total_questions': _questions.length,
+                            },
+                          );
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(builder: (_) => const HomePage()),
+                          );
+                        },
                         child: Row(
                           children: [
                             Text(

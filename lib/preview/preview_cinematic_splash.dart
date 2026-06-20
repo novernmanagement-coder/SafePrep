@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../iap_service.dart';
 import '../app_state.dart';
 import '../trial_timer_service.dart';
+import '../mixpanel_service.dart';
 import 'preview_assessment_page.dart';
 import '../home_page.dart';
 
@@ -81,6 +82,13 @@ class _PreviewCinematicSplashState extends State<PreviewCinematicSplash>
       curve: Curves.easeOutBack,
     ).drive(Tween(begin: 0.0, end: 1.0));
 
+    MixpanelService.instance.track(
+      'paywall_viewed',
+      properties: {
+        'source': _isReturningUser ? 'trial_expired' : 'fresh_launch',
+      },
+    );
+
     _runSequence();
   }
 
@@ -109,6 +117,10 @@ class _PreviewCinematicSplashState extends State<PreviewCinematicSplash>
   }
 
   Future<void> _onBuy() async {
+    MixpanelService.instance.track(
+      'purchase_initiated',
+      properties: {'tier': 'lifetime'},
+    );
     setState(() {
       _isPurchasing = true;
       _errorMessage = null;
@@ -127,6 +139,10 @@ class _PreviewCinematicSplashState extends State<PreviewCinematicSplash>
     Future.delayed(const Duration(seconds: 1), () async {
       if (!mounted) return;
       if (AppState().hasUnlockedApp) {
+        MixpanelService.instance.track(
+          'purchase_completed',
+          properties: {'tier': tier},
+        );
         await TrialTimerService.instance.resetTrial();
         if (!mounted) return;
         Navigator.pushAndRemoveUntil(
@@ -425,9 +441,14 @@ class _PreviewCinematicSplashState extends State<PreviewCinematicSplash>
           label: '\$4.99  —  7 Days Access',
           sublabel: 'Try it out',
           isHighlighted: false,
+          tier: 'seven_day',
           onTap: _isPurchasing
               ? null
               : () async {
+                  MixpanelService.instance.track(
+                    'purchase_initiated',
+                    properties: {'tier': 'seven_day'},
+                  );
                   setState(() {
                     _isPurchasing = true;
                     _errorMessage = null;
@@ -448,9 +469,14 @@ class _PreviewCinematicSplashState extends State<PreviewCinematicSplash>
           label: '\$8.99  —  14 Days Access',
           sublabel: 'Study deeper',
           isHighlighted: false,
+          tier: 'fourteen_day',
           onTap: _isPurchasing
               ? null
               : () async {
+                  MixpanelService.instance.track(
+                    'purchase_initiated',
+                    properties: {'tier': 'fourteen_day'},
+                  );
                   setState(() {
                     _isPurchasing = true;
                     _errorMessage = null;
@@ -471,6 +497,7 @@ class _PreviewCinematicSplashState extends State<PreviewCinematicSplash>
           label: '\$9.99  —  Lifetime Access',
           sublabel: 'Best value  •  Yours forever  ★',
           isHighlighted: true,
+          tier: 'lifetime',
           onTap: _isPurchasing ? null : _onBuy,
         ),
 
@@ -505,6 +532,7 @@ class _PreviewCinematicSplashState extends State<PreviewCinematicSplash>
     required String label,
     required String sublabel,
     required bool isHighlighted,
+    required String tier,
     required VoidCallback? onTap,
   }) {
     return SizedBox(

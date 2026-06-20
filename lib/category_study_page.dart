@@ -6,6 +6,7 @@ import 'app_state_persistence.dart';
 import 'dashboard_page.dart';
 import 'assessment_info_page.dart';
 import 'category_quiz_page.dart';
+import 'mixpanel_service.dart';
 
 class CategoryStudyPage extends StatefulWidget {
   final String category;
@@ -44,6 +45,14 @@ class _CategoryStudyPageState extends State<CategoryStudyPage> {
       _queue = all;
       _loaded = true;
     });
+    MixpanelService.instance.track(
+      'study_started',
+      properties: {
+        'category': widget.category,
+        'mode': _mode,
+        'card_count': _queue.length,
+      },
+    );
   }
 
   List<String> _buildKeyPoints(CurriculumModel content) {
@@ -65,6 +74,10 @@ class _CategoryStudyPageState extends State<CategoryStudyPage> {
 
   void _goNext() {
     if (_currentIndex == _queue.length - 1) {
+      MixpanelService.instance.track(
+        'study_completed',
+        properties: {'category': widget.category, 'mode': _mode},
+      );
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -411,6 +424,27 @@ class _CategoryStudyPageState extends State<CategoryStudyPage> {
                 height: AppSizes.primaryButtonHeight,
                 child: ElevatedButton(
                   onPressed: () {
+                    final allCardsViewed =
+                        _queue.isEmpty || _currentIndex >= _queue.length - 1;
+                    if (allCardsViewed) {
+                      MixpanelService.instance.track(
+                        'study_completed',
+                        properties: {
+                          'category': widget.category,
+                          'mode': _mode,
+                        },
+                      );
+                    } else {
+                      MixpanelService.instance.track(
+                        'study_abandoned',
+                        properties: {
+                          'category': widget.category,
+                          'mode': _mode,
+                          'cards_viewed': _currentIndex,
+                          'total_cards': _queue.length,
+                        },
+                      );
+                    }
                     _state.markCategoryStudied(widget.category);
                     AppStatePersistence.save();
                     Navigator.pushReplacement(

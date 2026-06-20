@@ -14,6 +14,7 @@ import 'final_exam_intro_page.dart';
 import 'peace_of_mind_page.dart';
 import 'trial_timer_service.dart';
 import 'preview/preview_cinematic_splash.dart';
+import 'mixpanel_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -33,8 +34,14 @@ class _HomePageState extends State<HomePage> {
     _loadFacts();
     _loadMilestones();
 
+    MixpanelService.instance.track(
+      'home_viewed',
+      properties: {'is_unlocked': _state.hasUnlockedApp},
+    );
+
     // Start trial timer for non-unlocked users
     if (!_state.hasUnlockedApp) {
+      MixpanelService.instance.track('trial_started');
       if (!TrialTimerService.instance.isExpired) {
         TrialTimerService.instance.onTrialExpired = _onTrialExpired;
         TrialTimerService.instance.start();
@@ -45,6 +52,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _onTrialExpired() {
+    MixpanelService.instance.track('trial_expired');
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
@@ -916,6 +924,9 @@ class _HomePageState extends State<HomePage> {
                             height: AppSizes.primaryButtonHeight,
                             child: ElevatedButton(
                               onPressed: () {
+                                MixpanelService.instance.track(
+                                  'curriculum_tapped',
+                                );
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
