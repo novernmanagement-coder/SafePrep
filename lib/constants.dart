@@ -136,19 +136,19 @@ class AppStrings {
 class AppConstants {
   // Exam Engine
   static const int totalQuestions = 90;
-  static const int diagnosticQuestions = 40;
+  static const int diagnosticQuestions = 20;
   static const int passingScorePercent = 85;
   static const int expertThreshold = 95;
   static const int upgradePromptThreshold = 60;
   static const int maxAttempts = 3;
   static const int questionBatchSize = 5;
   // Quiz Difficulty Weights
-static const double quizHardRatioRecovery = 0.20;
-static const double quizMediumRatioRecovery = 0.40;
-static const double quizHardRatioAssessment = 0.40;
-static const double quizMediumRatioAssessment = 0.40;
-static const double quizHardRatioStandard = 0.50;
-static const double quizMediumRatioStandard = 0.30;
+  static const double quizHardRatioRecovery = 0.20;
+  static const double quizMediumRatioRecovery = 0.40;
+  static const double quizHardRatioAssessment = 0.40;
+  static const double quizMediumRatioAssessment = 0.40;
+  static const double quizHardRatioStandard = 0.50;
+  static const double quizMediumRatioStandard = 0.30;
 
   // Animations
   static const int skipButtonDelayMs = 10000;
