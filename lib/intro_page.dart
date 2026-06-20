@@ -61,10 +61,10 @@ class _IntroductoryPageState extends State<IntroductoryPage>
     _saveName();
     Future.delayed(const Duration(milliseconds: 100), () {
       if (!mounted) return;
-      Navigator.of(
-        context,
-        rootNavigator: true,
-      ).pushReplacement(MaterialPageRoute(builder: (_) => const HomePage()));
+      Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const HomePage()),
+        (route) => false,
+      );
     });
   }
 
