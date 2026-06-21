@@ -1031,14 +1031,58 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           ),
                         ),
                       ),
-                      _buildButton(
-                        'When ready — take the SafePrep exam',
-                        () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const FinalExamIntroPage(),
-                          ),
-                        ),
+                      Builder(
+                        builder: (context) {
+                          final isLocked =
+                              !_state.hasUnlockedApp &&
+                              _state.readinessScore < 100;
+                          return Column(
+                            spacing: 2,
+                            children: [
+                              SizedBox(
+                                width: double.infinity,
+                                height: AppSizes.primaryButtonHeight,
+                                child: ElevatedButton(
+                                  onPressed: isLocked
+                                      ? null
+                                      : () => Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                const FinalExamIntroPage(),
+                                          ),
+                                        ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: isLocked
+                                        ? AppColors.disabledButton
+                                        : AppColors.primaryButton,
+                                    foregroundColor: isLocked
+                                        ? AppColors.disabledButtonForeground
+                                        : Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(
+                                        AppSizes.buttonCornerRadius,
+                                      ),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'When ready — take the SafePrep exam',
+                                    style: TextStyle(fontSize: AppFonts.button),
+                                  ),
+                                ),
+                              ),
+                              if (isLocked)
+                                Text(
+                                  'Available at 100% readiness',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.subtleText,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
                       ),
                       _buildButton(
                         'Settings and information',
