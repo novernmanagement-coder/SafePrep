@@ -15,6 +15,7 @@ import 'peace_of_mind_page.dart';
 import 'trial_timer_service.dart';
 import 'preview/preview_cinematic_splash.dart';
 import 'mixpanel_service.dart';
+import 'preview/preview_reveal_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
