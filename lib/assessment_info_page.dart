@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'constants.dart';
 import 'home_page.dart';
 import 'csv_loader.dart';
+import 'app_state.dart';
 import 'assessment_page_v2.dart';
 
 class AssessmentInfoPage extends StatefulWidget {
@@ -29,6 +30,10 @@ class _AssessmentInfoPageState extends State<AssessmentInfoPage> {
 
   @override
   Widget build(BuildContext context) {
+    final questionCount = AppState().hasUnlockedApp
+        ? AppConstants.diagnosticQuestionsFull
+        : AppConstants.diagnosticQuestions;
+
     return Scaffold(
       backgroundColor: AppColors.servSafeBlue,
       body: SafeArea(
@@ -36,7 +41,6 @@ class _AssessmentInfoPageState extends State<AssessmentInfoPage> {
           padding: AppSizes.pageMargin,
           child: Column(
             children: [
-              // Header
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Row(
@@ -79,7 +83,6 @@ class _AssessmentInfoPageState extends State<AssessmentInfoPage> {
                 ),
               ),
 
-              // Ticker
               Container(
                 height: 32,
                 margin: const EdgeInsets.only(bottom: 8),
@@ -103,7 +106,6 @@ class _AssessmentInfoPageState extends State<AssessmentInfoPage> {
                 ),
               ),
 
-              // Main content
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -120,7 +122,7 @@ class _AssessmentInfoPageState extends State<AssessmentInfoPage> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Text(
-                        'This assessment contains 40 questions. You may go back and change your answers before submitting.',
+                        'This assessment contains $questionCount questions. You may go back and change your answers before submitting.',
                         style: TextStyle(
                           fontSize: 14,
                           color: AppColors.bodyText,
@@ -154,7 +156,6 @@ class _AssessmentInfoPageState extends State<AssessmentInfoPage> {
                 ),
               ),
 
-              // Footer
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Column(

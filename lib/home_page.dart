@@ -45,7 +45,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       properties: {'is_unlocked': _state.hasUnlockedApp},
     );
 
-    // Start trial timer for non-unlocked users
     if (!_state.hasUnlockedApp) {
       MixpanelService.instance.track('trial_started');
       if (!TrialTimerService.instance.isExpired) {
@@ -658,6 +657,47 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
+  Widget _buildTrialUnlockBanner() {
+    if (_state.hasUnlockedApp) return const SizedBox();
+    return GestureDetector(
+      onTap: () {
+        MixpanelService.instance.track(
+          'paywall_viewed',
+          properties: {'source': 'home_page_banner'},
+        );
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const PreviewCinematicSplash()),
+          (route) => false,
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0A0A0F),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFD4AF37), width: 1.5),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Text('⭐', style: TextStyle(fontSize: 14)),
+            SizedBox(width: 8),
+            Text(
+              'Unlock Full Access — starting at \$4.99',
+              style: TextStyle(
+                color: Color(0xFFD4AF37),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildTrophySection() {
     if (_milestones.isEmpty) return const SizedBox();
 
@@ -1102,6 +1142,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           ),
                         ],
                       ),
+                      _buildTrialUnlockBanner(),
                       _buildTrophySection(),
                       _buildFooterSection(),
                     ],
