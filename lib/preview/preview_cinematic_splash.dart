@@ -5,6 +5,7 @@ import '../trial_timer_service.dart';
 import '../mixpanel_service.dart';
 import 'preview_assessment_page.dart';
 import '../home_page.dart';
+import 'preview_reveal_page.dart';
 
 class PreviewCinematicSplash extends StatefulWidget {
   const PreviewCinematicSplash({super.key});
