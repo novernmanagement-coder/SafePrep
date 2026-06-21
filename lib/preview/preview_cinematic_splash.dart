@@ -161,7 +161,7 @@ class _PreviewCinematicSplashState extends State<PreviewCinematicSplash>
     state.reset();
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => const PreviewCinematicSplash()),
+      MaterialPageRoute(builder: (_) => PreviewRevealPage()),
     );
   }
 
