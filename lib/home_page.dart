@@ -667,7 +667,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         );
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => const PreviewRevealPage()),
+          MaterialPageRoute(builder: (_) => PreviewRevealPage()),
           (route) => false,
         );
       },
