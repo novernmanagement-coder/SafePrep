@@ -291,7 +291,7 @@ class QuestionLoader {
 
     for (int i = 1; i < lines.length; i++) {
       final parts = splitCsvLine(lines[i]);
-      if (parts.length != 13) continue;
+      if (parts.length < 13) continue;
 
       int correctAnswer = 0;
       final parsed = int.tryParse(parts[7]);
