@@ -78,7 +78,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _openRefundPage() async {
     final uri = Uri.parse('https://foodsafetymadeeasy.com/safeprep-guarantee/');
-    if (await canLaunchUrl(uri)) {
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       await launchUrl(uri, mode: LaunchMode.inAppWebView);
     }
   }
@@ -171,7 +171,6 @@ class _SettingsPageState extends State<SettingsPage> {
       body: SafeArea(
         child: Column(
           children: [
-            // Header
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Row(
@@ -210,18 +209,16 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
 
-            // Body
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Column(
                   spacing: 10,
                   children: [
-                    // About
                     _buildSectionCard(
                       title: 'About SafePrep™',
                       children: [
-                        _buildInfoRow('Version', '1.3.6'),
+                        _buildInfoRow('Version', '1.3.7'),
                         _buildInfoRow('Build', 'June 2026'),
                         _buildInfoRow('Platform', 'Flutter'),
                         const SizedBox(height: 4),
@@ -235,7 +232,6 @@ class _SettingsPageState extends State<SettingsPage> {
                       ],
                     ),
 
-                    // Reset Options
                     _buildSectionCard(
                       title: 'Reset Options',
                       children: [
@@ -328,7 +324,6 @@ class _SettingsPageState extends State<SettingsPage> {
                       ],
                     ),
 
-                    // Tips
                     _buildSectionCard(
                       title: 'Tips and Information',
                       children: [
@@ -363,7 +358,6 @@ class _SettingsPageState extends State<SettingsPage> {
                       ],
                     ),
 
-                    // Contact
                     _buildSectionCard(
                       title: 'Contact & Support',
                       children: [
@@ -398,7 +392,6 @@ class _SettingsPageState extends State<SettingsPage> {
                       ],
                     ),
 
-                    // Legal
                     _buildSectionCard(
                       title: 'Legal & Compliance',
                       children: [
@@ -499,7 +492,6 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
 
-            // Nav Bar
             const SafePrepNavBar(),
           ],
         ),
