@@ -79,7 +79,7 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _openRefundPage() async {
     final uri = Uri.parse('https://foodsafetymadeeasy.com/safeprep-guarantee/');
     if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      await launchUrl(uri, mode: LaunchMode.inAppWebView);
     }
   }
 
