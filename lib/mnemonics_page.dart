@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'constants.dart';
 import 'peace_of_mind_page.dart';
+import 'safe_prep_nav_bar.dart';
 
 class MnemonicsPage extends StatelessWidget {
   const MnemonicsPage({super.key});
@@ -112,7 +113,7 @@ class MnemonicsPage extends StatelessWidget {
           children: [
             _buildHeader(context),
             Expanded(child: _buildCardsList()),
-            _buildFooter(),
+            const SafePrepNavBar(),
           ],
         ),
       ),
@@ -127,38 +128,55 @@ class MnemonicsPage extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text('Safe',
-                  style: TextStyle(
-                      fontSize: AppFonts.header,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.bodyText)),
-              const SizedBox(width: 6),
-              GestureDetector(
-                onTap: () => Navigator.pushReplacement(context,
-                    MaterialPageRoute(
-                        builder: (_) => const PeaceOfMindPage())),
-                child: Image.asset('Assets/splash.png',
-                    width: 36, height: 36, fit: BoxFit.contain),
+              const Text(
+                'Safe',
+                style: TextStyle(
+                  fontSize: AppFonts.header,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.bodyText,
+                ),
               ),
               const SizedBox(width: 6),
-              const Text('Prep™',
-                  style: TextStyle(
-                      fontSize: AppFonts.header,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.bodyText)),
+              GestureDetector(
+                onTap: () => Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PeaceOfMindPage()),
+                ),
+                child: Image.asset(
+                  'Assets/splash.png',
+                  width: 36,
+                  height: 36,
+                  fit: BoxFit.contain,
+                ),
+              ),
+              const SizedBox(width: 6),
+              const Text(
+                'Prep™',
+                style: TextStyle(
+                  fontSize: AppFonts.header,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.bodyText,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 4),
-          const Text('🧠 Mnemonics',
-              style: TextStyle(
-                  fontSize: AppFonts.header,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.strongText)),
+          const Text(
+            '🧠 Mnemonics',
+            style: TextStyle(
+              fontSize: AppFonts.header,
+              fontWeight: FontWeight.bold,
+              color: AppColors.strongText,
+            ),
+          ),
           const SizedBox(height: 2),
-          const Text('Pathogen acronyms from forty years of instruction',
-              style: TextStyle(
-                  fontSize: AppFonts.caption,
-                  color: AppColors.subtleText)),
+          const Text(
+            'Pathogen acronyms from forty years of instruction',
+            style: TextStyle(
+              fontSize: AppFonts.caption,
+              color: AppColors.subtleText,
+            ),
+          ),
         ],
       ),
     );
@@ -185,12 +203,15 @@ class MnemonicsPage extends StatelessWidget {
   Widget _buildSectionHeader(String type) {
     return Padding(
       padding: const EdgeInsets.only(top: 8),
-      child: Text(type.toUpperCase(),
-          style: const TextStyle(
-              fontSize: AppFonts.caption,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF888888),
-              letterSpacing: 2)),
+      child: Text(
+        type.toUpperCase(),
+        style: const TextStyle(
+          fontSize: AppFonts.caption,
+          fontWeight: FontWeight.bold,
+          color: Color(0xFF888888),
+          letterSpacing: 2,
+        ),
+      ),
     );
   }
 
@@ -202,20 +223,24 @@ class MnemonicsPage extends StatelessWidget {
         border: Border(top: BorderSide(color: m.color, width: 4)),
         boxShadow: const [
           BoxShadow(
-              color: Color(0x18000000),
-              blurRadius: 8,
-              offset: Offset(0, 2)),
+            color: Color(0x18000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
         ],
       ),
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(m.name,
-              style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: m.color)),
+          Text(
+            m.name,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: m.color,
+            ),
+          ),
           const SizedBox(height: 12),
           const Divider(color: Color(0xFFEEEEEE), height: 1),
           const SizedBox(height: 8),
@@ -240,42 +265,27 @@ class MnemonicsPage extends StatelessWidget {
               borderRadius: BorderRadius.circular(6),
             ),
             alignment: Alignment.center,
-            child: Text(letter,
-                style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white)),
+            child: Text(
+              letter,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
           ),
           Expanded(
             child: Padding(
               padding: const EdgeInsets.only(top: 4),
-              child: Text(phrase,
-                  style: const TextStyle(
-                      fontSize: AppFonts.body,
-                      color: Color(0xFF1A1A1A))),
+              child: Text(
+                phrase,
+                style: const TextStyle(
+                  fontSize: AppFonts.body,
+                  color: Color(0xFF1A1A1A),
+                ),
+              ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFooter() {
-    return const Padding(
-      padding: EdgeInsets.fromLTRB(0, 6, 0, 8),
-      child: Column(
-        children: [
-          Text(AppStrings.footerLine1,
-              style: TextStyle(
-                  fontSize: AppFonts.footer, color: AppColors.footerText)),
-          SizedBox(height: AppSizes.footerSpacing),
-          Text(AppStrings.footerLine2,
-              style: TextStyle(
-                  fontSize: AppFonts.footer, color: AppColors.footerText)),
-          SizedBox(height: AppSizes.footerSpacing),
-          Text(AppStrings.footerLine3,
-              style: TextStyle(
-                  fontSize: AppFonts.footer, color: AppColors.starMotifBlue)),
         ],
       ),
     );

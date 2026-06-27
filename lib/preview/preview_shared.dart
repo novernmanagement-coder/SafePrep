@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../constants.dart';
+import '../safe_prep_nav_bar.dart';
 
 // ─────────────────────────────────────────────────────────────
 // SHARED: Middle Marquee — typewriter then scrolls if overflow
@@ -245,40 +246,8 @@ Widget buildPreviewHeader() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// SHARED: Standard Footer
+// SHARED: Standard Footer — now a nav bar
 // ─────────────────────────────────────────────────────────────
-Widget buildPreviewFooter() {
-  return Padding(
-    padding: const EdgeInsets.symmetric(vertical: 8),
-    child: Column(
-      children: [
-        Text(
-          AppStrings.footerLine1,
-          style: TextStyle(
-            fontSize: AppFonts.footer,
-            color: AppColors.footerText,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 2),
-        Text(
-          AppStrings.footerLine2,
-          style: TextStyle(
-            fontSize: AppFonts.footer,
-            color: AppColors.footerText,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 2),
-        Text(
-          AppStrings.footerLine3,
-          style: TextStyle(
-            fontSize: AppFonts.footer,
-            color: AppColors.starMotifBlue,
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ],
-    ),
-  );
+Widget buildPreviewFooter(BuildContext context) {
+  return const SafePrepNavBar();
 }

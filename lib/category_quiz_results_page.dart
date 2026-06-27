@@ -9,6 +9,7 @@ import 'category_study_page.dart';
 import 'category_quiz_page.dart';
 import 'readiness_engine.dart';
 import 'recomputing_modal.dart';
+import 'safe_prep_nav_bar.dart';
 
 class CategoryQuizResultsPage extends StatefulWidget {
   final String category;
@@ -59,10 +60,7 @@ class _CategoryQuizResultsPageState extends State<CategoryQuizResultsPage> {
         : (widget.correctCount * 100) ~/ widget.totalCount;
     _state.saveCategoryQuizScore(widget.category, percent);
     _state.incrementCategoryQuizAttempts(widget.category);
-    // Note: markCategoryStudied is NOT called here
-    // Curriculum credit only comes from visiting the curriculum study page
 
-    // Update readiness score
     _state.readinessScore = ReadinessEngine.calculate(_state);
     _state.readinessCoachMessage = ReadinessEngine.coachMessage(
       _state,
@@ -102,225 +100,205 @@ class _CategoryQuizResultsPageState extends State<CategoryQuizResultsPage> {
     return Scaffold(
       backgroundColor: AppColors.servSafeBlue,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: AppSizes.pageMargin,
-          child: Column(
-            spacing: 12,
-            children: [
-              // Header
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: AppSizes.pageMargin,
+                child: Column(
+                  spacing: 12,
                   children: [
-                    GestureDetector(
-                      onTap: () => Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (_) => const HomePage()),
-                      ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
                       child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(
-                            'Safe',
-                            style: TextStyle(
-                              fontSize: AppFonts.header,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.bodyText,
+                          GestureDetector(
+                            onTap: () => Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const HomePage(),
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 6),
-                          Image.asset(
-                            'Assets/splash.png',
-                            width: 36,
-                            height: 36,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Prep™',
-                            style: TextStyle(
-                              fontSize: AppFonts.header,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.bodyText,
+                            child: Row(
+                              children: [
+                                Text(
+                                  'Safe',
+                                  style: TextStyle(
+                                    fontSize: AppFonts.header,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.bodyText,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Image.asset(
+                                  'Assets/splash.png',
+                                  width: 36,
+                                  height: 36,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Prep™',
+                                  style: TextStyle(
+                                    fontSize: AppFonts.header,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.bodyText,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ],
-                ),
-              ),
 
-              Text(
-                widget.category,
-                style: TextStyle(
-                  fontSize: AppFonts.header,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.bodyText,
-                ),
-                textAlign: TextAlign.center,
-              ),
-
-              if (_tickerFacts.isNotEmpty)
-                Container(
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF5F0E8),
-                    border: Border.all(color: const Color(0xFFC8B89A)),
-                    borderRadius: BorderRadius.circular(6),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x22000000),
-                        blurRadius: 4,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: Marquee(text: _tickerFacts),
-                  ),
-                ),
-
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: AppColors.cardBackground,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.cardBorder),
-                ),
-                child: Column(
-                  spacing: 8,
-                  children: [
                     Text(
-                      '${widget.correctCount}/${widget.totalCount}',
+                      widget.category,
                       style: TextStyle(
-                        fontSize: 48,
-                        fontWeight: FontWeight.bold,
-                        color: scoreColor,
+                        fontSize: AppFonts.header,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.bodyText,
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    Text(
-                      '$percent%',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.subtleText,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    Text(
-                      _scoreMessage(percent),
-                      style: TextStyle(fontSize: 13, color: AppColors.bodyText),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
 
-              SizedBox(
-                width: double.infinity,
-                height: AppSizes.primaryButtonHeight,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          CategoryStudyPage(category: widget.category),
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryButton,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(
-                        AppSizes.buttonCornerRadius,
+                    if (_tickerFacts.isNotEmpty)
+                      Container(
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF5F0E8),
+                          border: Border.all(color: const Color(0xFFC8B89A)),
+                          borderRadius: BorderRadius.circular(6),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x22000000),
+                              blurRadius: 4,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: Marquee(text: _tickerFacts),
+                        ),
                       ),
-                    ),
-                  ),
-                  child: const Text('Study this category again'),
-                ),
-              ),
 
-              SizedBox(
-                width: double.infinity,
-                height: AppSizes.primaryButtonHeight,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          CategoryQuizPage(category: widget.category),
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryButton,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(
-                        AppSizes.buttonCornerRadius,
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: AppColors.cardBackground,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.cardBorder),
+                      ),
+                      child: Column(
+                        spacing: 8,
+                        children: [
+                          Text(
+                            '${widget.correctCount}/${widget.totalCount}',
+                            style: TextStyle(
+                              fontSize: 48,
+                              fontWeight: FontWeight.bold,
+                              color: scoreColor,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          Text(
+                            '$percent%',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.subtleText,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          Text(
+                            _scoreMessage(percent),
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.bodyText,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                  child: const Text('Retake Quiz'),
-                ),
-              ),
 
-              SizedBox(
-                width: double.infinity,
-                height: AppSizes.primaryButtonHeight,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (_) => const DashboardPage()),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryButton,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(
-                        AppSizes.buttonCornerRadius,
+                    SizedBox(
+                      width: double.infinity,
+                      height: AppSizes.primaryButtonHeight,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                CategoryStudyPage(category: widget.category),
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryButton,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              AppSizes.buttonCornerRadius,
+                            ),
+                          ),
+                        ),
+                        child: const Text('Study this category again'),
                       ),
                     ),
-                  ),
-                  child: const Text('Back to Dashboard'),
-                ),
-              ),
 
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Column(
-                  spacing: AppSizes.footerSpacing,
-                  children: [
-                    Text(
-                      AppStrings.footerLine1,
-                      style: TextStyle(
-                        fontSize: AppFonts.footer,
-                        color: AppColors.footerText,
+                    SizedBox(
+                      width: double.infinity,
+                      height: AppSizes.primaryButtonHeight,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                CategoryQuizPage(category: widget.category),
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryButton,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              AppSizes.buttonCornerRadius,
+                            ),
+                          ),
+                        ),
+                        child: const Text('Retake Quiz'),
                       ),
-                      textAlign: TextAlign.center,
                     ),
-                    Text(
-                      AppStrings.footerLine2,
-                      style: TextStyle(
-                        fontSize: AppFonts.footer,
-                        color: AppColors.footerText,
+
+                    SizedBox(
+                      width: double.infinity,
+                      height: AppSizes.primaryButtonHeight,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const DashboardPage(),
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryButton,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              AppSizes.buttonCornerRadius,
+                            ),
+                          ),
+                        ),
+                        child: const Text('Back to Dashboard'),
                       ),
-                      textAlign: TextAlign.center,
-                    ),
-                    Text(
-                      AppStrings.footerLine3,
-                      style: TextStyle(
-                        fontSize: AppFonts.footer,
-                        color: AppColors.starMotifBlue,
-                      ),
-                      textAlign: TextAlign.center,
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+            const SafePrepNavBar(),
+          ],
         ),
       ),
     );

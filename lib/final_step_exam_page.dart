@@ -6,6 +6,7 @@ import 'app_state_persistence.dart';
 import 'home_page.dart';
 import 'final_exam_grade_page.dart';
 import 'final_exam_review_page.dart';
+import 'safe_prep_nav_bar.dart';
 
 class FinalStepExamPage extends StatefulWidget {
   const FinalStepExamPage({super.key});
@@ -52,8 +53,10 @@ class _FinalStepExamPageState extends State<FinalStepExamPage> {
     int allocated = 0;
 
     for (final cat in categoryWeights.keys) {
-      final count = ((categoryWeights[cat]! * totalQuestions).round())
-          .clamp(1, totalQuestions);
+      final count = ((categoryWeights[cat]! * totalQuestions).round()).clamp(
+        1,
+        totalQuestions,
+      );
       categoryCounts[cat] = count;
       allocated += count;
     }
@@ -72,13 +75,14 @@ class _FinalStepExamPageState extends State<FinalStepExamPage> {
     for (final cat in categoryWeights.keys) {
       final needed = categoryCounts[cat]!;
       final pool = all
-          .where((q) =>
-              (q.category.toLowerCase() == cat.toLowerCase() ||
-                  (cat == 'Food Safety Management' &&
-                      q.category.toLowerCase() == 'pest management')) &&
-              !usedIds.contains(q.id))
+          .where(
+            (q) =>
+                (q.category.toLowerCase() == cat.toLowerCase() ||
+                    (cat == 'Food Safety Management' &&
+                        q.category.toLowerCase() == 'pest management')) &&
+                !usedIds.contains(q.id),
+          )
           .toList();
-
       pool.shuffle();
 
       final mustInclude = pool.where((q) => q.mustInclude == 1).toList()
@@ -108,10 +112,9 @@ class _FinalStepExamPageState extends State<FinalStepExamPage> {
       ];
 
       if (fill.length < remaining) {
-        final fallback = rest
-            .where((q) => !fill.any((f) => f.id == q.id))
-            .toList()
-          ..shuffle();
+        final fallback =
+            rest.where((q) => !fill.any((f) => f.id == q.id)).toList()
+              ..shuffle();
         fill.addAll(fallback.take(remaining - fill.length));
       }
 
@@ -123,8 +126,6 @@ class _FinalStepExamPageState extends State<FinalStepExamPage> {
     }
 
     selected.shuffle();
-
-    // Randomize answer positions for each question (anti-muscle-memory)
     final shuffled = selected.map((q) => q.shuffled()).toList();
 
     setState(() {
@@ -134,9 +135,8 @@ class _FinalStepExamPageState extends State<FinalStepExamPage> {
     });
   }
 
-  void _selectAnswer(int index) {
-    setState(() => _selectedAnswers[_currentIndex] = index);
-  }
+  void _selectAnswer(int index) =>
+      setState(() => _selectedAnswers[_currentIndex] = index);
 
   void _goNext() {
     if (_selectedAnswers[_currentIndex] == -1) return;
@@ -160,16 +160,14 @@ class _FinalStepExamPageState extends State<FinalStepExamPage> {
 
     for (final entry in result.categoryScores.entries) {
       _state.saveCategoryQuizScore(entry.key, entry.value);
-      if (entry.value >= AppState.masteryThreshold) {
+      if (entry.value >= AppState.masteryThreshold)
         _state.markCategoryStudied(entry.key);
-      }
     }
 
     final missedIds = <String>[];
     for (int i = 0; i < _questions.length; i++) {
-      if (_selectedAnswers[i] != _questions[i].correctAnswer) {
+      if (_selectedAnswers[i] != _questions[i].correctAnswer)
         missedIds.add(_questions[i].id);
-      }
     }
 
     _state.missedFinalExamQuestionIds = missedIds;
@@ -177,8 +175,9 @@ class _FinalStepExamPageState extends State<FinalStepExamPage> {
     AppStatePersistence.save();
 
     if (missedIds.isNotEmpty) {
-      final missedQuestions =
-          _questions.where((q) => missedIds.contains(q.id)).toList();
+      final missedQuestions = _questions
+          .where((q) => missedIds.contains(q.id))
+          .toList();
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -191,8 +190,7 @@ class _FinalStepExamPageState extends State<FinalStepExamPage> {
     } else {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(
-            builder: (_) => FinalExamGradePage(result: result)),
+        MaterialPageRoute(builder: (_) => FinalExamGradePage(result: result)),
       );
     }
   }
@@ -204,15 +202,16 @@ class _FinalStepExamPageState extends State<FinalStepExamPage> {
       child: ElevatedButton(
         onPressed: () => _selectAnswer(index),
         style: ElevatedButton.styleFrom(
-          backgroundColor:
-              isSelected ? AppColors.selectedAnswer : AppColors.primaryButton,
-          foregroundColor:
-              isSelected ? AppColors.selectedAnswerForeground : Colors.white,
+          backgroundColor: isSelected
+              ? AppColors.selectedAnswer
+              : AppColors.primaryButton,
+          foregroundColor: isSelected
+              ? AppColors.selectedAnswerForeground
+              : Colors.white,
           alignment: Alignment.centerLeft,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           shape: RoundedRectangleBorder(
-            borderRadius:
-                BorderRadius.circular(AppSizes.buttonCornerRadius),
+            borderRadius: BorderRadius.circular(AppSizes.buttonCornerRadius),
             side: BorderSide(
               color: isSelected
                   ? AppColors.selectedAnswerBorder
@@ -220,27 +219,24 @@ class _FinalStepExamPageState extends State<FinalStepExamPage> {
             ),
           ),
         ),
-        child: Text(text,
-            style: const TextStyle(fontSize: AppFonts.body),
-            textAlign: TextAlign.left),
+        child: Text(
+          text,
+          style: const TextStyle(fontSize: AppFonts.body),
+          textAlign: TextAlign.left,
+        ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_loaded) {
+    if (!_loaded)
       return const Scaffold(
         backgroundColor: Color(0xFFE3F0F9),
         body: Center(child: CircularProgressIndicator()),
       );
-    }
-
-    if (_questions.isEmpty) {
-      return const Scaffold(
-        body: Center(child: Text('No questions found.')),
-      );
-    }
+    if (_questions.isEmpty)
+      return const Scaffold(body: Center(child: Text('No questions found.')));
 
     final q = _questions[_currentIndex];
     final hasSelected = _selectedAnswers[_currentIndex] != -1;
@@ -249,167 +245,159 @@ class _FinalStepExamPageState extends State<FinalStepExamPage> {
     return Scaffold(
       backgroundColor: AppColors.servSafeBlue,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: AppSizes.pageMargin,
-          child: Column(
-            spacing: 10,
-            children: [
-              // Header
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: AppSizes.pageMargin,
+                child: Column(
+                  spacing: 10,
                   children: [
-                    GestureDetector(
-                      onTap: () => Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const HomePage()),
-                      ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
                       child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text('Safe',
-                              style: TextStyle(
-                                fontSize: AppFonts.header,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.bodyText,
-                              )),
-                          const SizedBox(width: 6),
-                          Image.asset('Assets/splash.png',
-                              width: 36, height: 36),
-                          const SizedBox(width: 6),
-                          Text('Prep™',
-                              style: TextStyle(
-                                fontSize: AppFonts.header,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.bodyText,
-                              )),
+                          GestureDetector(
+                            onTap: () => Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const HomePage(),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Text(
+                                  'Safe',
+                                  style: TextStyle(
+                                    fontSize: AppFonts.header,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.bodyText,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Image.asset(
+                                  'Assets/splash.png',
+                                  width: 36,
+                                  height: 36,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Prep™',
+                                  style: TextStyle(
+                                    fontSize: AppFonts.header,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.bodyText,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ),
+
+                    Text(
+                      'SafePrep™ Final Exam',
+                      style: TextStyle(
+                        fontSize: AppFonts.header,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.bodyText,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    Text(
+                      'Question ${_currentIndex + 1} of ${_questions.length}',
+                      style: TextStyle(
+                        fontSize: AppFonts.subheader,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.bodyText,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+
+                    Container(
+                      width: double.infinity,
+                      padding: AppSizes.cardPadding,
+                      decoration: BoxDecoration(
+                        color: AppColors.cardBackground,
+                        borderRadius: BorderRadius.circular(
+                          AppSizes.cardCornerRadius,
+                        ),
+                        border: Border.all(color: AppColors.cardBorder),
+                      ),
+                      child: Text(
+                        q.questionText,
+                        style: const TextStyle(
+                          fontSize: AppFonts.question,
+                          fontWeight: FontWeight.bold,
+                          fontStyle: FontStyle.italic,
+                          color: AppColors.strongText,
+                        ),
+                      ),
+                    ),
+
+                    Column(
+                      spacing: 8,
+                      children: [
+                        _buildAnswerButton(0, q.answer1),
+                        _buildAnswerButton(1, q.answer2),
+                        _buildAnswerButton(2, q.answer3),
+                        _buildAnswerButton(3, q.answer4),
+                      ],
+                    ),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SizedBox(
+                            height: AppSizes.primaryButtonHeight,
+                            child: ElevatedButton(
+                              onPressed: _currentIndex > 0 ? _goPrevious : null,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primaryButton,
+                                foregroundColor: Colors.white,
+                                disabledBackgroundColor:
+                                    AppColors.disabledButton,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    AppSizes.buttonCornerRadius,
+                                  ),
+                                ),
+                              ),
+                              child: const Text('Back'),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: SizedBox(
+                            height: AppSizes.primaryButtonHeight,
+                            child: ElevatedButton(
+                              onPressed: hasSelected ? _goNext : null,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primaryButton,
+                                foregroundColor: Colors.white,
+                                disabledBackgroundColor:
+                                    AppColors.disabledButton,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    AppSizes.buttonCornerRadius,
+                                  ),
+                                ),
+                              ),
+                              child: Text(isLast ? 'Finish' : 'Next'),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
-
-              Text('SafePrep™ Final Exam',
-                  style: TextStyle(
-                    fontSize: AppFonts.header,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.bodyText,
-                  ),
-                  textAlign: TextAlign.center),
-
-              Text(
-                'Question ${_currentIndex + 1} of ${_questions.length}',
-                style: TextStyle(
-                  fontSize: AppFonts.subheader,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.bodyText,
-                ),
-                textAlign: TextAlign.center,
-              ),
-
-              // Question box
-              Container(
-                width: double.infinity,
-                padding: AppSizes.cardPadding,
-                decoration: BoxDecoration(
-                  color: AppColors.cardBackground,
-                  borderRadius:
-                      BorderRadius.circular(AppSizes.cardCornerRadius),
-                  border: Border.all(color: AppColors.cardBorder),
-                ),
-                child: Text(
-                  q.questionText,
-                  style: const TextStyle(
-                    fontSize: AppFonts.question,
-                    fontWeight: FontWeight.bold,
-                    fontStyle: FontStyle.italic,
-                    color: AppColors.strongText,
-                  ),
-                ),
-              ),
-
-              // Answer buttons
-              Column(
-                spacing: 8,
-                children: [
-                  _buildAnswerButton(0, q.answer1),
-                  _buildAnswerButton(1, q.answer2),
-                  _buildAnswerButton(2, q.answer3),
-                  _buildAnswerButton(3, q.answer4),
-                ],
-              ),
-
-              // Nav buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: SizedBox(
-                      height: AppSizes.primaryButtonHeight,
-                      child: ElevatedButton(
-                        onPressed: _currentIndex > 0 ? _goPrevious : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primaryButton,
-                          foregroundColor: Colors.white,
-                          disabledBackgroundColor: AppColors.disabledButton,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(
-                                AppSizes.buttonCornerRadius),
-                          ),
-                        ),
-                        child: const Text('Back'),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: SizedBox(
-                      height: AppSizes.primaryButtonHeight,
-                      child: ElevatedButton(
-                        onPressed: hasSelected ? _goNext : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primaryButton,
-                          foregroundColor: Colors.white,
-                          disabledBackgroundColor: AppColors.disabledButton,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(
-                                AppSizes.buttonCornerRadius),
-                          ),
-                        ),
-                        child: Text(isLast ? 'Finish' : 'Next'),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              // Footer
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Column(
-                  spacing: AppSizes.footerSpacing,
-                  children: [
-                    Text(AppStrings.footerLine1,
-                        style: TextStyle(
-                            fontSize: AppFonts.footer,
-                            color: AppColors.footerText),
-                        textAlign: TextAlign.center),
-                    Text(AppStrings.footerLine2,
-                        style: TextStyle(
-                            fontSize: AppFonts.footer,
-                            color: AppColors.footerText),
-                        textAlign: TextAlign.center),
-                    Text(AppStrings.footerLine3,
-                        style: TextStyle(
-                            fontSize: AppFonts.footer,
-                            color: AppColors.starMotifBlue),
-                        textAlign: TextAlign.center),
-                  ],
-                ),
-              ),
-            ],
-          ),
+            ),
+            const SafePrepNavBar(),
+          ],
         ),
       ),
     );

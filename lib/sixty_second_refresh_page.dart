@@ -6,6 +6,7 @@ import 'app_state_persistence.dart';
 import 'home_page.dart';
 import 'dashboard_page.dart';
 import 'readiness_engine.dart';
+import 'safe_prep_nav_bar.dart';
 
 enum SixtySecondReturnTo { homePage, dashboard }
 
@@ -96,23 +97,17 @@ class _SixtySecondRefreshPageState extends State<SixtySecondRefreshPage> {
       _showingBurst = true;
       _currentCategory = category;
     });
-
     final all = await QuestionLoader.loadByCategory(category);
     final questions =
         (all..sort((a, b) => b.difficulty.compareTo(a.difficulty)))
             .take(categoryBursts)
             .toList();
-
     if (questions.isEmpty) {
       setState(() => _showingBurst = false);
       return;
     }
-
     await _runBursts(questions, categoryBursts);
-
-    if (!_isStopped && mounted) {
-      setState(() => _showingBurst = false);
-    }
+    if (!_isStopped && mounted) setState(() => _showingBurst = false);
   }
 
   Future<void> _runBursts(List<QuestionModel> questions, int count) async {
@@ -132,12 +127,9 @@ class _SixtySecondRefreshPageState extends State<SixtySecondRefreshPage> {
 
       await _animateTimer(questionMs);
       if (_isStopped || !mounted) return;
-
       setState(() => _showAnswer = true);
-
       await _animateTimer(answerMs);
       if (_isStopped || !mounted) return;
-
       setState(() => _animating = false);
       await Future.delayed(const Duration(milliseconds: 150));
     }
@@ -155,8 +147,8 @@ class _SixtySecondRefreshPageState extends State<SixtySecondRefreshPage> {
   Widget _buildCategoryGrid() {
     final categories = AppState.allCategories;
     final hasMissed = _state.missedFinalExamQuestionIds.isNotEmpty;
-
     final rows = <Widget>[];
+
     for (int i = 0; i < categories.length; i += 2) {
       final cat1 = categories[i];
       final cat2 = i + 1 < categories.length ? categories[i + 1] : null;
@@ -183,7 +175,7 @@ class _SixtySecondRefreshPageState extends State<SixtySecondRefreshPage> {
             width: double.infinity,
             height: 44,
             child: ElevatedButton(
-              onPressed: () => _startFinalReview(),
+              onPressed: _startFinalReview,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryButton,
                 foregroundColor: Colors.white,
@@ -205,28 +197,21 @@ class _SixtySecondRefreshPageState extends State<SixtySecondRefreshPage> {
   Future<void> _startFinalReview() async {
     final missedIds = _state.missedFinalExamQuestionIds;
     if (missedIds.isEmpty) return;
-
     setState(() {
       _isStopped = false;
       _showingBurst = true;
       _currentCategory = 'Final Test Review';
     });
-
     final all = await QuestionLoader.loadAll();
     final missed = all.where((q) => missedIds.contains(q.id)).toList()
       ..shuffle();
     final questions = missed.take(20).toList();
-
     if (questions.isEmpty) {
       setState(() => _showingBurst = false);
       return;
     }
-
     await _runBursts(questions, questions.length);
-
-    if (!_isStopped && mounted) {
-      setState(() => _showingBurst = false);
-    }
+    if (!_isStopped && mounted) setState(() => _showingBurst = false);
   }
 
   Widget _buildCatButton(String category) {
@@ -255,7 +240,6 @@ class _SixtySecondRefreshPageState extends State<SixtySecondRefreshPage> {
   Widget _buildBurstPlayer() {
     final catColor =
         categoryColors[_currentCategory] ?? AppColors.primaryButton;
-
     return Column(
       spacing: 12,
       children: [
@@ -414,38 +398,7 @@ class _SixtySecondRefreshPageState extends State<SixtySecondRefreshPage> {
                     : _buildCategoryGrid(),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Column(
-                spacing: AppSizes.footerSpacing,
-                children: [
-                  Text(
-                    AppStrings.footerLine1,
-                    style: TextStyle(
-                      fontSize: AppFonts.footer,
-                      color: AppColors.footerText,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  Text(
-                    AppStrings.footerLine2,
-                    style: TextStyle(
-                      fontSize: AppFonts.footer,
-                      color: AppColors.footerText,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  Text(
-                    AppStrings.footerLine3,
-                    style: TextStyle(
-                      fontSize: AppFonts.footer,
-                      color: AppColors.starMotifBlue,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
+            const SafePrepNavBar(),
           ],
         ),
       ),

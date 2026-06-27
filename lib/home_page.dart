@@ -16,6 +16,7 @@ import 'trial_timer_service.dart';
 import 'preview/preview_cinematic_splash.dart';
 import 'mixpanel_service.dart';
 import 'preview/preview_reveal_page.dart';
+import 'safe_prep_nav_bar.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -40,7 +41,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       'session_start',
       properties: {'is_unlocked': _state.hasUnlockedApp},
     );
-
     MixpanelService.instance.track(
       'home_viewed',
       properties: {'is_unlocked': _state.hasUnlockedApp},
@@ -65,9 +65,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused) {
+    if (state == AppLifecycleState.paused)
       MixpanelService.instance.track('session_end');
-    }
   }
 
   void _onTrialExpired() {
@@ -90,11 +89,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   Future<void> _loadFacts() async {
     final facts = await FactLoader.loadAll();
-    if (mounted) {
+    if (mounted)
       setState(() {
         _currentFact = facts.map((f) => f.fact).join('  •  ');
       });
-    }
   }
 
   Future<void> _loadMilestones() async {
@@ -401,9 +399,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: List.generate(4, (i) {
-                          if (i >= earnedSlots.length) {
+                          if (i >= earnedSlots.length)
                             return const SizedBox(width: 26);
-                          }
                           return Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 2),
                             child: Container(
@@ -430,9 +427,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: List.generate(4, (i) {
                             final idx = i + 4;
-                            if (idx >= earnedSlots.length) {
+                            if (idx >= earnedSlots.length)
                               return const SizedBox(width: 26);
-                            }
                             return Padding(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 2,
@@ -470,19 +466,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Widget _buildReadinessMeter() {
     final score = _state.readinessScore;
     final isGreenLight = score >= 100;
-
     String label;
-    if (score >= 100) {
+    if (score >= 100)
       label = '🟢 Green Light';
-    } else if (score >= 85) {
+    else if (score >= 85)
       label = 'Nearly Ready';
-    } else if (score >= 66) {
+    else if (score >= 66)
       label = 'Almost There';
-    } else if (score >= 41) {
+    else if (score >= 41)
       label = 'Building Momentum';
-    } else {
+    else
       label = 'Keep Going';
-    }
 
     return GestureDetector(
       onTap: () => _showInfoModal(
@@ -549,11 +543,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         final starMin = i * 20.0;
         final starMax = (i + 1) * 20.0;
         double fillFraction = 0.0;
-        if (score >= starMax) {
+        if (score >= starMax)
           fillFraction = 1.0;
-        } else if (score > starMin) {
+        else if (score > starMin)
           fillFraction = (score - starMin) / 20.0;
-        }
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 2),
           child: _buildPartialStar(fillFraction),
@@ -701,23 +694,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   Widget _buildTrophySection() {
     if (_milestones.isEmpty) return const SizedBox();
-
     final topTwo = _milestones.take(2).toList();
     final curriculumDone = _state.curriculumCompletedCategories;
     final mastered = _state.masteredCategories;
-
     final earnedCount = topTwo.where((m) => _isEarned(m)).length;
     final totalEarned =
         earnedCount +
         (curriculumDone.isNotEmpty ? 1 : 0) +
         (mastered.isNotEmpty ? 1 : 0);
-
-    String subtitle;
-    if (totalEarned == 0) {
-      subtitle = 'Keep going — trophies are waiting.';
-    } else {
-      subtitle = '$earnedCount of 2 earned';
-    }
+    String subtitle = totalEarned == 0
+        ? 'Keep going — trophies are waiting.'
+        : '$earnedCount of 2 earned';
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -976,6 +963,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   child: Column(
                     spacing: AppSizes.cardSpacing,
                     children: [
+                      // Create curriculum button
                       Column(
                         spacing: 2,
                         children: [
@@ -1022,15 +1010,32 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           ),
                         ],
                       ),
-                      _buildButton(
-                        'The SafePrep™ Dashboard',
-                        () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const DashboardPage(),
+
+                      // Dashboard button
+                      Column(
+                        spacing: 2,
+                        children: [
+                          _buildButton(
+                            'The SafePrep™ Dashboard',
+                            () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const DashboardPage(),
+                              ),
+                            ),
                           ),
-                        ),
+                          Text(
+                            'See your curriculum progress here',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.subtleText,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ],
                       ),
+
+                      // Final exam button
                       Builder(
                         builder: (context) {
                           final isLocked =
@@ -1084,6 +1089,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           );
                         },
                       ),
+
                       _buildButton(
                         'Settings and information',
                         () => Navigator.push(
@@ -1093,34 +1099,50 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           ),
                         ),
                       ),
-                      SizedBox(
-                        width: double.infinity,
-                        height: AppSizes.primaryButtonHeight,
-                        child: ElevatedButton(
-                          onPressed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const PeaceOfMindPage(),
-                            ),
-                          ).then((_) => setState(() {})),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primaryButton,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(
-                                AppSizes.buttonCornerRadius,
+
+                      // Peace of Mind button
+                      Column(
+                        spacing: 2,
+                        children: [
+                          SizedBox(
+                            width: double.infinity,
+                            height: AppSizes.primaryButtonHeight,
+                            child: ElevatedButton(
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const PeaceOfMindPage(),
+                                ),
+                              ).then((_) => setState(() {})),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primaryButton,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    AppSizes.buttonCornerRadius,
+                                  ),
+                                ),
+                              ),
+                              child: const Text(
+                                '🔓 Peace of Mind',
+                                style: TextStyle(
+                                  fontSize: AppFonts.button,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ),
-                          child: const Text(
-                            '🔓 Peace of Mind',
+                          Text(
+                            'Great quick study options',
                             style: TextStyle(
-                              fontSize: AppFonts.button,
-                              fontWeight: FontWeight.w600,
+                              fontSize: 11,
+                              color: AppColors.subtleText,
+                              fontStyle: FontStyle.italic,
                             ),
                           ),
-                        ),
+                        ],
                       ),
+
                       Row(
                         spacing: 8,
                         children: [
@@ -1187,6 +1209,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           ),
                         ],
                       ),
+
                       _buildTrialUnlockBanner(),
                       _buildTrophySection(),
                       _buildFooterSection(),
@@ -1194,6 +1217,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   ),
                 ),
               ),
+              const SafePrepNavBar(),
             ],
           ),
         ),

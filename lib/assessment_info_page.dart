@@ -4,6 +4,7 @@ import 'home_page.dart';
 import 'csv_loader.dart';
 import 'app_state.dart';
 import 'assessment_page_v2.dart';
+import 'safe_prep_nav_bar.dart';
 
 class AssessmentInfoPage extends StatefulWidget {
   const AssessmentInfoPage({super.key});
@@ -156,38 +157,7 @@ class _AssessmentInfoPageState extends State<AssessmentInfoPage> {
                 ),
               ),
 
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Column(
-                  spacing: AppSizes.footerSpacing,
-                  children: [
-                    Text(
-                      AppStrings.footerLine1,
-                      style: TextStyle(
-                        fontSize: AppFonts.footer,
-                        color: AppColors.footerText,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    Text(
-                      AppStrings.footerLine2,
-                      style: TextStyle(
-                        fontSize: AppFonts.footer,
-                        color: AppColors.footerText,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    Text(
-                      AppStrings.footerLine3,
-                      style: TextStyle(
-                        fontSize: AppFonts.footer,
-                        color: AppColors.starMotifBlue,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
+              const SafePrepNavBar(),
             ],
           ),
         ),

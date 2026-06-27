@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'constants.dart';
 import 'app_state.dart';
 import 'app_state_persistence.dart';
 import 'home_page.dart';
 import 'splash_page.dart';
 import 'tips_page.dart';
+import 'safe_prep_nav_bar.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -66,13 +68,18 @@ class _SettingsPageState extends State<SettingsPage> {
       _state.reset();
       AppStatePersistence.delete();
       if (mounted) {
-        // Reset clears hasUnlockedApp — SplashPage will route correctly
-        // based on the new state (preview for unregistered users)
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const SplashPage()),
         );
       }
+    }
+  }
+
+  Future<void> _openRefundPage() async {
+    final uri = Uri.parse('https://foodsafetymadeeasy.com/safeprep-guarantee/');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 
@@ -214,8 +221,8 @@ class _SettingsPageState extends State<SettingsPage> {
                     _buildSectionCard(
                       title: 'About SafePrep™',
                       children: [
-                        _buildInfoRow('Version', '1.2.0'),
-                        _buildInfoRow('Build', 'May 2026'),
+                        _buildInfoRow('Version', '1.3.6'),
+                        _buildInfoRow('Build', 'June 2026'),
                         _buildInfoRow('Platform', 'Flutter'),
                         const SizedBox(height: 4),
                         Text(
@@ -379,7 +386,7 @@ class _SettingsPageState extends State<SettingsPage> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            'NovernManagement@gmail.com',
+                            'info@foodsafetymadeeasy.com',
                             style: TextStyle(
                               fontSize: AppFonts.body,
                               fontWeight: FontWeight.w600,
@@ -401,7 +408,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         ),
                         _buildLegalSection(
                           'Disclaimer',
-                          'SafePrep™ is an independent educational resource. It does not provide legal, professional, or certification-granting services. All content is for general study purposes only. The developer makes no guarantees regarding exam outcomes or certification results. Use at your own risk.',
+                          'SafePrep™ is an independent educational resource and is not affiliated with ServSafe® or the National Restaurant Association. For our guarantee policy, see below.',
                         ),
                         _buildLegalSection(
                           'Terms of Use',
@@ -410,6 +417,29 @@ class _SettingsPageState extends State<SettingsPage> {
                         _buildLegalSection(
                           'Privacy & Data Handling',
                           'The App may collect limited technical or usage data for functionality and analytics. No personally identifiable information is collected unless voluntarily provided. Collected data is never sold or shared with third parties except as required by law. By using the App you consent to this policy.',
+                        ),
+                        _buildLegalSection(
+                          'Our Guarantee',
+                          'We guarantee you will pass the exam on your first try, or we will give you your money back, no questions asked.',
+                        ),
+                        const SizedBox(height: 4),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 44,
+                          child: ElevatedButton(
+                            onPressed: _openRefundPage,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primaryButton,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: const Text('Refund'),
+                          ),
+                        ),
+                        Divider(
+                          color: AppColors.cardBorder.withValues(alpha: 0.4),
                         ),
                         Text(
                           'Full Legal Documents',
@@ -442,7 +472,7 @@ class _SettingsPageState extends State<SettingsPage> {
                             spacing: 4,
                             children: [
                               Text(
-                                'sites.google.com/view/safeprep/privacy-policy',
+                                'foodsafetymadeeasy.com/privacy-policy',
                                 style: TextStyle(
                                   fontSize: AppFonts.caption,
                                   color: AppColors.strongText,
@@ -450,7 +480,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                 textAlign: TextAlign.center,
                               ),
                               Text(
-                                'sites.google.com/view/safeprep/terms-of-service',
+                                'foodsafetymadeeasy.com/terms-of-service',
                                 style: TextStyle(
                                   fontSize: AppFonts.caption,
                                   color: AppColors.strongText,
@@ -469,39 +499,8 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ),
 
-            // Footer
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Column(
-                spacing: 4,
-                children: [
-                  Text(
-                    AppStrings.footerLine1,
-                    style: TextStyle(
-                      fontSize: AppFonts.footer,
-                      color: AppColors.footerText,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  Text(
-                    AppStrings.footerLine2,
-                    style: TextStyle(
-                      fontSize: AppFonts.footer,
-                      color: AppColors.footerText,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  Text(
-                    AppStrings.footerLine3,
-                    style: TextStyle(
-                      fontSize: AppFonts.footer,
-                      color: AppColors.starMotifBlue,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
+            // Nav Bar
+            const SafePrepNavBar(),
           ],
         ),
       ),

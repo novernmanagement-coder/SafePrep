@@ -5,6 +5,7 @@ import 'app_state.dart';
 import 'home_page.dart';
 import 'category_study_page.dart';
 import 'sixty_second_refresh_page.dart';
+import 'safe_prep_nav_bar.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -368,9 +369,8 @@ class _DashboardPageState extends State<DashboardPage> {
       pulseCategories = failingCategories.take(2).toList();
     } else if (failingCategories.length == 1) {
       pulseCategories = [failingCategories[0]];
-      if (untestedCategories.isNotEmpty) {
+      if (untestedCategories.isNotEmpty)
         pulseCategories.add(untestedCategories[0]);
-      }
     } else {
       pulseCategories = untestedCategories.take(2).toList();
     }
@@ -416,9 +416,7 @@ class _DashboardPageState extends State<DashboardPage> {
         ),
       );
 
-      if (i + 2 < studyCategories.length) {
-        rows.add(const SizedBox(height: 12));
-      }
+      if (i + 2 < studyCategories.length) rows.add(const SizedBox(height: 12));
     }
 
     return Column(children: rows);
@@ -592,146 +590,120 @@ class _DashboardPageState extends State<DashboardPage> {
     return Scaffold(
       backgroundColor: AppColors.servSafeBlue,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(8),
-          child: Column(
-            children: [
-              _buildHeader(),
-
-              Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A1A),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.all(16),
-                margin: const EdgeInsets.only(bottom: 12),
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(8),
                 child: Column(
-                  spacing: 16,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      spacing: 4,
-                      children: [
-                        Text(
-                          dashTitle,
-                          style: const TextStyle(
-                            color: Color(0xFFE0E0E0),
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
+                    _buildHeader(),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1A1A1A),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.all(16),
+                      margin: const EdgeInsets.only(bottom: 12),
+                      child: Column(
+                        spacing: 16,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            spacing: 4,
+                            children: [
+                              Text(
+                                dashTitle,
+                                style: const TextStyle(
+                                  color: Color(0xFFE0E0E0),
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const Divider(color: Color(0xFF2C2C2C)),
+                            ],
                           ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const Divider(color: Color(0xFF2C2C2C)),
-                      ],
-                    ),
-                    _buildSummaryCards(),
-                    const Divider(color: Color(0xFF2C2C2C)),
-                    Column(
-                      spacing: 0,
-                      children: [
-                        GestureDetector(
-                          onTap: () => setState(
-                            () => _studyCategoriesExpanded =
-                                !_studyCategoriesExpanded,
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            child: Row(
-                              children: [
-                                const Expanded(
-                                  child: Text(
-                                    'Study Categories',
-                                    style: TextStyle(
-                                      color: Color(0xFFE0E0E0),
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                          _buildSummaryCards(),
+                          const Divider(color: Color(0xFF2C2C2C)),
+                          Column(
+                            spacing: 0,
+                            children: [
+                              GestureDetector(
+                                onTap: () => setState(
+                                  () => _studyCategoriesExpanded =
+                                      !_studyCategoriesExpanded,
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 4,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Expanded(
+                                        child: Text(
+                                          'Study Categories',
+                                          style: TextStyle(
+                                            color: Color(0xFFE0E0E0),
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                      Text(
+                                        _studyCategoriesExpanded
+                                            ? '\u25bc'
+                                            : '\u25b6',
+                                        style: const TextStyle(
+                                          color: Color(0xFF4DA3FF),
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                Text(
-                                  _studyCategoriesExpanded
-                                      ? '\u25bc'
-                                      : '\u25b6',
-                                  style: const TextStyle(
-                                    color: Color(0xFF4DA3FF),
-                                    fontSize: 12,
-                                  ),
-                                ),
+                              ),
+                              if (_studyCategoriesExpanded) ...[
+                                const SizedBox(height: 12),
+                                _buildStudyGrid(),
                               ],
+                            ],
+                          ),
+                          _buildMasteredSection(),
+                        ],
+                      ),
+                    ),
+                    SizedBox(
+                      width: 280,
+                      height: AppSizes.primaryButtonHeight,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const SixtySecondRefreshPage(
+                              returnTo: SixtySecondReturnTo.dashboard,
                             ),
                           ),
                         ),
-                        if (_studyCategoriesExpanded) ...[
-                          const SizedBox(height: 12),
-                          _buildStudyGrid(),
-                        ],
-                      ],
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryButton,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              AppSizes.buttonCornerRadius,
+                            ),
+                          ),
+                        ),
+                        child: const Text('\u23f1 60-Second Refresh'),
+                      ),
                     ),
-                    _buildMasteredSection(),
+                    const SizedBox(height: 12),
                   ],
                 ),
               ),
-
-              SizedBox(
-                width: 280,
-                height: AppSizes.primaryButtonHeight,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const SixtySecondRefreshPage(
-                        returnTo: SixtySecondReturnTo.dashboard,
-                      ),
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryButton,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(
-                        AppSizes.buttonCornerRadius,
-                      ),
-                    ),
-                  ),
-                  child: const Text('\u23f1 60-Second Refresh'),
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              Column(
-                spacing: AppSizes.footerSpacing,
-                children: [
-                  Text(
-                    AppStrings.footerLine1,
-                    style: TextStyle(
-                      fontSize: AppFonts.footer,
-                      color: AppColors.footerText,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  Text(
-                    AppStrings.footerLine2,
-                    style: TextStyle(
-                      fontSize: AppFonts.footer,
-                      color: AppColors.footerText,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  Text(
-                    AppStrings.footerLine3,
-                    style: TextStyle(
-                      fontSize: AppFonts.footer,
-                      color: AppColors.starMotifBlue,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 12),
-            ],
-          ),
+            ),
+            const SafePrepNavBar(),
+          ],
         ),
       ),
     );

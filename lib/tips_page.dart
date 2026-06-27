@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'constants.dart';
 import 'home_page.dart';
+import 'safe_prep_nav_bar.dart';
 
 class TipsPage extends StatelessWidget {
   const TipsPage({super.key});
@@ -18,14 +19,22 @@ class TipsPage extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         spacing: 6,
         children: [
-          Text(title,
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: AppFonts.subheader,
+              color: AppColors.strongText,
+            ),
+          ),
+          ...paragraphs.map(
+            (p) => Text(
+              p,
               style: TextStyle(
-                fontSize: AppFonts.subheader,
-                color: AppColors.strongText,
-              )),
-          ...paragraphs.map((p) => Text(p,
-              style: TextStyle(
-                  fontSize: AppFonts.body, color: AppColors.bodyText))),
+                fontSize: AppFonts.body,
+                color: AppColors.bodyText,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -38,7 +47,6 @@ class TipsPage extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            // Header
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Row(
@@ -51,22 +59,25 @@ class TipsPage extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        Text('Safe',
-                            style: TextStyle(
-                              fontSize: AppFonts.header,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.bodyText,
-                            )),
+                        Text(
+                          'Safe',
+                          style: TextStyle(
+                            fontSize: AppFonts.header,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.bodyText,
+                          ),
+                        ),
                         const SizedBox(width: 6),
-                        Image.asset('Assets/splash.png',
-                            width: 36, height: 36),
+                        Image.asset('Assets/splash.png', width: 36, height: 36),
                         const SizedBox(width: 6),
-                        Text('Prep™',
-                            style: TextStyle(
-                              fontSize: AppFonts.header,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.bodyText,
-                            )),
+                        Text(
+                          'Prep™',
+                          style: TextStyle(
+                            fontSize: AppFonts.header,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.bodyText,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -74,7 +85,6 @@ class TipsPage extends StatelessWidget {
               ),
             ),
 
-            // Body
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -115,6 +125,8 @@ class TipsPage extends StatelessWidget {
                 ),
               ),
             ),
+
+            const SafePrepNavBar(),
           ],
         ),
       ),

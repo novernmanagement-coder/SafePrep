@@ -3,6 +3,7 @@ import 'constants.dart';
 import 'csv_loader.dart';
 import 'home_page.dart';
 import 'final_step_exam_page.dart';
+import 'safe_prep_nav_bar.dart';
 
 class FinalExamIntroPage extends StatefulWidget {
   const FinalExamIntroPage({super.key});
@@ -36,7 +37,6 @@ class _FinalExamIntroPageState extends State<FinalExamIntroPage> {
           padding: AppSizes.pageMargin,
           child: Column(
             children: [
-              // Header
               Padding(
                 padding: const EdgeInsets.only(top: 8, bottom: 8),
                 child: Column(
@@ -48,27 +48,33 @@ class _FinalExamIntroPageState extends State<FinalExamIntroPage> {
                         GestureDetector(
                           onTap: () => Navigator.pushReplacement(
                             context,
-                            MaterialPageRoute(
-                                builder: (_) => const HomePage()),
+                            MaterialPageRoute(builder: (_) => const HomePage()),
                           ),
                           child: Row(
                             children: [
-                              Text('Safe',
-                                  style: TextStyle(
-                                    fontSize: AppFonts.header,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.bodyText,
-                                  )),
+                              Text(
+                                'Safe',
+                                style: TextStyle(
+                                  fontSize: AppFonts.header,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.bodyText,
+                                ),
+                              ),
                               const SizedBox(width: 6),
-                              Image.asset('Assets/splash.png',
-                                  width: 36, height: 36),
+                              Image.asset(
+                                'Assets/splash.png',
+                                width: 36,
+                                height: 36,
+                              ),
                               const SizedBox(width: 6),
-                              Text('Prep™',
-                                  style: TextStyle(
-                                    fontSize: AppFonts.header,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.bodyText,
-                                  )),
+                              Text(
+                                'Prep™',
+                                style: TextStyle(
+                                  fontSize: AppFonts.header,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.bodyText,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -87,7 +93,6 @@ class _FinalExamIntroPageState extends State<FinalExamIntroPage> {
                 ),
               ),
 
-              // Ticker
               if (_tickerFacts.isNotEmpty)
                 Container(
                   height: 32,
@@ -110,7 +115,6 @@ class _FinalExamIntroPageState extends State<FinalExamIntroPage> {
                   ),
                 ),
 
-              // Body
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -128,15 +132,17 @@ class _FinalExamIntroPageState extends State<FinalExamIntroPage> {
                     Text(
                       '90 questions covering everything in the ServSafe® curriculum.',
                       style: TextStyle(
-                          fontSize: AppFonts.body,
-                          color: AppColors.subtleText),
+                        fontSize: AppFonts.body,
+                        color: AppColors.subtleText,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                     Text(
                       'There is no timer. One question at a time. Take a breath.',
                       style: TextStyle(
-                          fontSize: AppFonts.body,
-                          color: AppColors.subtleText),
+                        fontSize: AppFonts.body,
+                        color: AppColors.subtleText,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 8),
@@ -147,14 +153,16 @@ class _FinalExamIntroPageState extends State<FinalExamIntroPage> {
                         onPressed: () => Navigator.pushReplacement(
                           context,
                           MaterialPageRoute(
-                              builder: (_) => const FinalStepExamPage()),
+                            builder: (_) => const FinalStepExamPage(),
+                          ),
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primaryButton,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(
-                                AppSizes.buttonCornerRadius),
+                              AppSizes.buttonCornerRadius,
+                            ),
                           ),
                         ),
                         child: const Text("I'm Ready — Start the Exam"),
@@ -164,30 +172,7 @@ class _FinalExamIntroPageState extends State<FinalExamIntroPage> {
                 ),
               ),
 
-              // Footer
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Column(
-                  spacing: AppSizes.footerSpacing,
-                  children: [
-                    Text(AppStrings.footerLine1,
-                        style: TextStyle(
-                            fontSize: AppFonts.footer,
-                            color: AppColors.footerText),
-                        textAlign: TextAlign.center),
-                    Text(AppStrings.footerLine2,
-                        style: TextStyle(
-                            fontSize: AppFonts.footer,
-                            color: AppColors.footerText),
-                        textAlign: TextAlign.center),
-                    Text(AppStrings.footerLine3,
-                        style: TextStyle(
-                            fontSize: AppFonts.footer,
-                            color: AppColors.starMotifBlue),
-                        textAlign: TextAlign.center),
-                  ],
-                ),
-              ),
+              const SafePrepNavBar(),
             ],
           ),
         ),
