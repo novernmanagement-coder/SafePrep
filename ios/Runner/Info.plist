@@ -66,5 +66,11 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>LSApplicationQueriesSchemes</key>
+<array>
+    <string>googlechrome</string>
+    <string>microsoft-edge-https</string>
+    <string>firefox</string>
+</array>
 </dict>
 </plist>
