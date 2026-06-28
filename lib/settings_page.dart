@@ -77,10 +77,32 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _openRefundPage() async {
-    final uri = Uri.parse('https://foodsafetymadeeasy.com/safeprep-guarantee/');
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      await launchUrl(uri, mode: LaunchMode.inAppWebView);
+    final pageUrl = 'foodsafetymadeeasy.com/safeprep-guarantee/';
+
+    // Try Chrome first
+    final chromeUri = Uri.parse('googlechrome://$pageUrl');
+    if (await canLaunchUrl(chromeUri)) {
+      await launchUrl(chromeUri);
+      return;
     }
+
+    // Try Edge second
+    final edgeUri = Uri.parse('microsoft-edge-https://$pageUrl');
+    if (await canLaunchUrl(edgeUri)) {
+      await launchUrl(edgeUri);
+      return;
+    }
+
+    // Try Firefox third
+    final firefoxUri = Uri.parse('firefox://open-url?url=https://$pageUrl');
+    if (await canLaunchUrl(firefoxUri)) {
+      await launchUrl(firefoxUri);
+      return;
+    }
+
+    // Fall back to default browser (Safari)
+    final uri = Uri.parse('https://$pageUrl');
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   Widget _buildSectionCard({
@@ -430,6 +452,15 @@ class _SettingsPageState extends State<SettingsPage> {
                             ),
                             child: const Text('Refund'),
                           ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Best viewed in Chrome or Edge on mobile.',
+                          style: TextStyle(
+                            fontSize: AppFonts.caption,
+                            color: AppColors.subtleText,
+                          ),
+                          textAlign: TextAlign.center,
                         ),
                         Divider(
                           color: AppColors.cardBorder.withValues(alpha: 0.4),
