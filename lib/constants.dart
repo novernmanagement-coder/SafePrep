@@ -124,6 +124,10 @@ class AppStrings {
   static const String footerLine2 = 'SafePrep™: ServSafe® & NRA® trademarks.';
   static const String footerLine3 = '⋆⋆⋆⋆⋆';
 
+  static const String navHome = 'Home';
+  static const String navDashboard = 'Dashboard';
+  static const String navRapidFire = 'Rapid Fire';
+
   static const List<String> skipButtonLines = [
     "I don't know — and that's okay",
     "If you don't know, it's OK — just click this button",
@@ -137,7 +141,7 @@ class AppConstants {
   // Exam Engine
   static const int totalQuestions = 90;
   static const int diagnosticQuestions = 20; // trial
-  static const int diagnosticQuestionsFull = 40; // paid
+  static const int diagnosticQuestionsFull = 31; // paid
   static const int passingScorePercent = 85;
   static const int expertThreshold = 95;
   static const int upgradePromptThreshold = 60;

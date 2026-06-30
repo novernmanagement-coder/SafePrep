@@ -111,6 +111,14 @@ class IAPService {
 
   Future<void> _handleSuccess(PurchaseDetails purchase) async {
     final state = AppState();
+
+    // Clear trial history on first purchase only
+    if (!state.hasUnlockedApp) {
+      state.testHistory.clear();
+      state.clearCurriculumProgress();
+      state.hasSeenIntro = false;
+    }
+
     state.hasUnlockedApp = true;
     state.purchaseDate = DateTime.now();
 

@@ -1025,7 +1025,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             ),
                           ),
                           Text(
-                            'See your curriculum progress here',
+                            'Access your study curriculum and view progress',
                             style: TextStyle(
                               fontSize: 11,
                               color: AppColors.subtleText,
@@ -1076,15 +1076,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                   ),
                                 ),
                               ),
-                              if (isLocked)
-                                Text(
-                                  'Available at 100% readiness',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: AppColors.subtleText,
-                                    fontStyle: FontStyle.italic,
-                                  ),
+                              Text(
+                                isLocked
+                                    ? 'Available at 100% readiness'
+                                    : 'Access enabled when 100% ServSafe readiness is achieved',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isLocked
+                                      ? AppColors.subtleText
+                                      : AppColors.success,
+                                  fontStyle: FontStyle.italic,
                                 ),
+                              ),
                             ],
                           );
                         },
@@ -1124,7 +1127,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 ),
                               ),
                               child: const Text(
-                                '🔓 Peace of Mind',
+                                '🔓 60 Second Trainers',
                                 style: TextStyle(
                                   fontSize: AppFonts.button,
                                   fontWeight: FontWeight.w600,
@@ -1133,7 +1136,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             ),
                           ),
                           Text(
-                            'Great quick study options',
+                            'Quick tools to sharpen your knowledge',
                             style: TextStyle(
                               fontSize: 11,
                               color: AppColors.subtleText,
