@@ -416,7 +416,7 @@ class _PreviewRevealPageState extends State<PreviewRevealPage>
                                   ),
                                   const SizedBox(height: 6),
                                   const Text(
-                                    'Peace of Mind tools included free',
+                                    '60 Second Trainers included free',
                                     style: TextStyle(
                                       color: _gold,
                                       fontSize: 13,
@@ -459,7 +459,7 @@ class _PreviewRevealPageState extends State<PreviewRevealPage>
                             const SizedBox(height: 16),
 
                             Text(
-                              'All plans include Peace of Mind tools',
+                              'All plans include 60 Second Trainers',
                               style: TextStyle(
                                 color: _mutedWhite,
                                 fontSize: 11,
