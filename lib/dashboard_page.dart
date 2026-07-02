@@ -34,6 +34,28 @@ class _DashboardPageState extends State<DashboardPage> {
     'Food Safety Management',
   ];
 
+  // ── National average seed values (DISPLAY-ONLY) ─────────────────────
+  // Best-guess placeholders, not sourced data — swap in real numbers
+  // when available. These are never written to AppState/ReadinessEngine;
+  // they exist purely so the Dashboard doesn't look empty before a user
+  // has generated any real data. The moment a category has a real score
+  // (hasScoreForCategory == true), its seeded value is ignored entirely.
+  static const Map<String, int> _nationalAverages = {
+    'Time & Temperature': 68,
+    'Cross-Contamination': 74,
+    'Food Preparation': 78,
+    'Receiving & Storage': 76,
+    'Personal Hygiene': 82,
+    'Cleaning & Sanitizing': 80,
+    'Facility & Equipment': 85,
+    'Food Safety Management': 71,
+  };
+
+  int get _nationalAverageOverall {
+    final values = _nationalAverages.values.toList();
+    return values.reduce((a, b) => a + b) ~/ values.length;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -156,6 +178,17 @@ class _DashboardPageState extends State<DashboardPage> {
       overallText = '$latest%';
       deltaText =
           'Avg of ${scores.length} ${scores.length == 1 ? 'category' : 'categories'}';
+      overallColor = _scoreColor(latest);
+    } else {
+      // No real data yet — show the seeded national average.
+      // Display-only: never written to AppState. Applies regardless of
+      // purchase status — purchased users start blank-then-seeded too,
+      // since progress is explicitly reset on first post-purchase launch
+      // (see splash_page.dart clearCurriculumProgress + reset notice).
+      latest = _nationalAverageOverall;
+      overallText = '$latest%';
+      deltaText = 'National average — not your score yet';
+      baselineText = 'Adapts as you study';
       overallColor = _scoreColor(latest);
     }
 
@@ -308,15 +341,17 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
             ),
             Text(
-              hasTaken ? '$score%' : '\u2014',
+              hasTaken ? '$score%' : '${_nationalAverages[category] ?? 75}%',
               style: TextStyle(
-                color: hasTaken ? _scoreColor(score) : const Color(0xFF555555),
+                color: hasTaken ? _scoreColor(score) : const Color(0xFF6B7A8A),
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
             ),
             Text(
-              hasTaken ? 'Baseline: $baseline%' : 'Not yet tested',
+              hasTaken
+                  ? 'Baseline: $baseline%'
+                  : 'National avg — adapts as you study',
               style: const TextStyle(color: Color(0xFF8A8A8A), fontSize: 10),
             ),
             const SizedBox(height: 4),

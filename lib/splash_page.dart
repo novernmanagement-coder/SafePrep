@@ -8,7 +8,7 @@ import 'home_page.dart';
 import 'intro_page.dart';
 import 'preview/preview_cinematic_splash.dart';
 
-// BUILD 26 — version 1.4.1+9 — Full page curriculum, navigation fix, fresh dashboard on first load
+// BUILD 26 — version 1.3.5+9 — Full page curriculum, navigation fix, fresh dashboard on first load
 // UPDATED — hard-lock splash with guarantee copy + baked-in countdown.
 // First-ever launch holds 15 seconds; every launch after holds 5 seconds.
 class SplashPage extends StatefulWidget {

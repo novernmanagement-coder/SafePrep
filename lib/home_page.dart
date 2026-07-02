@@ -1097,12 +1097,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         ],
                       ),
 
-                      // Final exam button
+                      // Final exam button — hidden entirely when locked,
+                      // rather than shown grayed out. Reappears automatically
+                      // for paid users, or trial users who reach 100% readiness.
                       Builder(
                         builder: (context) {
                           final isLocked =
                               !_state.hasUnlockedApp &&
                               _state.readinessScore < 100;
+                          if (isLocked) return const SizedBox();
                           return Column(
                             spacing: 2,
                             children: [
@@ -1110,22 +1113,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 width: double.infinity,
                                 height: AppSizes.primaryButtonHeight,
                                 child: ElevatedButton(
-                                  onPressed: isLocked
-                                      ? null
-                                      : () => Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) =>
-                                                const FinalExamIntroPage(),
-                                          ),
-                                        ),
+                                  onPressed: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const FinalExamIntroPage(),
+                                    ),
+                                  ),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: isLocked
-                                        ? AppColors.disabledButton
-                                        : AppColors.primaryButton,
-                                    foregroundColor: isLocked
-                                        ? AppColors.disabledButtonForeground
-                                        : Colors.white,
+                                    backgroundColor: AppColors.primaryButton,
+                                    foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(
                                         AppSizes.buttonCornerRadius,
@@ -1139,14 +1136,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 ),
                               ),
                               Text(
-                                isLocked
-                                    ? 'Available at 100% readiness'
-                                    : 'Access enabled when 100% ServSafe readiness is achieved',
+                                'Access enabled when 100% ServSafe readiness is achieved',
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: isLocked
-                                      ? AppColors.subtleText
-                                      : AppColors.success,
+                                  color: AppColors.success,
                                   fontStyle: FontStyle.italic,
                                 ),
                               ),
