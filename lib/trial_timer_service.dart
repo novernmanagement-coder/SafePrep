@@ -74,4 +74,9 @@ class TrialTimerService with WidgetsBindingObserver {
   }
 
   bool get isExpired => _expired;
+
+  /// Seconds remaining in the trial, clamped to 0.
+  /// Used by HomePage to display a live "Trial — mm:ss" countdown.
+  int get remainingSeconds =>
+      (_trialSeconds - _elapsedSeconds).clamp(0, _trialSeconds);
 }

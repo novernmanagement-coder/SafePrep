@@ -6,6 +6,7 @@ import 'home_page.dart';
 import 'category_study_page.dart';
 import 'sixty_second_refresh_page.dart';
 import 'safe_prep_nav_bar.dart';
+import 'mixpanel_service.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -36,6 +37,10 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void initState() {
     super.initState();
+    MixpanelService.instance.track(
+      'dashboard_viewed',
+      properties: {'app_name': 'SP'},
+    );
     _loadFacts();
     _startFactTimer();
   }

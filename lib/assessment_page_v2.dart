@@ -39,7 +39,10 @@ class _AssessmentPageV2State extends State<AssessmentPageV2> {
   void initState() {
     super.initState();
     _loadQuestions();
-    MixpanelService.instance.track('assessment_started');
+    MixpanelService.instance.track(
+      'assessment_started',
+      properties: {'app_name': 'SP'},
+    );
   }
 
   Future<void> _loadQuestions() async {
@@ -163,6 +166,7 @@ class _AssessmentPageV2State extends State<AssessmentPageV2> {
         'score': result.overallScore,
         'question_count': _questions.length,
         'is_unlocked': state.hasUnlockedApp,
+        'app_name': 'SP',
       },
     );
 
@@ -281,6 +285,7 @@ class _AssessmentPageV2State extends State<AssessmentPageV2> {
                             properties: {
                               'questions_answered': _currentIndex,
                               'total_questions': _questions.length,
+                              'app_name': 'SP',
                             },
                           );
                           Navigator.pushReplacement(

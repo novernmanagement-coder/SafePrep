@@ -7,6 +7,7 @@ import 'home_page.dart';
 import 'dashboard_page.dart';
 import 'readiness_engine.dart';
 import 'safe_prep_nav_bar.dart';
+import 'mixpanel_service.dart';
 
 enum SixtySecondReturnTo { homePage, dashboard }
 
@@ -53,6 +54,10 @@ class _SixtySecondRefreshPageState extends State<SixtySecondRefreshPage> {
   @override
   void initState() {
     super.initState();
+    MixpanelService.instance.track(
+      'sixty_second_viewed',
+      properties: {'app_name': 'SP'},
+    );
     _awardExtraCredit();
   }
 

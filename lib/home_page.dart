@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'constants.dart';
 import 'app_state.dart';
@@ -30,6 +31,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   String _currentFact = '';
   List<MilestoneModel> _milestones = [];
 
+  // Local display-only ticker for the "Trial — mm:ss" countdown on Home.
+  // Reads TrialTimerService.remainingSeconds; does not affect trial logic.
+  Timer? _displayTicker;
+
   @override
   void initState() {
     super.initState();
@@ -39,38 +44,57 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
     MixpanelService.instance.track(
       'session_start',
-      properties: {'is_unlocked': _state.hasUnlockedApp},
+      properties: {'is_unlocked': _state.hasUnlockedApp, 'app_name': 'SP'},
     );
     MixpanelService.instance.track(
       'home_viewed',
-      properties: {'is_unlocked': _state.hasUnlockedApp},
+      properties: {'is_unlocked': _state.hasUnlockedApp, 'app_name': 'SP'},
     );
 
     if (!_state.hasUnlockedApp) {
-      MixpanelService.instance.track('trial_started');
+      MixpanelService.instance.track(
+        'trial_started',
+        properties: {'app_name': 'SP'},
+      );
       if (!TrialTimerService.instance.isExpired) {
         TrialTimerService.instance.onTrialExpired = _onTrialExpired;
         TrialTimerService.instance.start();
+        _startDisplayTicker();
       } else {
         _onTrialExpired();
       }
     }
   }
 
+  void _startDisplayTicker() {
+    _displayTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() {}); // repaint to reflect TrialTimerService.remainingSeconds
+    });
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _displayTicker?.cancel();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused)
-      MixpanelService.instance.track('session_end');
+      MixpanelService.instance.track(
+        'session_end',
+        properties: {'app_name': 'SP'},
+      );
   }
 
   void _onTrialExpired() {
-    MixpanelService.instance.track('trial_expired');
+    MixpanelService.instance.track(
+      'trial_expired',
+      properties: {'app_name': 'SP'},
+    );
+    _displayTicker?.cancel();
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
@@ -657,7 +681,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       onTap: () {
         MixpanelService.instance.track(
           'paywall_viewed',
-          properties: {'source': 'home_page_banner'},
+          properties: {'source': 'home_page_banner', 'app_name': 'SP'},
         );
         Navigator.pushAndRemoveUntil(
           context,
@@ -689,6 +713,39 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           ],
         ),
       ),
+    );
+  }
+
+  // ── Trial countdown display (replaces the curriculum button during trial) ──
+  // PASSIVE — no tap action, per spec.
+  Widget _buildTrialCountdown() {
+    final remaining = TrialTimerService.instance.remainingSeconds;
+    final minutes = (remaining ~/ 60).toString().padLeft(2, '0');
+    final seconds = (remaining % 60).toString().padLeft(2, '0');
+
+    return Column(
+      spacing: 2,
+      children: [
+        Container(
+          width: double.infinity,
+          height: AppSizes.primaryButtonHeight,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: const Color(0xFF0A0A0F),
+            borderRadius: BorderRadius.circular(AppSizes.buttonCornerRadius),
+            border: Border.all(color: const Color(0xFFD4AF37), width: 1.5),
+          ),
+          child: Text(
+            'Trial — $minutes:$seconds',
+            style: const TextStyle(
+              color: Color(0xFFD4AF37),
+              fontSize: AppFonts.button,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -963,53 +1020,58 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   child: Column(
                     spacing: AppSizes.cardSpacing,
                     children: [
-                      // Create curriculum button
-                      Column(
-                        spacing: 2,
-                        children: [
-                          SizedBox(
-                            width: double.infinity,
-                            height: AppSizes.primaryButtonHeight,
-                            child: ElevatedButton(
-                              onPressed: () {
-                                MixpanelService.instance.track(
-                                  'curriculum_tapped',
-                                );
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const AssessmentInfoPage(),
-                                  ),
-                                );
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primaryButton,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(
-                                    AppSizes.buttonCornerRadius,
+                      // Top slot: trial countdown (unpurchased) OR
+                      // curriculum/assessment button (purchased).
+                      _state.hasUnlockedApp
+                          ? Column(
+                              spacing: 2,
+                              children: [
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: AppSizes.primaryButtonHeight,
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      MixpanelService.instance.track(
+                                        'curriculum_tapped',
+                                        properties: {'app_name': 'SP'},
+                                      );
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              const AssessmentInfoPage(),
+                                        ),
+                                      );
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.primaryButton,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(
+                                          AppSizes.buttonCornerRadius,
+                                        ),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'Create my personalized curriculum',
+                                      style: TextStyle(
+                                        fontSize: AppFonts.button,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              ),
-                              child: const Text(
-                                'Create my personalized curriculum',
-                                style: TextStyle(
-                                  fontSize: AppFonts.button,
-                                  fontWeight: FontWeight.w700,
+                                Text(
+                                  'Study less — take the assessment first',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.subtleText,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
-                              ),
-                            ),
-                          ),
-                          Text(
-                            '(Recommended first step)',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: AppColors.subtleText,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
+                              ],
+                            )
+                          : _buildTrialCountdown(),
 
                       // Dashboard button
                       Column(

@@ -3,8 +3,10 @@ import '../constants.dart';
 import '../iap_service.dart';
 import '../app_state.dart';
 import '../splash_page.dart';
+import '../trial_timer_service.dart';
+import '../home_page.dart';
+import '../mixpanel_service.dart';
 import 'preview_shared.dart';
-import 'preview_cinematic_splash.dart';
 import 'preview_reel_overlay.dart';
 
 class PreviewRevealPage extends StatefulWidget {
@@ -59,7 +61,11 @@ class _PreviewRevealPageState extends State<PreviewRevealPage>
     super.dispose();
   }
 
-  Future<void> _onBuy(Future<IAPResult> Function() buyFn) async {
+  Future<void> _onBuy(String tier, Future<IAPResult> Function() buyFn) async {
+    MixpanelService.instance.track(
+      'purchase_tier_tapped',
+      properties: {'tier': tier, 'app_name': 'SP'},
+    );
     setState(() {
       _isPurchasing = true;
       _errorMessage = null;
@@ -68,16 +74,20 @@ class _PreviewRevealPageState extends State<PreviewRevealPage>
     if (!mounted) return;
     setState(() => _isPurchasing = false);
     if (result == IAPResult.initiated) {
-      _waitForConfirmation();
+      _waitForConfirmation(tier);
     } else {
       setState(() => _errorMessage = result.userMessage);
     }
   }
 
-  void _waitForConfirmation() {
+  void _waitForConfirmation(String tier) {
     Future.delayed(const Duration(seconds: 1), () {
       if (!mounted) return;
       if (AppState().hasUnlockedApp) {
+        MixpanelService.instance.track(
+          'purchase_confirmed',
+          properties: {'tier': tier, 'app_name': 'SP'},
+        );
         if (!mounted) return;
         Navigator.pushAndRemoveUntil(
           context,
@@ -85,16 +95,81 @@ class _PreviewRevealPageState extends State<PreviewRevealPage>
           (route) => false,
         );
       } else {
-        _waitForConfirmation();
+        _waitForConfirmation(tier);
       }
     });
   }
 
   void _startOver() {
+    if (TrialTimerService.instance.isExpired) {
+      _showTrialExpiredModal();
+      return;
+    }
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => const PreviewCinematicSplash()),
+      MaterialPageRoute(builder: (_) => const HomePage()),
       (route) => false,
+    );
+  }
+
+  void _showTrialExpiredModal() {
+    MixpanelService.instance.track(
+      'trial_expired_modal_shown',
+      properties: {'app_name': 'SP'},
+    );
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: _cardBg,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _gold, width: 1.5),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Your trial has ended.',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: _gold,
+                  letterSpacing: 0.3,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'To continue, please select one of the payment options below.',
+                style: TextStyle(fontSize: 13, color: _mutedWhite, height: 1.5),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: 100,
+                height: 40,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _gold,
+                    foregroundColor: _darkBg,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'OK',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -162,21 +237,21 @@ class _PreviewRevealPageState extends State<PreviewRevealPage>
           label: '\$4.99  —  7 Days Access',
           sublabel: 'Try it out',
           isHighlighted: false,
-          onTap: () => _onBuy(IAPService.instance.buySevenDay),
+          onTap: () => _onBuy('7day', IAPService.instance.buySevenDay),
         ),
         const SizedBox(height: 10),
         _buildTierButton(
           label: '\$8.99  —  14 Days Access',
           sublabel: 'Study deeper',
           isHighlighted: false,
-          onTap: () => _onBuy(IAPService.instance.buyFourteenDay),
+          onTap: () => _onBuy('14day', IAPService.instance.buyFourteenDay),
         ),
         const SizedBox(height: 10),
         _buildTierButton(
           label: '\$9.99  —  Lifetime Access',
           sublabel: 'Best value  •  Yours forever  ★',
           isHighlighted: true,
-          onTap: () => _onBuy(IAPService.instance.buyUnlockApp),
+          onTap: () => _onBuy('lifetime', IAPService.instance.buyUnlockApp),
         ),
       ],
     );
@@ -367,8 +442,13 @@ class _PreviewRevealPageState extends State<PreviewRevealPage>
                             SizedBox(
                               width: double.infinity,
                               child: OutlinedButton(
-                                onPressed: () =>
-                                    setState(() => _reelVisible = true),
+                                onPressed: () {
+                                  MixpanelService.instance.track(
+                                    'preview_reel_viewed',
+                                    properties: {'app_name': 'SP'},
+                                  );
+                                  setState(() => _reelVisible = true);
+                                },
                                 style: OutlinedButton.styleFrom(
                                   side: BorderSide(
                                     color: _gold.withValues(alpha: 0.7),
@@ -471,8 +551,13 @@ class _PreviewRevealPageState extends State<PreviewRevealPage>
                             const SizedBox(height: 16),
 
                             TextButton(
-                              onPressed: () =>
-                                  IAPService.instance.restorePurchases(),
+                              onPressed: () {
+                                MixpanelService.instance.track(
+                                  'restore_purchase_tapped',
+                                  properties: {'app_name': 'SP'},
+                                );
+                                IAPService.instance.restorePurchases();
+                              },
                               child: Text(
                                 'Restore previous purchase',
                                 style: TextStyle(
@@ -512,12 +597,14 @@ class _PreviewRevealPageState extends State<PreviewRevealPage>
           if (_reelVisible)
             Positioned.fill(
               child: PreviewReelOverlay(
-                onBuy: () => _onBuy(IAPService.instance.buyUnlockApp),
+                onBuy: () =>
+                    _onBuy('lifetime', IAPService.instance.buyUnlockApp),
                 isPurchasing: _isPurchasing,
                 unlockPrice: IAPService.instance.unlockPrice,
-                onBuySevenDay: () => _onBuy(IAPService.instance.buySevenDay),
+                onBuySevenDay: () =>
+                    _onBuy('7day', IAPService.instance.buySevenDay),
                 onBuyFourteenDay: () =>
-                    _onBuy(IAPService.instance.buyFourteenDay),
+                    _onBuy('14day', IAPService.instance.buyFourteenDay),
               ),
             ),
         ],
