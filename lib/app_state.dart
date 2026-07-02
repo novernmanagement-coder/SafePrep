@@ -318,8 +318,13 @@ class AppState {
   }
 
   void clearCurriculumProgress() {
-    studiedCategories.clear();
-    curriculumProgress.clear();
+    // Only clear studied/curriculum tracking for categories that DON'T
+    // have a real quiz score. If a category was studied AND scored during
+    // trial, that's genuine, earned progress — it survives purchase intact,
+    // including its CURRICULUM trophy. Only incomplete/browsing-only state
+    // gets reset, so purchasing never erases work the user actually did.
+    studiedCategories.removeWhere((c) => !hasScoreForCategory(c));
+    curriculumProgress.removeWhere((c, _) => !hasScoreForCategory(c));
   }
 
   int getOverallCurriculumPercent() {

@@ -179,12 +179,13 @@ class _DashboardPageState extends State<DashboardPage> {
       deltaText =
           'Avg of ${scores.length} ${scores.length == 1 ? 'category' : 'categories'}';
       overallColor = _scoreColor(latest);
-    } else {
-      // No real data yet — show the seeded national average.
-      // Display-only: never written to AppState. Applies regardless of
-      // purchase status — purchased users start blank-then-seeded too,
-      // since progress is explicitly reset on first post-purchase launch
-      // (see splash_page.dart clearCurriculumProgress + reset notice).
+    } else if (!_state.hasUnlockedApp) {
+      // Trial mode only, no real data yet — show the seeded national
+      // average so a browsing trial user doesn't see a blank dashboard.
+      // Display-only: never written to AppState. Purchased users always
+      // fall through to the default blank/dash state below, even right
+      // after purchase — the "Thank You" modal already tells them they're
+      // starting fresh, so the dashboard should actually look fresh too.
       latest = _nationalAverageOverall;
       overallText = '$latest%';
       deltaText = 'National average — not your score yet';
@@ -341,7 +342,11 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
             ),
             Text(
-              hasTaken ? '$score%' : '${_nationalAverages[category] ?? 75}%',
+              hasTaken
+                  ? '$score%'
+                  : (_state.hasUnlockedApp
+                        ? '\u2014'
+                        : '${_nationalAverages[category] ?? 75}%'),
               style: TextStyle(
                 color: hasTaken ? _scoreColor(score) : const Color(0xFF6B7A8A),
                 fontSize: 18,
@@ -351,7 +356,9 @@ class _DashboardPageState extends State<DashboardPage> {
             Text(
               hasTaken
                   ? 'Baseline: $baseline%'
-                  : 'National avg — adapts as you study',
+                  : (_state.hasUnlockedApp
+                        ? 'Not yet tested'
+                        : 'National avg — adapts as you study'),
               style: const TextStyle(color: Color(0xFF8A8A8A), fontSize: 10),
             ),
             const SizedBox(height: 4),

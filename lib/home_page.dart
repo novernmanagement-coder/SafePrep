@@ -487,11 +487,24 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
+  // Flat seeded display value shown on the Home readiness meter before any
+  // real assessment/quiz data exists. Display-only — never written to
+  // _state.readinessScore, so trophies, the Final Exam gate, and the real
+  // ReadinessEngine calculation are completely unaffected.
+  static const int _seededReadinessDisplay = 62;
+
   Widget _buildReadinessMeter() {
-    final score = _state.readinessScore;
+    final hasRealData =
+        _state.latestResult != null || _state.categoryQuizScores.isNotEmpty;
+    final showSeeded = !hasRealData && !_state.hasUnlockedApp;
+    final score = hasRealData
+        ? _state.readinessScore
+        : (showSeeded ? _seededReadinessDisplay : _state.readinessScore);
     final isGreenLight = score >= 100;
     String label;
-    if (score >= 100)
+    if (showSeeded)
+      label = 'National avg — adapts as you study';
+    else if (score >= 100)
       label = '🟢 Green Light';
     else if (score >= 85)
       label = 'Nearly Ready';
@@ -506,7 +519,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       onTap: () => _showInfoModal(
         context,
         'ServSafe Readiness',
-        'SafePrep\'s exclusive algorithm. 100% means you\'re ready. Take the SafePrep Final Exam to prove it.',
+        'Before you\'ve studied, this shows a national average — just something to compare against, not your real score. The moment you study a category or take the assessment, your actual data takes over and your Readiness Score updates to reflect you. 100% means you\'re ready. Take the SafePrep Final Exam to prove it.',
       ),
       child: Container(
         padding: const EdgeInsets.fromLTRB(10, 10, 10, 14),

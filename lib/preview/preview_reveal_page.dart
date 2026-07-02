@@ -124,7 +124,7 @@ class _PreviewRevealPageState extends State<PreviewRevealPage>
               ),
               const SizedBox(height: 10),
               Text(
-                'We\'re resetting your trial data so you can start your studying with a clean slate.',
+                'Anything you studied and scored during your trial carries right over — you\'re picking up exactly where you left off.',
                 style: TextStyle(fontSize: 13, color: _mutedWhite, height: 1.5),
                 textAlign: TextAlign.center,
               ),

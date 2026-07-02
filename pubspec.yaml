@@ -2,7 +2,7 @@ name: safeprep
 description: "SafePrep - Food Safety Exam Prep"
 publish_to: 'none'
 
-version: 1.4.2+2
+version: 1.4.2+3
 
 environment:
   sdk: ^3.11.5
