@@ -5,10 +5,11 @@ import 'constants.dart';
 import 'app_state.dart';
 import 'app_state_persistence.dart';
 import 'home_page.dart';
+import 'dashboard_page.dart';
 import 'intro_page.dart';
 import 'preview/preview_cinematic_splash.dart';
 
-// BUILD 26 — version 1.3.5+9 — Full page curriculum, navigation fix, fresh dashboard on first load
+// BUILD 26 — version 1.4.2+5 — Full page curriculum, navigation fix, fresh dashboard on first load
 // UPDATED — hard-lock splash with guarantee copy + baked-in countdown.
 // First-ever launch holds 15 seconds; every launch after holds 5 seconds.
 class SplashPage extends StatefulWidget {
@@ -128,27 +129,23 @@ class _SplashPageState extends State<SplashPage> {
         state.clearCurriculumProgress();
         state.hasSeenIntro = true;
         AppStatePersistence.save();
-        if (!mounted) return;
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const IntroductoryPage()),
-        );
-      } else {
-        if (!mounted) return;
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const HomePage()),
-        );
       }
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const DashboardPage()),
+      );
       return;
     }
 
-    // Trial mode — always show intro page until purchased
+    // Trial mode — go straight to DashboardPage; the splash countdown already
+    // sets the expectation ("Your dashboard opens in 3...2...1...") so this
+    // delivers on that promise directly.
     // TrialTimerService will fire the paywall at 30 minutes
     if (!mounted) return;
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => const IntroductoryPage()),
+      MaterialPageRoute(builder: (_) => const DashboardPage()),
     );
   }
 

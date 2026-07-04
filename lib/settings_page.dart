@@ -166,6 +166,8 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isTrial = !_state.hasUnlockedApp;
+
     return Scaffold(
       backgroundColor: AppColors.servSafeBlue,
       body: SafeArea(
@@ -420,10 +422,15 @@ class _SettingsPageState extends State<SettingsPage> {
                           width: double.infinity,
                           height: 44,
                           child: ElevatedButton(
-                            onPressed: _openRefundPage,
+                            onPressed: isTrial ? null : _openRefundPage,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primaryButton,
                               foregroundColor: Colors.white,
+                              disabledBackgroundColor: AppColors.primaryButton
+                                  .withValues(alpha: 0.35),
+                              disabledForegroundColor: Colors.white.withValues(
+                                alpha: 0.7,
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
@@ -431,6 +438,19 @@ class _SettingsPageState extends State<SettingsPage> {
                             child: const Text('Refund'),
                           ),
                         ),
+                        if (isTrial)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Text(
+                              'Refunds apply to purchases only — available once you\'ve unlocked full access.',
+                              style: TextStyle(
+                                fontSize: AppFonts.caption,
+                                color: AppColors.subtleText,
+                                fontStyle: FontStyle.italic,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
                         const SizedBox(height: 4),
 
                         Divider(

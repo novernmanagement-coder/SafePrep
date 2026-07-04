@@ -749,7 +749,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               ),
             ),
-            const SafePrepNavBar(),
+            const SafePrepNavBar(isDashboardPage: true),
           ],
         ),
       ),
