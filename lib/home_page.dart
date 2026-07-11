@@ -52,10 +52,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
 
     if (!_state.hasUnlockedApp) {
-      MixpanelService.instance.track(
-        'trial_started',
-        properties: {'app_name': 'SP'},
-      );
+      // trial_started should represent the trial beginning ONCE per
+      // install, not "user returned to Home." HomePage gets rebuilt on
+      // every navigation back here (pushAndRemoveUntil from the intro
+      // page, the splash-icon shortcut, etc), so without this guard the
+      // event — and TrialTimerService.start() below — would re-fire on
+      // every single visit.
+      if (!_state.trialStarted) {
+        MixpanelService.instance.track(
+          'trial_started',
+          properties: {'app_name': 'SP'},
+        );
+        _state.trialStarted = true;
+        AppStatePersistence.save();
+      }
       if (!TrialTimerService.instance.isExpired) {
         TrialTimerService.instance.onTrialExpired = _onTrialExpired;
         TrialTimerService.instance.start();
@@ -730,35 +740,61 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   // ── Trial countdown display (replaces the curriculum button during trial) ──
-  // PASSIVE — no tap action, per spec.
+  // Tappable — routes to PreviewRevealPage rather than firing a direct
+  // purchase (unlike the nav bar's "Unlock" button). This widget reads
+  // as a status display, not a buy button, so a tap should lead to
+  // context and a price choice, not an immediate App Store sheet — that
+  // distinction matters for a widget this prominent; an unexpected
+  // purchase prompt here would read as a bait-and-switch.
   Widget _buildTrialCountdown() {
     final remaining = TrialTimerService.instance.remainingSeconds;
     final minutes = (remaining ~/ 60).toString().padLeft(2, '0');
     final seconds = (remaining % 60).toString().padLeft(2, '0');
 
-    return Column(
-      spacing: 2,
-      children: [
-        Container(
-          width: double.infinity,
-          height: AppSizes.primaryButtonHeight,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: const Color(0xFF0A0A0F),
-            borderRadius: BorderRadius.circular(AppSizes.buttonCornerRadius),
-            border: Border.all(color: const Color(0xFFD4AF37), width: 1.5),
-          ),
-          child: Text(
-            'Trial — $minutes:$seconds',
-            style: const TextStyle(
-              color: Color(0xFFD4AF37),
-              fontSize: AppFonts.button,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.5,
+    return GestureDetector(
+      onTap: () {
+        MixpanelService.instance.track(
+          'paywall_viewed',
+          properties: {'source': 'trial_countdown', 'app_name': 'SP'},
+        );
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => PreviewRevealPage()),
+          (route) => false,
+        );
+      },
+      child: Column(
+        spacing: 2,
+        children: [
+          Container(
+            width: double.infinity,
+            height: AppSizes.primaryButtonHeight,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: const Color(0xFF0A0A0F),
+              borderRadius: BorderRadius.circular(AppSizes.buttonCornerRadius),
+              border: Border.all(color: const Color(0xFFD4AF37), width: 1.5),
+            ),
+            child: Text(
+              'Trial — $minutes:$seconds',
+              style: const TextStyle(
+                color: Color(0xFFD4AF37),
+                fontSize: AppFonts.button,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+              ),
             ),
           ),
-        ),
-      ],
+          Text(
+            'Tap to see full access options',
+            style: TextStyle(
+              fontSize: 11,
+              color: AppColors.subtleText,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -874,14 +910,27 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             GestureDetector(
               onTap: () async {
                 final result = await IAPService.instance.buyUpgrade();
-                if (result != IAPResult.initiated && mounted) {
+                if (!mounted) return;
+
+                if (result == IAPResult.success) {
+                  setState(() {}); // canUpgradeToLifetime flips false now
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        result.userMessage ?? 'Something went wrong.',
-                      ),
+                    const SnackBar(
+                      content: Text("You're upgraded to Lifetime! 🎉"),
                     ),
                   );
+                  return;
+                }
+
+                if (result == IAPResult.canceled) {
+                  return; // user backed out — intentional, nothing to show
+                }
+
+                final message = result.userMessage;
+                if (message != null) {
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(message)));
                 }
               },
               child: Container(

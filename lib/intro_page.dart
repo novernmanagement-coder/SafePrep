@@ -191,35 +191,6 @@ class _IntroductoryPageState extends State<IntroductoryPage>
                   child: ElevatedButton(
                     onPressed: _goToHomePage,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1A1A14),
-                      foregroundColor: const Color(0xFFF0EDE8),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(40),
-                        side: BorderSide(
-                          color: const Color(0xFFD4AF37).withValues(alpha: 0.4),
-                        ),
-                      ),
-                      elevation: 2,
-                    ),
-                    child: const Text(
-                      'Got it',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 10),
-
-                // Unlock for free now button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _goToHomePage,
-                    style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFD4AF37),
                       foregroundColor: const Color(0xFF0A0A0F),
                       padding: const EdgeInsets.symmetric(vertical: 14),
@@ -229,7 +200,7 @@ class _IntroductoryPageState extends State<IntroductoryPage>
                       elevation: 6,
                     ),
                     child: const Text(
-                      '🔓  Unlock for free now',
+                      'Got it',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,

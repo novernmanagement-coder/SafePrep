@@ -7,6 +7,7 @@ import 'dashboard_page.dart';
 import 'assessment_info_page.dart';
 import 'category_quiz_page.dart';
 import 'mixpanel_service.dart';
+import 'safe_prep_nav_bar.dart';
 
 class CategoryStudyPage extends StatefulWidget {
   final String category;
@@ -363,112 +364,127 @@ class _CategoryStudyPageState extends State<CategoryStudyPage> {
     return Scaffold(
       backgroundColor: AppColors.servSafeBlue,
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: Padding(
           padding: AppSizes.pageMargin,
           child: Column(
             children: [
-              _buildHeader(),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      _buildHeader(),
 
-              isComplete || content == null
-                  ? _buildCompletionCard()
-                  : _buildConceptCard(content),
+                      isComplete || content == null
+                          ? _buildCompletionCard()
+                          : _buildConceptCard(content),
 
-              if (!isComplete) ...[
-                Row(
-                  spacing: 8,
-                  children: [
-                    Expanded(
-                      child: SizedBox(
+                      if (!isComplete) ...[
+                        Row(
+                          spacing: 8,
+                          children: [
+                            Expanded(
+                              child: SizedBox(
+                                height: AppSizes.primaryButtonHeight,
+                                child: ElevatedButton(
+                                  onPressed: _currentIndex > 0
+                                      ? _goPrevious
+                                      : null,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primaryButton,
+                                    foregroundColor: Colors.white,
+                                    disabledBackgroundColor:
+                                        AppColors.disabledButton,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(
+                                        AppSizes.buttonCornerRadius,
+                                      ),
+                                    ),
+                                  ),
+                                  child: const Text('← Previous'),
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: SizedBox(
+                                height: AppSizes.primaryButtonHeight,
+                                child: ElevatedButton(
+                                  onPressed: _goNext,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primaryButton,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(
+                                        AppSizes.buttonCornerRadius,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Text(isLast ? 'Take Quiz' : 'Next →'),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+
+                      SizedBox(
+                        width: double.infinity,
                         height: AppSizes.primaryButtonHeight,
                         child: ElevatedButton(
-                          onPressed: _currentIndex > 0 ? _goPrevious : null,
+                          onPressed: () {
+                            final allCardsViewed =
+                                _queue.isEmpty ||
+                                _currentIndex >= _queue.length - 1;
+                            if (allCardsViewed) {
+                              MixpanelService.instance.track(
+                                'study_completed',
+                                properties: {
+                                  'category': widget.category,
+                                  'mode': _mode,
+                                },
+                              );
+                            } else {
+                              MixpanelService.instance.track(
+                                'study_abandoned',
+                                properties: {
+                                  'category': widget.category,
+                                  'mode': _mode,
+                                  'cards_viewed': _currentIndex,
+                                  'total_cards': _queue.length,
+                                },
+                              );
+                            }
+                            _state.markCategoryStudied(widget.category);
+                            AppStatePersistence.save();
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const DashboardPage(),
+                              ),
+                            );
+                          },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primaryButton,
                             foregroundColor: Colors.white,
-                            disabledBackgroundColor: AppColors.disabledButton,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(
                                 AppSizes.buttonCornerRadius,
                               ),
                             ),
                           ),
-                          child: const Text('← Previous'),
+                          child: const Text('Back to Dashboard'),
                         ),
                       ),
-                    ),
-                    Expanded(
-                      child: SizedBox(
-                        height: AppSizes.primaryButtonHeight,
-                        child: ElevatedButton(
-                          onPressed: _goNext,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primaryButton,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(
-                                AppSizes.buttonCornerRadius,
-                              ),
-                            ),
-                          ),
-                          child: Text(isLast ? 'Take Quiz' : 'Next →'),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-              ],
 
-              SizedBox(
-                width: double.infinity,
-                height: AppSizes.primaryButtonHeight,
-                child: ElevatedButton(
-                  onPressed: () {
-                    final allCardsViewed =
-                        _queue.isEmpty || _currentIndex >= _queue.length - 1;
-                    if (allCardsViewed) {
-                      MixpanelService.instance.track(
-                        'study_completed',
-                        properties: {
-                          'category': widget.category,
-                          'mode': _mode,
-                        },
-                      );
-                    } else {
-                      MixpanelService.instance.track(
-                        'study_abandoned',
-                        properties: {
-                          'category': widget.category,
-                          'mode': _mode,
-                          'cards_viewed': _currentIndex,
-                          'total_cards': _queue.length,
-                        },
-                      );
-                    }
-                    _state.markCategoryStudied(widget.category);
-                    AppStatePersistence.save();
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(builder: (_) => const DashboardPage()),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryButton,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(
-                        AppSizes.buttonCornerRadius,
-                      ),
-                    ),
+                      const SizedBox(height: 10),
+
+                      if (!isComplete && keyPoints.isNotEmpty)
+                        _buildKeyPointsCard(keyPoints),
+                    ],
                   ),
-                  child: const Text('Back to Dashboard'),
                 ),
               ),
-
-              const SizedBox(height: 10),
-
-              if (!isComplete && keyPoints.isNotEmpty)
-                _buildKeyPointsCard(keyPoints),
+              const SafePrepNavBar(),
             ],
           ),
         ),

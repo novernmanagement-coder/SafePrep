@@ -61,6 +61,10 @@ class _PreviewRevealPageState extends State<PreviewRevealPage>
     super.dispose();
   }
 
+  // IAPService now awaits the ACTUAL purchase outcome (success / canceled /
+  // error / timeout) instead of just "request submitted," so `result` here
+  // is final and known — no more need to poll AppState().hasUnlockedApp in
+  // a loop. The old _waitForConfirmation() method this replaced is gone.
   Future<void> _onBuy(String tier, Future<IAPResult> Function() buyFn) async {
     MixpanelService.instance.track(
       'purchase_tier_tapped',
@@ -73,27 +77,23 @@ class _PreviewRevealPageState extends State<PreviewRevealPage>
     final result = await buyFn();
     if (!mounted) return;
     setState(() => _isPurchasing = false);
-    if (result == IAPResult.initiated) {
-      _waitForConfirmation(tier);
-    } else {
-      setState(() => _errorMessage = result.userMessage);
-    }
-  }
 
-  void _waitForConfirmation(String tier) {
-    Future.delayed(const Duration(seconds: 1), () {
-      if (!mounted) return;
-      if (AppState().hasUnlockedApp) {
-        MixpanelService.instance.track(
-          'purchase_confirmed',
-          properties: {'tier': tier, 'app_name': 'SP'},
-        );
-        if (!mounted) return;
-        _showPurchaseThankYouModal();
-      } else {
-        _waitForConfirmation(tier);
-      }
-    });
+    if (result == IAPResult.success) {
+      MixpanelService.instance.track(
+        'purchase_confirmed',
+        properties: {'tier': tier, 'app_name': 'SP'},
+      );
+      _showPurchaseThankYouModal();
+      return;
+    }
+
+    if (result == IAPResult.canceled) {
+      // User intentionally backed out of the App Store sheet — no error
+      // to show, nothing more to do.
+      return;
+    }
+
+    setState(() => _errorMessage = result.userMessage);
   }
 
   void _showPurchaseThankYouModal() {

@@ -5,6 +5,7 @@ import 'app_state.dart';
 import 'app_state_persistence.dart';
 import 'dashboard_page.dart';
 import 'category_quiz_results_page.dart';
+import 'safe_prep_nav_bar.dart';
 
 class CategoryQuizPage extends StatefulWidget {
   final String category;
@@ -205,255 +206,274 @@ class _CategoryQuizPageState extends State<CategoryQuizPage> {
     return Scaffold(
       backgroundColor: AppColors.servSafeBlue,
       body: SafeArea(
-        child: SingleChildScrollView(
-          controller: _scrollController,
+        child: Padding(
           padding: AppSizes.pageMargin,
           child: Column(
-            spacing: 10,
             children: [
-              // Header
-              Padding(
-                padding: const EdgeInsets.only(top: 8, bottom: 10),
-                child: Column(
-                  spacing: 4,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        GestureDetector(
-                          onTap: () => Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const DashboardPage(),
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: _scrollController,
+                  child: Column(
+                    spacing: 10,
+                    children: [
+                      // Header
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8, bottom: 10),
+                        child: Column(
+                          spacing: 4,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                GestureDetector(
+                                  onTap: () => Navigator.pushReplacement(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const DashboardPage(),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Text(
+                                        'Safe',
+                                        style: TextStyle(
+                                          fontSize: AppFonts.header,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.bodyText,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Image.asset(
+                                        'Assets/splash.png',
+                                        width: 36,
+                                        height: 36,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Prep™',
+                                        style: TextStyle(
+                                          fontSize: AppFonts.header,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.bodyText,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              widget.category,
+                              style: TextStyle(
+                                fontSize: AppFonts.subheader,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.bodyText,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            if (hasQuestions)
+                              Text(
+                                'Question ${_currentIndex + 1} of ${_questions.length}',
+                                style: TextStyle(
+                                  fontSize: AppFonts.caption,
+                                  color: AppColors.subtleText,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                          ],
+                        ),
+                      ),
+
+                      if (!hasQuestions)
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppColors.cardBackground,
+                            borderRadius: BorderRadius.circular(
+                              AppSizes.cardCornerRadius,
+                            ),
+                            border: Border.all(color: AppColors.cardBorder),
+                          ),
+                          child: Text(
+                            'No quiz questions available for this category yet.',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppColors.strongText,
                             ),
                           ),
-                          child: Row(
-                            children: [
-                              Text(
-                                'Safe',
-                                style: TextStyle(
-                                  fontSize: AppFonts.header,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.bodyText,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Image.asset(
-                                'Assets/splash.png',
-                                width: 36,
-                                height: 36,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                'Prep™',
-                                style: TextStyle(
-                                  fontSize: AppFonts.header,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.bodyText,
-                                ),
-                              ),
-                            ],
+                        ),
+
+                      if (hasQuestions && q != null) ...[
+                        // Question card
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.cardBackground,
+                            borderRadius: BorderRadius.circular(
+                              AppSizes.cardCornerRadius,
+                            ),
+                            border: Border.all(color: AppColors.cardBorder),
+                          ),
+                          child: Text(
+                            q.questionText,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppColors.strongText,
+                              height: 1.5,
+                            ),
                           ),
                         ),
+
+                        // Answer buttons
+                        ...[
+                          q.answer1,
+                          q.answer2,
+                          q.answer3,
+                          q.answer4,
+                        ].asMap().entries.map((e) {
+                          final i = e.key;
+                          final text = e.value;
+                          return SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: _answered
+                                  ? null
+                                  : () => _answerSelected(i),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _answerColor(
+                                  i,
+                                  q.correctAnswer,
+                                ),
+                                foregroundColor: Colors.white,
+                                disabledBackgroundColor: _answerColor(
+                                  i,
+                                  q.correctAnswer,
+                                ),
+                                disabledForegroundColor: Colors.white,
+                                alignment: Alignment.centerLeft,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                minimumSize: Size(
+                                  double.infinity,
+                                  AppSizes.primaryButtonHeight,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    AppSizes.buttonCornerRadius,
+                                  ),
+                                ),
+                              ),
+                              child: Text(
+                                text,
+                                style: const TextStyle(fontSize: 13),
+                                textAlign: TextAlign.left,
+                              ),
+                            ),
+                          );
+                        }),
+
+                        // Feedback card
+                        if (_answered)
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            margin: const EdgeInsets.only(top: 4),
+                            decoration: BoxDecoration(
+                              color: correct
+                                  ? const Color(0xFF3BA776)
+                                  : const Color(0xFFD64545),
+                              borderRadius: BorderRadius.circular(
+                                AppSizes.cardCornerRadius,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              spacing: 8,
+                              children: [
+                                Text(
+                                  correct ? 'Correct.' : 'Not quite.',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                Text(
+                                  q.explanation,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.white,
+                                    height: 1.5,
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: AppSizes.primaryButtonHeight,
+                                  child: ElevatedButton(
+                                    onPressed: _nextQuestion,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.white,
+                                      foregroundColor: AppColors.strongText,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(
+                                          AppSizes.buttonCornerRadius,
+                                        ),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      isLast
+                                          ? 'See results'
+                                          : 'Next question →',
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                       ],
-                    ),
-                    Text(
-                      widget.category,
-                      style: TextStyle(
-                        fontSize: AppFonts.subheader,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.bodyText,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    if (hasQuestions)
-                      Text(
-                        'Question ${_currentIndex + 1} of ${_questions.length}',
-                        style: TextStyle(
-                          fontSize: AppFonts.caption,
-                          color: AppColors.subtleText,
+
+                      // Footer
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Column(
+                          spacing: AppSizes.footerSpacing,
+                          children: [
+                            Text(
+                              AppStrings.footerLine1,
+                              style: TextStyle(
+                                fontSize: AppFonts.footer,
+                                color: AppColors.footerText,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            Text(
+                              AppStrings.footerLine2,
+                              style: TextStyle(
+                                fontSize: AppFonts.footer,
+                                color: AppColors.footerText,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            Text(
+                              AppStrings.footerLine3,
+                              style: TextStyle(
+                                fontSize: AppFonts.footer,
+                                color: AppColors.starMotifBlue,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
                         ),
-                        textAlign: TextAlign.center,
                       ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-
-              if (!hasQuestions)
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.cardBackground,
-                    borderRadius: BorderRadius.circular(
-                      AppSizes.cardCornerRadius,
-                    ),
-                    border: Border.all(color: AppColors.cardBorder),
-                  ),
-                  child: Text(
-                    'No quiz questions available for this category yet.',
-                    style: TextStyle(fontSize: 14, color: AppColors.strongText),
-                  ),
-                ),
-
-              if (hasQuestions && q != null) ...[
-                // Question card
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.cardBackground,
-                    borderRadius: BorderRadius.circular(
-                      AppSizes.cardCornerRadius,
-                    ),
-                    border: Border.all(color: AppColors.cardBorder),
-                  ),
-                  child: Text(
-                    q.questionText,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: AppColors.strongText,
-                      height: 1.5,
-                    ),
-                  ),
-                ),
-
-                // Answer buttons
-                ...[
-                  q.answer1,
-                  q.answer2,
-                  q.answer3,
-                  q.answer4,
-                ].asMap().entries.map((e) {
-                  final i = e.key;
-                  final text = e.value;
-                  return SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _answered ? null : () => _answerSelected(i),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _answerColor(i, q.correctAnswer),
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: _answerColor(
-                          i,
-                          q.correctAnswer,
-                        ),
-                        disabledForegroundColor: Colors.white,
-                        alignment: Alignment.centerLeft,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        minimumSize: Size(
-                          double.infinity,
-                          AppSizes.primaryButtonHeight,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(
-                            AppSizes.buttonCornerRadius,
-                          ),
-                        ),
-                      ),
-                      child: Text(
-                        text,
-                        style: const TextStyle(fontSize: 13),
-                        textAlign: TextAlign.left,
-                      ),
-                    ),
-                  );
-                }),
-
-                // Feedback card
-                if (_answered)
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    margin: const EdgeInsets.only(top: 4),
-                    decoration: BoxDecoration(
-                      color: correct
-                          ? const Color(0xFF3BA776)
-                          : const Color(0xFFD64545),
-                      borderRadius: BorderRadius.circular(
-                        AppSizes.cardCornerRadius,
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      spacing: 8,
-                      children: [
-                        Text(
-                          correct ? 'Correct.' : 'Not quite.',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                        Text(
-                          q.explanation,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.white,
-                            height: 1.5,
-                          ),
-                        ),
-                        SizedBox(
-                          width: double.infinity,
-                          height: AppSizes.primaryButtonHeight,
-                          child: ElevatedButton(
-                            onPressed: _nextQuestion,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: AppColors.strongText,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(
-                                  AppSizes.buttonCornerRadius,
-                                ),
-                              ),
-                            ),
-                            child: Text(
-                              isLast ? 'See results' : 'Next question →',
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-
-              // Footer
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Column(
-                  spacing: AppSizes.footerSpacing,
-                  children: [
-                    Text(
-                      AppStrings.footerLine1,
-                      style: TextStyle(
-                        fontSize: AppFonts.footer,
-                        color: AppColors.footerText,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    Text(
-                      AppStrings.footerLine2,
-                      style: TextStyle(
-                        fontSize: AppFonts.footer,
-                        color: AppColors.footerText,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    Text(
-                      AppStrings.footerLine3,
-                      style: TextStyle(
-                        fontSize: AppFonts.footer,
-                        color: AppColors.starMotifBlue,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
+              const SafePrepNavBar(),
             ],
           ),
         ),

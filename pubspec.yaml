@@ -8,6 +8,7 @@ environment:
   sdk: ^3.11.5
 
 dependencies:
+  flutter_secure_storage: ^9.0.0
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8

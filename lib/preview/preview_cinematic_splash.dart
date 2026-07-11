@@ -117,6 +117,36 @@ class _PreviewCinematicSplashState extends State<PreviewCinematicSplash>
     super.dispose();
   }
 
+  // Shared purchase-outcome handler for all three tiers on this page.
+  // IAPService now awaits the ACTUAL result (success / canceled / error /
+  // timeout) instead of just "request submitted," so there is no more
+  // need to poll AppState().hasUnlockedApp in a loop — the old
+  // _waitForConfirmation() method this replaced is gone. `result` here
+  // is the final, known outcome.
+  Future<void> _completePurchase(IAPResult result) async {
+    if (!mounted) return;
+    setState(() => _isPurchasing = false);
+
+    if (result == IAPResult.success) {
+      await TrialTimerService.instance.resetTrial();
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const HomePage()),
+        (route) => false,
+      );
+      return;
+    }
+
+    if (result == IAPResult.canceled) {
+      // User intentionally backed out of the App Store sheet — no error
+      // to show, nothing more to do.
+      return;
+    }
+
+    setState(() => _errorMessage = result.userMessage);
+  }
+
   Future<void> _onBuy() async {
     MixpanelService.instance.track(
       'purchase_initiated',
@@ -127,34 +157,7 @@ class _PreviewCinematicSplashState extends State<PreviewCinematicSplash>
       _errorMessage = null;
     });
     final result = await IAPService.instance.buyUnlockApp();
-    if (!mounted) return;
-    setState(() => _isPurchasing = false);
-    if (result == IAPResult.initiated) {
-      _waitForConfirmation('lifetime');
-    } else {
-      setState(() => _errorMessage = result.userMessage);
-    }
-  }
-
-  void _waitForConfirmation(String tier) {
-    Future.delayed(const Duration(seconds: 1), () async {
-      if (!mounted) return;
-      if (AppState().hasUnlockedApp) {
-        MixpanelService.instance.track(
-          'purchase_completed',
-          properties: {'tier': tier},
-        );
-        await TrialTimerService.instance.resetTrial();
-        if (!mounted) return;
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const HomePage()),
-          (route) => false,
-        );
-      } else {
-        _waitForConfirmation(tier);
-      }
-    });
+    await _completePurchase(result);
   }
 
   void _startOver() {
@@ -455,13 +458,7 @@ class _PreviewCinematicSplashState extends State<PreviewCinematicSplash>
                     _errorMessage = null;
                   });
                   final result = await IAPService.instance.buySevenDay();
-                  if (!mounted) return;
-                  setState(() => _isPurchasing = false);
-                  if (result == IAPResult.initiated) {
-                    _waitForConfirmation('seven_day');
-                  } else {
-                    setState(() => _errorMessage = result.userMessage);
-                  }
+                  await _completePurchase(result);
                 },
         ),
         const SizedBox(height: 10),
@@ -483,13 +480,7 @@ class _PreviewCinematicSplashState extends State<PreviewCinematicSplash>
                     _errorMessage = null;
                   });
                   final result = await IAPService.instance.buyFourteenDay();
-                  if (!mounted) return;
-                  setState(() => _isPurchasing = false);
-                  if (result == IAPResult.initiated) {
-                    _waitForConfirmation('fourteen_day');
-                  } else {
-                    setState(() => _errorMessage = result.userMessage);
-                  }
+                  await _completePurchase(result);
                 },
         ),
         const SizedBox(height: 10),
