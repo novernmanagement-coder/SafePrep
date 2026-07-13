@@ -7,6 +7,7 @@ import 'mnemonics_page.dart';
 import 'rapid_fire_page.dart';
 import 'scenario_drills_page.dart';
 import 'safe_prep_nav_bar.dart';
+import 'mixpanel_service.dart';
 
 class PeaceOfMindPage extends StatelessWidget {
   const PeaceOfMindPage({super.key});
@@ -15,6 +16,13 @@ class PeaceOfMindPage extends StatelessWidget {
     context,
     MaterialPageRoute(builder: (_) => page),
   );
+
+  void _trackTrainerSelected(String trainerName) {
+    MixpanelService.instance.track(
+      'trainer_selected',
+      properties: {'trainer_name': trainerName},
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -92,35 +100,34 @@ class PeaceOfMindPage extends StatelessWidget {
 
                     const SizedBox(height: 20),
 
-                    _buildToolButton(
-                      context,
-                      '\ud83c\udccf Flash Cards',
-                      () => _go(context, const FlashCardsPage()),
-                    ),
+                    _buildToolButton(context, '\ud83c\udccf Flash Cards', () {
+                      _trackTrainerSelected('flash_cards');
+                      _go(context, const FlashCardsPage());
+                    }),
                     const SizedBox(height: 8),
                     _buildToolButton(
                       context,
                       '\ud83c\udfad Scenario Drills',
-                      () => _go(context, const ScenarioDrillsPage()),
+                      () {
+                        _trackTrainerSelected('scenario_drills');
+                        _go(context, const ScenarioDrillsPage());
+                      },
                     ),
                     const SizedBox(height: 8),
-                    _buildToolButton(
-                      context,
-                      '\u26a1 Rapid Fire',
-                      () => _go(context, const RapidFirePage()),
-                    ),
+                    _buildToolButton(context, '\u26a1 Rapid Fire', () {
+                      _trackTrainerSelected('rapid_fire');
+                      _go(context, const RapidFirePage());
+                    }),
                     const SizedBox(height: 8),
-                    _buildToolButton(
-                      context,
-                      '\ud83e\udde0 Mnemonics',
-                      () => _go(context, const MnemonicsPage()),
-                    ),
+                    _buildToolButton(context, '\ud83e\udde0 Mnemonics', () {
+                      _trackTrainerSelected('mnemonics');
+                      _go(context, const MnemonicsPage());
+                    }),
                     const SizedBox(height: 8),
-                    _buildToolButton(
-                      context,
-                      '\ud83d\udccc Proctor Tips',
-                      () => _go(context, const InstructorTipsPage()),
-                    ),
+                    _buildToolButton(context, '\ud83d\udccc Proctor Tips', () {
+                      _trackTrainerSelected('proctor_tips');
+                      _go(context, const InstructorTipsPage());
+                    }),
 
                     const SizedBox(height: 12),
                   ],

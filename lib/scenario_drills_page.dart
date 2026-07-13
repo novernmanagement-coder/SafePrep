@@ -7,6 +7,7 @@ import 'readiness_engine.dart';
 import 'csv_loader.dart';
 import 'peace_of_mind_page.dart';
 import 'safe_prep_nav_bar.dart';
+import 'mixpanel_service.dart';
 
 class ScenarioDrillsPage extends StatefulWidget {
   final String? filterCategory;
@@ -154,7 +155,16 @@ class _ScenarioDrillsPageState extends State<ScenarioDrillsPage> {
 
     _currentIndex = 0;
     _current = _scenarios.isNotEmpty ? _scenarios[0] : null;
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {});
+      MixpanelService.instance.track(
+        'scenario_drills_started',
+        properties: {
+          'scenario_count': _scenarios.length,
+          'category_label': _categoryLabel,
+        },
+      );
+    }
   }
 
   void _showPhase1() {
@@ -187,11 +197,20 @@ class _ScenarioDrillsPageState extends State<ScenarioDrillsPage> {
 
   void _onChoiceSelected(int choiceIndex) {
     if (_phase != _Phase.choices) return;
+    final isCorrect = choiceIndex == _current!.correctChoice;
     setState(() {
       _selectedChoice = choiceIndex;
       _phase = _Phase.result;
     });
-    _transitionToPhase3(choiceIndex == _current!.correctChoice);
+    MixpanelService.instance.track(
+      'scenario_drill_answered',
+      properties: {
+        'scenario_index': _currentIndex,
+        'category': _current?.category,
+        'correct': isCorrect,
+      },
+    );
+    _transitionToPhase3(isCorrect);
   }
 
   Future<void> _transitionToPhase3(bool isCorrect) async {

@@ -54,10 +54,7 @@ class _SixtySecondRefreshPageState extends State<SixtySecondRefreshPage> {
   @override
   void initState() {
     super.initState();
-    MixpanelService.instance.track(
-      'sixty_second_viewed',
-      properties: {'app_name': 'SP'},
-    );
+    MixpanelService.instance.track('sixty_second_viewed');
     _awardExtraCredit();
   }
 
@@ -97,6 +94,10 @@ class _SixtySecondRefreshPageState extends State<SixtySecondRefreshPage> {
   }
 
   Future<void> _startCategoryBursts(String category) async {
+    MixpanelService.instance.track(
+      'sixty_second_category_selected',
+      properties: {'category': category},
+    );
     setState(() {
       _isStopped = false;
       _showingBurst = true;
@@ -202,6 +203,10 @@ class _SixtySecondRefreshPageState extends State<SixtySecondRefreshPage> {
   Future<void> _startFinalReview() async {
     final missedIds = _state.missedFinalExamQuestionIds;
     if (missedIds.isEmpty) return;
+    MixpanelService.instance.track(
+      'sixty_second_final_review_started',
+      properties: {'missed_question_count': missedIds.length},
+    );
     setState(() {
       _isStopped = false;
       _showingBurst = true;

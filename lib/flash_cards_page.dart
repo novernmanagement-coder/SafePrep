@@ -5,6 +5,7 @@ import 'app_state_persistence.dart';
 import 'csv_loader.dart';
 import 'peace_of_mind_page.dart';
 import 'readiness_engine.dart';
+import 'mixpanel_service.dart';
 
 enum _CardState { deck, question, reveal }
 
@@ -108,6 +109,10 @@ class _FlashCardsPageState extends State<FlashCardsPage>
 
     if (mounted) {
       setState(() => _cards = [...mustInclude, ...personalized]);
+      MixpanelService.instance.track(
+        'flash_cards_started',
+        properties: {'deck_size': _cards.length},
+      );
     }
   }
 
@@ -152,6 +157,10 @@ class _FlashCardsPageState extends State<FlashCardsPage>
       state.readinessScore,
     );
     AppStatePersistence.save();
+    MixpanelService.instance.track(
+      'flash_cards_completed',
+      properties: {'cards_reviewed': _currentIndex + 1},
+    );
     Navigator.pop(context);
   }
 

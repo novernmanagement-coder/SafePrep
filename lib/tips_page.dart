@@ -2,9 +2,21 @@ import 'package:flutter/material.dart';
 import 'constants.dart';
 import 'home_page.dart';
 import 'safe_prep_nav_bar.dart';
+import 'mixpanel_service.dart';
 
-class TipsPage extends StatelessWidget {
+class TipsPage extends StatefulWidget {
   const TipsPage({super.key});
+
+  @override
+  State<TipsPage> createState() => _TipsPageState();
+}
+
+class _TipsPageState extends State<TipsPage> {
+  @override
+  void initState() {
+    super.initState();
+    MixpanelService.instance.track('proctor_tips_viewed');
+  }
 
   Widget _buildCard(String title, List<String> paragraphs) {
     return Container(

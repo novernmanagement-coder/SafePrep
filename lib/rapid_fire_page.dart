@@ -6,6 +6,7 @@ import 'csv_loader.dart';
 import 'app_state_persistence.dart';
 import 'readiness_engine.dart';
 import 'peace_of_mind_page.dart';
+import 'mixpanel_service.dart';
 
 class RapidFirePage extends StatefulWidget {
   const RapidFirePage({super.key});
@@ -63,6 +64,7 @@ class _RapidFirePageState extends State<RapidFirePage>
   @override
   void initState() {
     super.initState();
+    MixpanelService.instance.track('rapid_fire_started');
     _awardExtraCredit();
     _init();
   }
@@ -635,6 +637,14 @@ class _RapidFirePageState extends State<RapidFirePage>
   void _onMoreFacts() => _loadDeck(append: true);
 
   void _stopAndExit() {
+    MixpanelService.instance.track(
+      'rapid_fire_completed',
+      properties: {
+        'correct': _correct,
+        'incorrect': _incorrect,
+        'skipped': _skipped,
+      },
+    );
     _isStopped = true;
     if (mounted) {
       Navigator.pushReplacement(
