@@ -7,6 +7,8 @@ import 'category_study_page.dart';
 import 'sixty_second_refresh_page.dart';
 import 'safe_prep_nav_bar.dart';
 import 'mixpanel_service.dart';
+import 'trial_timer_service.dart';
+import 'preview/preview_reveal_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -59,6 +61,19 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void initState() {
     super.initState();
+    final bool locked =
+        !_state.hasUnlockedApp && TrialTimerService.instance.isExpired;
+    if (locked) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => PreviewRevealPage()),
+          (route) => false,
+        );
+      });
+      return;
+    }
     MixpanelService.instance.track(
       'dashboard_viewed',
       properties: {'app_name': 'SP'},

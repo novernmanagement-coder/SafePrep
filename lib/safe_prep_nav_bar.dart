@@ -8,6 +8,7 @@ import 'iap_service.dart';
 import 'home_page.dart';
 import 'dashboard_page.dart';
 import 'rapid_fire_page.dart';
+import 'preview/preview_reveal_page.dart';
 
 class SafePrepNavBar extends StatefulWidget {
   /// Set to true only from DashboardPage. When true and the user is still
@@ -33,6 +34,16 @@ class _SafePrepNavBarState extends State<SafePrepNavBar> {
   }
 
   void _goDashboard(BuildContext context) {
+    final bool locked =
+        !AppState().hasUnlockedApp && TrialTimerService.instance.isExpired;
+    if (locked) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => PreviewRevealPage()),
+        (route) => false,
+      );
+      return;
+    }
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (_) => const DashboardPage()),
