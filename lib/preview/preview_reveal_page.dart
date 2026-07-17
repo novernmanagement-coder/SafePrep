@@ -645,7 +645,9 @@ class _PreviewRevealPageState extends State<PreviewRevealPage>
 
                             const SizedBox(height: 8),
 
-                            buildPreviewFooter(context),
+                            if (!(!AppState().hasUnlockedApp &&
+                                TrialTimerService.instance.isExpired))
+                              buildPreviewFooter(context),
                           ],
                         ),
                       ),
