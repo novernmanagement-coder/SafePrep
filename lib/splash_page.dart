@@ -4,10 +4,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'constants.dart';
 import 'app_state.dart';
 import 'app_state_persistence.dart';
+import 'mixpanel_service.dart';
 import 'dashboard_page.dart';
 import 'onboard/onboard_intro.dart';
 import 'onboard/onboard_paywall.dart';
-import 'rapid_fire_limited_page.dart';
 
 // BUILD 27 — Simplified routing.
 //
@@ -103,6 +103,10 @@ class _SplashPageState extends State<SplashPage> {
     //   3. First time / hasn't declined yet → full onboarding funnel
     //
     if (state.hasUnlockedApp && !state.isExpired) {
+      MixpanelService.instance.track(
+        'splash_route',
+        properties: {'app_name': 'SP', 'path': 'purchased'},
+      );
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const DashboardPage()),
@@ -117,14 +121,15 @@ class _SplashPageState extends State<SplashPage> {
     if (!mounted) return;
 
     final prefs = await SharedPreferences.getInstance();
-    final hasDeclined =
-        prefs.getBool(RapidFireLimitedPage.declinedToLimitedKey) ?? false;
+    final hasDeclined = prefs.getBool('has_declined_to_limited') ?? false;
 
     if (!mounted) return;
 
     if (hasDeclined) {
-      // Returning decliner — drop them on the decline page so they
-      // can purchase immediately, or jump into the limited Rapid Fire.
+      MixpanelService.instance.track(
+        'splash_route',
+        properties: {'app_name': 'SP', 'path': 'returner_declined'},
+      );
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -132,7 +137,10 @@ class _SplashPageState extends State<SplashPage> {
         ),
       );
     } else {
-      // First time — full onboarding funnel.
+      MixpanelService.instance.track(
+        'splash_route',
+        properties: {'app_name': 'SP', 'path': 'fresh_onboarding'},
+      );
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const OnboardIntro()),
