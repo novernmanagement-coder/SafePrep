@@ -8,6 +8,7 @@ import 'mixpanel_service.dart';
 import 'dashboard_page.dart';
 import 'onboard/onboard_intro.dart';
 import 'onboard/onboard_paywall.dart';
+import 'onboard/onboard_answers.dart';
 
 // BUILD 27 — Simplified routing.
 //
@@ -137,6 +138,11 @@ class _SplashPageState extends State<SplashPage> {
         ),
       );
     } else {
+      // Clear stale diagnostic data from any previous onboarding run.
+      // Without this, a returning user who declined gets the old
+      // DiagnosticResult on the readiness screen instead of their new
+      // answers.
+      OnboardingAnswers.instance.reset();
       MixpanelService.instance.track(
         'splash_route',
         properties: {'app_name': 'SP', 'path': 'fresh_onboarding'},
