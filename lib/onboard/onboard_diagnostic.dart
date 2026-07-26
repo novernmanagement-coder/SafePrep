@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../constants.dart';
 import '../mixpanel_service.dart';
@@ -23,6 +25,14 @@ import 'onboard_category_score.dart';
 /// calibration label on the results screen. Every data point the
 /// readiness screen references is captured here — nothing invented.
 ///
+/// Q1 ONLY: after the confidence star is tapped, the FSME character
+/// (animated red eyeballs + terminal box) takes over. It reacts to the
+/// star level, announces an incoming call, bails, and we overhear his
+/// side of it. Then the screen auto-advances to Q2 — no Next button on
+/// Q1 regardless of study style. FSME does not appear again for the rest
+/// of the diagnostic. It's a one-time personality beat, not a per-question
+/// feature.
+///
 /// Timer is deliberately absent. A countdown would make people rush, and
 /// a rushed answer measures reaction time rather than knowledge — which
 /// would corrupt the category gap map the whole plan is built from.
@@ -33,13 +43,15 @@ class OnboardDiagnostic extends StatefulWidget {
   State<OnboardDiagnostic> createState() => _OnboardDiagnosticState();
 }
 
-class _OnboardDiagnosticState extends State<OnboardDiagnostic> {
+class _OnboardDiagnosticState extends State<OnboardDiagnostic>
+    with TickerProviderStateMixin {
   static const Color _gold = Color(0xFFD4AF37);
   static const Color _darkBg = Color(0xFF0A0A0F);
   static const Color _softWhite = Color(0xFFF0EDE8);
   static const Color _cardBg = Color(0xFF13130F);
   static const Color _green = Color(0xFF639922);
   static const Color _red = Color(0xFFE24B4A);
+  static const Color _eyeRed = Color(0xFFE24B4A);
 
   int _index = 0;
   int? _picked;
@@ -52,6 +64,96 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic> {
   final List<bool> _answers = [];
   final List<int> _confidenceRatings = [];
 
+  // ── FSME (Q1 only) ─────────────────────────────────────────────────
+  /// True once the Q1 star is tapped — drives the FSME takeover. While
+  /// this is on, the normal advance/Next path is suppressed on Q1.
+  bool _fsmeActive = false;
+
+  /// Lines revealed so far in the FSME terminal box.
+  final List<String> _fsmeLines = [];
+
+  /// Eye gaze: -1 left, 0 center, 1 right. Held center, occasional darts.
+  int _gazeTarget = 0;
+  double _gazeCurrent = 0.0;
+  Timer? _gazeTimer;
+  late AnimationController _gazeAnim;
+
+  // Eye blink.
+  late AnimationController _blinkController;
+  Timer? _blinkTimer;
+
+  final math.Random _rng = math.Random();
+
+  /// Confidence line keyed to the star the user tapped on Q1.
+  static const Map<int, String> _confidenceLines = {
+    1: "I'm basically guessing",
+    2: 'In between a guess and kind of confident',
+    3: "I'm fairly confident",
+    4:
+        "I'd go 5, but I just got an other-worldly inkling there's a "
+        '.0001% chance I might be wrong',
+    5: 'Duh, you bet I know this answer',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+
+    _gazeAnim = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    )..addListener(_advanceGaze);
+    _gazeAnim.repeat();
+
+    _blinkController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 180),
+    );
+  }
+
+  void _advanceGaze() {
+    final target = _gazeTarget.toDouble();
+    final next = _gazeCurrent + (target - _gazeCurrent) * 0.18;
+    if ((next - _gazeCurrent).abs() > 0.001) {
+      setState(() => _gazeCurrent = next);
+    }
+  }
+
+  void _scheduleGaze() {
+    final delay = Duration(milliseconds: 1800 + _rng.nextInt(2200));
+    _gazeTimer = Timer(delay, () {
+      if (!mounted || !_fsmeActive) return;
+      if (_rng.nextDouble() < 0.30) {
+        setState(() => _gazeTarget = _rng.nextBool() ? -1 : 1);
+        Timer(Duration(milliseconds: 700 + _rng.nextInt(400)), () {
+          if (mounted) setState(() => _gazeTarget = 0);
+        });
+      } else {
+        setState(() => _gazeTarget = 0);
+      }
+      _scheduleGaze();
+    });
+  }
+
+  void _scheduleBlink() {
+    final delay = Duration(milliseconds: 3000 + _rng.nextInt(5000));
+    _blinkTimer = Timer(delay, () async {
+      if (!mounted || !_fsmeActive) return;
+      await _blinkController.forward(from: 0.0);
+      if (mounted) await _blinkController.reverse();
+      _scheduleBlink();
+    });
+  }
+
+  @override
+  void dispose() {
+    _gazeAnim.dispose();
+    _blinkController.dispose();
+    _gazeTimer?.cancel();
+    _blinkTimer?.cancel();
+    super.dispose();
+  }
+
   /// Falls back to the most informative mode if screen 3 was somehow
   /// skipped — better to over-explain than to show a bare score.
   StudyStyle get _style =>
@@ -61,6 +163,7 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic> {
   bool get _isAnswered => _picked != null;
   bool get _hasConfidence => _confidence != null;
   bool get _isLast => _index == kDiagnosticQuestions.length - 1;
+  bool get _isFirst => _index == 0;
 
   void _pick(int optionIndex) {
     if (_isAnswered) return;
@@ -80,6 +183,38 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic> {
         'correct': wasCorrect,
       },
     );
+
+    // Q1: FSME appears the moment the answer is picked, opening with an
+    // explanation of the star system. The stars then sit below his box;
+    // tapping one prints his reaction and drives the advance.
+    if (_isFirst) {
+      _openFsme();
+    }
+  }
+
+  /// Opening beat — box appears with the star-system explanation, then
+  /// the star row renders below it (see build). No advance yet; that
+  /// waits for the star tap in [_setConfidence].
+  Future<void> _openFsme() async {
+    setState(() {
+      _fsmeActive = true;
+      _fsmeLines.clear();
+    });
+    _scheduleGaze();
+    _scheduleBlink();
+
+    await Future.delayed(const Duration(milliseconds: 400));
+    if (!mounted) return;
+    setState(() {
+      _fsmeLines.addAll([
+        'Rate your confidence below.',
+        "1 star = you're guessing.",
+        '2 = between a guess and sort of sure.',
+        '3 = fairly sure.',
+        '4 = sure, minus a .0001% inkling.',
+        "5 = you'd bet your certification on it.",
+      ]);
+    });
   }
 
   void _setConfidence(int stars) {
@@ -100,10 +235,42 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic> {
       },
     );
 
+    // Q1: FSME is already on screen (opened at pick). The star tap prints
+    // his reaction lines and drives the advance.
+    if (_isFirst) {
+      _runFsmeReaction(stars);
+      return;
+    }
+
     // Quiz format shows no feedback, so advance after a short beat.
     if (!_style.showsImmediateFeedback) {
       Future.delayed(const Duration(milliseconds: 140), _advance);
     }
+  }
+
+  /// Q1 star-tap beat. The opening star-system line is already showing.
+  /// This appends the confidence reaction, then the call gag, one line at
+  /// a time, then holds two seconds and advances to Q2.
+  Future<void> _runFsmeReaction(int stars) async {
+    final lines = <String>[
+      _confidenceLines[stars] ?? "I'm basically guessing",
+      'I have a call coming in... you\'re on your own',
+      "Hello... FSME here. No, I don't want to renew my subscription "
+          'to Byte Me Quarterly',
+    ];
+
+    await Future.delayed(const Duration(milliseconds: 400));
+    for (final line in lines) {
+      if (!mounted) return;
+      setState(() => _fsmeLines.add(line));
+      await Future.delayed(const Duration(milliseconds: 1100));
+    }
+
+    // Hold on the last line, then move on.
+    await Future.delayed(const Duration(seconds: 6));
+    if (!mounted) return;
+    _fsmeActive = false;
+    _advance();
   }
 
   void _advance() {
@@ -140,6 +307,8 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic> {
       _index++;
       _picked = null;
       _confidence = null;
+      _fsmeActive = false;
+      _fsmeLines.clear();
     });
   }
 
@@ -346,35 +515,117 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic> {
     );
   }
 
-  /// The "why" block — explanations mode only.
-  Widget _explanation() {
-    return Container(
-      margin: const EdgeInsets.only(top: 7),
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      decoration: const BoxDecoration(
-        color: _cardBg,
-        border: Border(left: BorderSide(color: _gold, width: 3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text(
-            'WHY',
-            style: TextStyle(
-              fontSize: 11,
-              color: _gold,
-              letterSpacing: 0.8,
-              fontWeight: FontWeight.w600,
+  /// One glowing red eyeball that darts and blinks.
+  Widget _davEye() {
+    return AnimatedBuilder(
+      animation: Listenable.merge([_gazeAnim, _blinkController]),
+      builder: (context, _) {
+        final blink = 1.0 - _blinkController.value * 0.92;
+        return Transform(
+          alignment: Alignment.center,
+          transform: Matrix4.identity()..scale(1.0, blink),
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const RadialGradient(
+                colors: [
+                  Color(0xFFFF2200),
+                  Color(0xFFCC1100),
+                  Color(0xFF660000),
+                  Color(0xFF1A0000),
+                ],
+                stops: [0.0, 0.35, 0.7, 1.0],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: _eyeRed.withValues(alpha: 0.6),
+                  blurRadius: 14,
+                  spreadRadius: 3,
+                ),
+                BoxShadow(
+                  color: _eyeRed.withValues(alpha: 0.25),
+                  blurRadius: 26,
+                  spreadRadius: 6,
+                ),
+              ],
+            ),
+            child: Center(
+              child: Transform.translate(
+                offset: Offset(_gazeCurrent * 8, 1),
+                child: Container(
+                  width: 14,
+                  height: 17,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0A0000),
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            _q.explanation,
-            style: TextStyle(
-              fontSize: 12,
-              color: _softWhite.withValues(alpha: 0.7),
-              height: 1.55,
+        );
+      },
+    );
+  }
+
+  /// FSME takeover box (Q1 only) — animated eyes + terminal readout that
+  /// fills in one line at a time.
+  Widget _fsmeBox() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _davEye(),
+              const SizedBox(width: 16),
+              Text(
+                'F S M E',
+                style: TextStyle(
+                  fontSize: 10,
+                  letterSpacing: 3,
+                  color: _eyeRed.withValues(alpha: 0.3),
+                  fontWeight: FontWeight.w300,
+                ),
+              ),
+              const SizedBox(width: 16),
+              _davEye(),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0A0E14),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: _gold.withValues(alpha: 0.25),
+                width: 1,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final line in _fsmeLines)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text(
+                      '> $line',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 11,
+                        height: 1.5,
+                        color: _gold.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ],
@@ -384,7 +635,9 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic> {
 
   @override
   Widget build(BuildContext context) {
-    final bool showNext = _hasConfidence && _style.showsImmediateFeedback;
+    // On Q1, FSME owns the advance — the normal Next button never shows.
+    final bool showNext =
+        _hasConfidence && _style.showsImmediateFeedback && !_isFirst;
 
     return Scaffold(
       backgroundColor: _darkBg,
@@ -412,11 +665,23 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic> {
 
               for (var i = 0; i < _q.options.length; i++) _option(i),
 
-              // Star capture: appears after pick, before feedback.
+              // Q1: FSME box appears the moment the answer is picked,
+              // opening with the star-system explanation. The star row
+              // then renders BELOW his box.
+              if (_isFirst && _fsmeActive) _fsmeBox(),
+
+              // Star capture: appears after pick, before feedback. On Q1
+              // it sits under the FSME box; the reaction lines append when
+              // a star is tapped.
               if (_isAnswered && !_hasConfidence) _starRow(),
               if (_hasConfidence) _starResult(),
 
-              if (showNext && _style.showsExplanations) _explanation(),
+              // Explanation (feedback modes, not Q1 while FSME runs).
+              if (_hasConfidence &&
+                  _style.showsImmediateFeedback &&
+                  _style.showsExplanations &&
+                  !_isFirst)
+                _explanation(),
 
               if (showNext) ...[
                 const SizedBox(height: 16),
@@ -449,6 +714,42 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// The "why" block — explanations mode only.
+  Widget _explanation() {
+    return Container(
+      margin: const EdgeInsets.only(top: 7),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: const BoxDecoration(
+        color: _cardBg,
+        border: Border(left: BorderSide(color: _gold, width: 3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'WHY',
+            style: TextStyle(
+              fontSize: 11,
+              color: _gold,
+              letterSpacing: 0.8,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _q.explanation,
+            style: TextStyle(
+              fontSize: 12,
+              color: _softWhite.withValues(alpha: 0.7),
+              height: 1.55,
+            ),
+          ),
+        ],
       ),
     );
   }
