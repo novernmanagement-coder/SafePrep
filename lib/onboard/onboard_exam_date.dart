@@ -52,7 +52,7 @@ class _OnboardExamDateState extends State<OnboardExamDate> {
     if (!mounted) return;
 
     await navigator.push(
-      MaterialPageRoute(builder: (_) => const OnboardStudyStyle()),
+      MaterialPageRoute(builder: (_) => OnboardStudyStyle()),
     );
 
     // Clear the guard so the screen still works if they come back.
