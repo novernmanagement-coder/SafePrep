@@ -11,10 +11,6 @@ import 'rapid_fire_page.dart';
 import 'preview/preview_reveal_page.dart';
 
 class SafePrepNavBar extends StatefulWidget {
-  /// Set to true only from DashboardPage. When true and the user is still
-  /// in trial mode, the "Dashboard" button is replaced with a live
-  /// "Trial — mm:ss" countdown instead. Every other page keeps the normal
-  /// "Dashboard" label regardless of this flag.
   final bool isDashboardPage;
 
   const SafePrepNavBar({super.key, this.isDashboardPage = false});
@@ -57,19 +53,6 @@ class _SafePrepNavBarState extends State<SafePrepNavBar> {
     );
   }
 
-  // Nav bar's Unlock button buys the $4.99 / 7-day product directly —
-  // no PreviewRevealPage detour. Someone tapping "Unlock" from the nav
-  // bar has already shown intent; making them choose between three
-  // prices on a separate page is an extra step they didn't ask for.
-  // The 3-price selector on PreviewRevealPage (reached via trial
-  // expiration or the Home page banner) is untouched.
-  //
-  // _buyNow now waits for IAPService to resolve the actual outcome
-  // (success / canceled / error / timeout) instead of just "request
-  // submitted" — the loading spinner stays up for the whole App Store
-  // sheet interaction, and the person gets real feedback either way
-  // instead of the button silently resetting with nothing having
-  // visibly happened.
   Future<void> _buyNow(BuildContext context) async {
     if (_purchaseInFlight) return;
     setState(() => _purchaseInFlight = true);
@@ -85,18 +68,13 @@ class _SafePrepNavBarState extends State<SafePrepNavBar> {
     setState(() => _purchaseInFlight = false);
 
     if (result == IAPResult.success) {
-      ScaffoldMessenger.of().showSnackBar(
-        const SnackBar(content: Text("You're unlocked! 🎉")),
-      );
-      return; // isUnlocked flips on next build — Unlock button disappears
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("You're unlocked! 🎉")));
+      return;
     }
 
     if (result == IAPResult.canceled) {
-      // User intentionally backed out of the App Store sheet — no error,
-      // nothing to show. This IS the fix for "nothing happens": before,
-      // the button reset silently too, but now it's a deliberate no-op
-      // instead of an accidental one — we know for certain they canceled
-      // rather than guessing from a swallowed stream event.
       return;
     }
 
@@ -104,7 +82,7 @@ class _SafePrepNavBarState extends State<SafePrepNavBar> {
     if (message != null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      ).showSnackBar(const SnackBar(content: Text("You're unlocked! 🎉")));
     }
   }
 
@@ -141,11 +119,6 @@ class _SafePrepNavBarState extends State<SafePrepNavBar> {
               onTap: () => _goRapidFire(context),
             ),
           ),
-          // Persistent purchase CTA — shown on every page that includes
-          // this nav bar, for as long as the user hasn't unlocked. This
-          // is intentionally the ONLY nav item styled to stand out (gold),
-          // since it's the primary conversion path and previously was only
-          // reachable via a banner buried well down the Home page scroll.
           if (!isUnlocked)
             Expanded(
               child: _UnlockNavButton(
@@ -159,10 +132,6 @@ class _SafePrepNavBarState extends State<SafePrepNavBar> {
   }
 }
 
-/// Persistent gold "Unlock" nav button. Only rendered for trial users, on
-/// every page that includes SafePrepNavBar — gives the purchase flow a
-/// fixed, always-visible entry point instead of relying on users to find
-/// a banner further down an individual page.
 class _UnlockNavButton extends StatelessWidget {
   final bool loading;
   final VoidCallback onTap;
@@ -218,10 +187,6 @@ class _UnlockNavButton extends StatelessWidget {
   }
 }
 
-/// Dashboard-only nav slot that displays a live-ticking "Trial — mm:ss"
-/// countdown in place of the normal Dashboard label/icon, reading from the
-/// same TrialTimerService instance used elsewhere so it never drifts out
-/// of sync with the actual expiration logic.
 class _TrialTimerNavButton extends StatefulWidget {
   final VoidCallback onTap;
 
