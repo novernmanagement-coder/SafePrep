@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'constants.dart';
 import 'csv_loader.dart';
 import 'app_state.dart';
@@ -24,6 +25,8 @@ class _CategoryStudyPageState extends State<CategoryStudyPage> {
   int _currentIndex = 0;
   bool _loaded = false;
   String _mode = 'Standard';
+
+  static const String _assessmentPromptKey = 'has_seen_assessment_prompt';
 
   @override
   void initState() {
@@ -73,18 +76,141 @@ class _CategoryStudyPageState extends State<CategoryStudyPage> {
         .toList();
   }
 
+  /// Shows the assessment recommendation dialog once, then navigates
+  /// to [destination]. If they've already seen it, navigates directly.
+  Future<void> _navigateWithPrompt(Widget destination) async {
+    final prefs = await SharedPreferences.getInstance();
+    final hasSeen = prefs.getBool(_assessmentPromptKey) ?? false;
+
+    if (!mounted) return;
+
+    if (!hasSeen) {
+      await prefs.setBool(_assessmentPromptKey, true);
+
+      MixpanelService.instance.track(
+        'assessment_prompt_shown',
+        properties: {'app_name': 'SP', 'from_category': widget.category},
+      );
+
+      final takeAssessment = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => Dialog(
+          backgroundColor: AppColors.cardBackground,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: AppColors.cardBorder),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.assessment_outlined,
+                  size: 32,
+                  color: AppColors.primaryButton,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Want a more complete study plan?',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.strongText,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Your plan is based on 10 diagnostic questions. '
+                  'A full 30-question assessment will map every '
+                  'category and adapt as you go.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.bodyText,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryButton,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(
+                          AppSizes.buttonCornerRadius,
+                        ),
+                      ),
+                    ),
+                    child: const Text(
+                      'Take the assessment',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: () => Navigator.pop(ctx, false),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      'No thanks, keep studying',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.subtleText,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      if (!mounted) return;
+
+      if (takeAssessment == true) {
+        MixpanelService.instance.track(
+          'assessment_prompt_accepted',
+          properties: {'app_name': 'SP'},
+        );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const AssessmentInfoPage()),
+        );
+        return;
+      }
+
+      MixpanelService.instance.track(
+        'assessment_prompt_declined',
+        properties: {'app_name': 'SP'},
+      );
+    }
+
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => destination),
+    );
+  }
+
   void _goNext() {
     if (_currentIndex == _queue.length - 1) {
       MixpanelService.instance.track(
         'study_completed',
         properties: {'category': widget.category, 'mode': _mode},
       );
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => CategoryQuizPage(category: widget.category),
-        ),
-      );
+      _navigateWithPrompt(CategoryQuizPage(category: widget.category));
       return;
     }
     setState(() => _currentIndex++);
@@ -104,10 +230,7 @@ class _CategoryStudyPageState extends State<CategoryStudyPage> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               GestureDetector(
-                onTap: () => Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (_) => const DashboardPage()),
-                ),
+                onTap: () => _navigateWithPrompt(const DashboardPage()),
                 child: Row(
                   children: [
                     Text(
@@ -456,12 +579,7 @@ class _CategoryStudyPageState extends State<CategoryStudyPage> {
                             }
                             _state.markCategoryStudied(widget.category);
                             AppStatePersistence.save();
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const DashboardPage(),
-                              ),
-                            );
+                            _navigateWithPrompt(const DashboardPage());
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primaryButton,

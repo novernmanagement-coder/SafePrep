@@ -4,14 +4,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'constants.dart';
 import 'app_state.dart';
 import 'app_state_persistence.dart';
-import 'home_page.dart';
 import 'dashboard_page.dart';
-import 'intro_page.dart';
-import 'preview/preview_cinematic_splash.dart';
+import 'onboard/onboard_intro.dart';
+import 'onboard/onboard_paywall.dart';
+import 'rapid_fire_limited_page.dart';
 
-// BUILD 26 — version 1.4.2+5 — Full page curriculum, navigation fix, fresh dashboard on first load
-// UPDATED — hard-lock splash with guarantee copy + baked-in countdown.
-// First-ever launch holds 15 seconds; every launch after holds 5 seconds.
+// BUILD 27 — Simplified routing.
+//
+// Two paths, nothing else:
+//   purchased  → DashboardPage
+//   not purchased → OnboardIntro (replays every launch until they buy)
+//
+// The old preview/trial/cinematic flow is dead. The onboarding funnel
+// IS the trial — no free-roam dashboard, no 30-minute timer, no
+// PreviewCinematicSplash.
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
 
@@ -20,21 +26,16 @@ class SplashPage extends StatefulWidget {
 }
 
 class _SplashPageState extends State<SplashPage> {
-  static const bool _debugBypassPreview = false;
-  static const bool _debugShowPreview = false;
-
   static const String _seenSplashPrefKey = 'has_seen_splash_before';
+
   static const int _firstLaunchHoldSeconds = 15;
   static const int _returningHoldSeconds = 5;
-  // How long before the countdown number starts ticking (orientation beat).
   static const int _orientationSeconds = 2;
 
   Timer? _displayTicker;
   int _secondsElapsed = 0;
-
-  // Resolved once prefs are read. Null until then — build() shows no
-  // countdown text during that brief window.
   int? _totalHoldSeconds;
+  bool _isFirstLaunch = true;
 
   @override
   void initState() {
@@ -54,7 +55,10 @@ class _SplashPageState extends State<SplashPage> {
     }
 
     if (!mounted) return;
-    setState(() => _totalHoldSeconds = holdSeconds);
+    setState(() {
+      _totalHoldSeconds = holdSeconds;
+      _isFirstLaunch = !hasSeenBefore;
+    });
     _startDisplayTicker();
     WidgetsBinding.instance.addPostFrameCallback((_) => _navigate(holdSeconds));
   }
@@ -72,8 +76,6 @@ class _SplashPageState extends State<SplashPage> {
     super.dispose();
   }
 
-  // Seconds remaining in the baked-in countdown line, once the orientation
-  // beat has passed. Clamped so it never shows a negative number.
   int get _countdownRemaining {
     final total = _totalHoldSeconds ?? _returningHoldSeconds;
     final remaining = total - _secondsElapsed;
@@ -83,7 +85,6 @@ class _SplashPageState extends State<SplashPage> {
   Future<void> _navigate(int holdSeconds) async {
     final state = AppState();
 
-    // Hard-lock hold — no skip, matches the visible countdown above.
     await Future.delayed(Duration(seconds: holdSeconds));
     if (!mounted) return;
 
@@ -94,43 +95,14 @@ class _SplashPageState extends State<SplashPage> {
     }
     if (!mounted) return;
 
-    if (_debugShowPreview) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const PreviewCinematicSplash()),
-      );
-      return;
-    }
-
-    if (_debugBypassPreview) {
-      state.hasUnlockedApp = true;
-      state.purchaseType = PurchaseType.lifetime;
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const HomePage()),
-      );
-      return;
-    }
-
-    if (state.hasUnlockedApp && state.isExpired) {
-      state.hasUnlockedApp = false;
-      AppStatePersistence.save();
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const PreviewCinematicSplash()),
-      );
-      return;
-    }
-
-    if (state.hasUnlockedApp) {
-      if (!state.hasSeenIntro) {
-        state.clearCurriculumProgress();
-        state.hasSeenIntro = true;
-        AppStatePersistence.save();
-      }
-      if (!mounted) return;
+    // ── Three paths ──────────────────────────────────────────────────
+    //
+    //   1. Purchased and active → Dashboard
+    //   2. Already declined to limited Rapid Fire → decline page
+    //      (purchase button + Rapid Fire + Student Presenter)
+    //   3. First time / hasn't declined yet → full onboarding funnel
+    //
+    if (state.hasUnlockedApp && !state.isExpired) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const DashboardPage()),
@@ -138,15 +110,34 @@ class _SplashPageState extends State<SplashPage> {
       return;
     }
 
-    // Trial mode — go straight to DashboardPage; the splash countdown already
-    // sets the expectation ("Your dashboard opens in 3...2...1...") so this
-    // delivers on that promise directly.
-    // TrialTimerService will fire the paywall at 30 minutes
+    if (state.hasUnlockedApp && state.isExpired) {
+      state.hasUnlockedApp = false;
+      AppStatePersistence.save();
+    }
     if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const DashboardPage()),
-    );
+
+    final prefs = await SharedPreferences.getInstance();
+    final hasDeclined =
+        prefs.getBool(RapidFireLimitedPage.declinedToLimitedKey) ?? false;
+
+    if (!mounted) return;
+
+    if (hasDeclined) {
+      // Returning decliner — drop them on the decline page so they
+      // can purchase immediately, or jump into the limited Rapid Fire.
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const OnboardPaywall(startOnDecline: true),
+        ),
+      );
+    } else {
+      // First time — full onboarding funnel.
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const OnboardIntro()),
+      );
+    }
   }
 
   @override
@@ -177,7 +168,7 @@ class _SplashPageState extends State<SplashPage> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Pass the ServSafe® exam or your money back.\nWe\'ll have you ready in less than 4 hours.',
+                'Pass the ServSafe\u00AE exam or your money back.\nWe\'ll have you ready in less than 4 hours.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: AppColors.strongText,
@@ -190,7 +181,9 @@ class _SplashPageState extends State<SplashPage> {
               const SizedBox(height: 20),
 
               Text(
-                'We\'ve pre-loaded your dashboard with national averages so you can start browsing right away — watch your Readiness Score adapt as you go.',
+                _isFirstLaunch
+                    ? 'A short diagnostic will show you exactly where you stand \u2014 and how little time it takes to close the gap.'
+                    : 'Welcome back \u2014 your study plan is right where you left it.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: AppColors.subtleText,
@@ -202,14 +195,12 @@ class _SplashPageState extends State<SplashPage> {
 
               const SizedBox(height: 28),
 
-              // Baked-in countdown line — replaces a standalone numeral.
-              // Blank during the 2-second orientation beat, then ticks live.
               AnimatedOpacity(
                 opacity: showCountdown ? 1.0 : 0.0,
                 duration: const Duration(milliseconds: 300),
                 child: Text(
                   showCountdown
-                      ? 'Your dashboard opens in $_countdownRemaining\u2026'
+                      ? 'Initializing system $_countdownRemaining\u2026'
                       : ' ',
                   textAlign: TextAlign.center,
                   style: const TextStyle(
