@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../constants.dart';
 import '../mixpanel_service.dart';
+import '../app_state.dart';
+import '../app_state_persistence.dart';
 import '../category_study_page.dart';
 import '../assessment_info_page.dart';
 import 'onboard_answers.dart';
@@ -148,6 +150,12 @@ class _OnboardPostPurchaseState extends State<OnboardPostPurchase> {
   }
 
   void _startStudying() {
+    // Clear any stale curriculum progress so the study page loads
+    // from the beginning, not from a previous session's endpoint.
+    final state = AppState();
+    state.clearCurriculumProgress();
+    AppStatePersistence.save();
+
     MixpanelService.instance.track(
       'onboarding_post_purchase_start',
       properties: {'app_name': 'SP', 'category': _weakestCategory},

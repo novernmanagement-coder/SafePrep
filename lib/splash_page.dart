@@ -29,7 +29,7 @@ class SplashPage extends StatefulWidget {
 class _SplashPageState extends State<SplashPage> {
   static const String _seenSplashPrefKey = 'has_seen_splash_before';
 
-  static const int _firstLaunchHoldSeconds = 15;
+  static const int _firstLaunchHoldSeconds = 8;
   static const int _returningHoldSeconds = 5;
   static const int _orientationSeconds = 2;
 
