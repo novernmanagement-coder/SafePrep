@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../constants.dart';
 import '../mixpanel_service.dart';
@@ -12,6 +14,12 @@ import 'onboard_diagnostic.dart';
 ///
 /// Deliberately does NOT say what most people score. Pre-announcing an
 /// expected result defuses the sting when the real number lands.
+///
+/// Below the CTA sits the FSME command box — two glowing red eyeballs that
+/// dart and blink, then a terminal readout confirming Quiz mode and
+/// spelling out how confidence rating works. Same dark-terminal + gold-mono
+/// aesthetic as the study-style screen, so the character reads as one
+/// continuous presence across the funnel.
 class OnboardQuizIntro extends StatefulWidget {
   const OnboardQuizIntro({super.key});
 
@@ -19,21 +27,106 @@ class OnboardQuizIntro extends StatefulWidget {
   State<OnboardQuizIntro> createState() => _OnboardQuizIntroState();
 }
 
-class _OnboardQuizIntroState extends State<OnboardQuizIntro> {
+class _OnboardQuizIntroState extends State<OnboardQuizIntro>
+    with TickerProviderStateMixin {
   static const Color _gold = Color(0xFFD4AF37);
   static const Color _darkBg = Color(0xFF0A0A0F);
   static const Color _softWhite = Color(0xFFF0EDE8);
   static const Color _cardBg = Color(0xFF13130F);
+  static const Color _eyeRed = Color(0xFFE24B4A);
 
   bool _starting = false;
+
+  /// One snark line, chosen once when the screen builds so it stays
+  /// stable across rebuilds.
+  late final String _snark;
+
+  static const List<String> _quizSnark = [
+    'No peeking. The answers are locked in a vault......',
+    'Quiz mode? Brave. Very brave......',
+    'Someone woke up feeling confident today......',
+  ];
+
+  // Eye gaze — discrete look states matching the website: the eyes hold
+  // center most of the time and occasionally snap left or right.
+  // -1 = left, 0 = center, 1 = right.
+  int _gazeTarget = 0;
+  double _gazeCurrent = 0.0;
+  Timer? _gazeTimer;
+  late AnimationController _gazeAnim;
+
+  // Eye blink — periodic, every 3–8s.
+  late AnimationController _blinkController;
+  Timer? _blinkTimer;
+
+  final math.Random _rng = math.Random();
 
   @override
   void initState() {
     super.initState();
+    _snark = _quizSnark[_rng.nextInt(_quizSnark.length)];
+
+    _gazeAnim = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    )..addListener(_advanceGaze);
+    _gazeAnim.repeat();
+
+    _blinkController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 180),
+    );
+
+    _scheduleGaze();
+    _scheduleBlink();
+
     MixpanelService.instance.track(
       'onboarding_quiz_intro_viewed',
       properties: {'app_name': 'SP'},
     );
+  }
+
+  void _advanceGaze() {
+    final target = _gazeTarget.toDouble();
+    final next = _gazeCurrent + (target - _gazeCurrent) * 0.18;
+    if ((next - _gazeCurrent).abs() > 0.001) {
+      setState(() => _gazeCurrent = next);
+    }
+  }
+
+  void _scheduleGaze() {
+    final delay = Duration(milliseconds: 1800 + _rng.nextInt(2200));
+    _gazeTimer = Timer(delay, () {
+      if (!mounted) return;
+      if (_rng.nextDouble() < 0.30) {
+        setState(() => _gazeTarget = _rng.nextBool() ? -1 : 1);
+        Timer(Duration(milliseconds: 700 + _rng.nextInt(400)), () {
+          if (mounted) setState(() => _gazeTarget = 0);
+        });
+      } else {
+        setState(() => _gazeTarget = 0);
+      }
+      _scheduleGaze();
+    });
+  }
+
+  void _scheduleBlink() {
+    final delay = Duration(milliseconds: 3000 + _rng.nextInt(5000));
+    _blinkTimer = Timer(delay, () async {
+      if (!mounted) return;
+      await _blinkController.forward(from: 0.0);
+      if (mounted) await _blinkController.reverse();
+      _scheduleBlink();
+    });
+  }
+
+  @override
+  void dispose() {
+    _gazeAnim.dispose();
+    _blinkController.dispose();
+    _gazeTimer?.cancel();
+    _blinkTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _startQuiz() async {
@@ -114,6 +207,137 @@ class _OnboardQuizIntroState extends State<OnboardQuizIntro> {
           ),
         ],
       ),
+    );
+  }
+
+  /// One glowing red eyeball that darts and blinks — same construction as
+  /// the study-style screen.
+  Widget _davEye() {
+    return AnimatedBuilder(
+      animation: Listenable.merge([_gazeAnim, _blinkController]),
+      builder: (context, _) {
+        final blink = 1.0 - _blinkController.value * 0.92;
+        return Transform(
+          alignment: Alignment.center,
+          transform: Matrix4.identity()..scale(1.0, blink),
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const RadialGradient(
+                colors: [
+                  Color(0xFFFF2200),
+                  Color(0xFFCC1100),
+                  Color(0xFF660000),
+                  Color(0xFF1A0000),
+                ],
+                stops: [0.0, 0.35, 0.7, 1.0],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: _eyeRed.withValues(alpha: 0.6),
+                  blurRadius: 14,
+                  spreadRadius: 3,
+                ),
+                BoxShadow(
+                  color: _eyeRed.withValues(alpha: 0.25),
+                  blurRadius: 26,
+                  spreadRadius: 6,
+                ),
+              ],
+            ),
+            child: Center(
+              child: Transform.translate(
+                offset: Offset(_gazeCurrent * 8, 1),
+                child: Container(
+                  width: 14,
+                  height: 17,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0A0000),
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// One line in the terminal readout. [indent] nudges the confidence
+  /// sub-lines in from the left and drops the "> " prefix.
+  Widget _terminalLine(String text, {bool indent = false}) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 6, left: indent ? 16 : 0),
+      child: Text(
+        indent ? text : '> $text',
+        style: TextStyle(
+          fontFamily: 'monospace',
+          fontSize: 11,
+          height: 1.5,
+          color: _gold.withValues(alpha: 0.8),
+        ),
+      ),
+    );
+  }
+
+  /// FSME command box — animated eyes + label, then the terminal readout.
+  Widget _fsmeBox() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _davEye(),
+            const SizedBox(width: 16),
+            Text(
+              'F S M E',
+              style: TextStyle(
+                fontSize: 10,
+                letterSpacing: 3,
+                color: _eyeRed.withValues(alpha: 0.3),
+                fontWeight: FontWeight.w300,
+              ),
+            ),
+            const SizedBox(width: 16),
+            _davEye(),
+          ],
+        ),
+
+        const SizedBox(height: 14),
+
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0A0E14),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: _gold.withValues(alpha: 0.25), width: 1),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _terminalLine('User//: Selected Quiz mode'),
+              _terminalLine(_snark),
+              _terminalLine(
+                'User//: Quiz style — answer each question, '
+                'one selection per question',
+              ),
+              _terminalLine('User//: Then rate your confidence:'),
+              _terminalLine('1 = low confidence', indent: true),
+              _terminalLine('3 = normal confidence', indent: true),
+              _terminalLine(
+                '5 = high confidence (I absolutely know this is correct)',
+                indent: true,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -241,6 +465,11 @@ class _OnboardQuizIntroState extends State<OnboardQuizIntro> {
                   ),
                 ),
               ),
+
+              const SizedBox(height: 26),
+
+              // ── FSME command box ──────────────────────────────────
+              _fsmeBox(),
             ],
           ),
         ),

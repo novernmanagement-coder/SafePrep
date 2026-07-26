@@ -34,28 +34,46 @@ class _OnboardStudyStyleState extends State<OnboardStudyStyle>
 
   StudyStyle? _selected;
 
-  // Eye animation
-  late AnimationController _eyeController;
-  late Animation<double> _eyePosition;
+  // Eye gaze — discrete look states matching the website: the eyes hold
+  // center most of the time and occasionally snap left or right, rather
+  // than sweeping continuously.
+  // -1 = left, 0 = center, 1 = right.
+  int _gazeTarget = 0;
+  double _gazeCurrent = 0.0;
+  Timer? _gazeTimer;
+  late AnimationController _gazeAnim; // drives the ease toward _gazeTarget
+
+  // Eye blink — periodic, every 3–8s like the website.
+  late AnimationController _blinkController;
+  Timer? _blinkTimer;
 
   // Terminal confirmation
   final List<String> _terminalLines = [];
   bool _showTerminal = false;
   Timer? _typer;
 
+  final math.Random _rng = math.Random();
+
   @override
   void initState() {
     super.initState();
 
-    _eyeController = AnimationController(
+    // Gaze easing controller — repaints while the pupil slides toward its
+    // target. We don't repeat this; we just tick it to drive the lerp.
+    _gazeAnim = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1800),
-    )..repeat(reverse: true);
+      duration: const Duration(milliseconds: 400),
+    )..addListener(_advanceGaze);
+    _gazeAnim.repeat();
 
-    _eyePosition = Tween<double>(
-      begin: -1.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(parent: _eyeController, curve: Curves.easeInOut));
+    // Blink controller — quick scaleY pinch.
+    _blinkController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 180),
+    );
+
+    _scheduleGaze();
+    _scheduleBlink();
 
     MixpanelService.instance.track(
       'onboarding_study_style_viewed',
@@ -63,9 +81,54 @@ class _OnboardStudyStyleState extends State<OnboardStudyStyle>
     );
   }
 
+  /// Ease the current pupil position toward the target each frame.
+  void _advanceGaze() {
+    final target = _gazeTarget.toDouble();
+    final next = _gazeCurrent + (target - _gazeCurrent) * 0.18;
+    if ((next - _gazeCurrent).abs() > 0.001) {
+      setState(() => _gazeCurrent = next);
+    }
+  }
+
+  /// Website behavior: mostly center, occasional dart. Roughly 30% of the
+  /// time it looks to a side, then returns to center.
+  void _scheduleGaze() {
+    if (_selected != null) return; // eyes lock center once a choice is made
+    final delay = Duration(milliseconds: 1800 + _rng.nextInt(2200));
+    _gazeTimer = Timer(delay, () {
+      if (!mounted || _selected != null) return;
+      if (_rng.nextDouble() < 0.30) {
+        // dart to a side
+        setState(() => _gazeTarget = _rng.nextBool() ? -1 : 1);
+        // return to center shortly after
+        Timer(Duration(milliseconds: 700 + _rng.nextInt(400)), () {
+          if (mounted && _selected == null) {
+            setState(() => _gazeTarget = 0);
+          }
+        });
+      } else {
+        setState(() => _gazeTarget = 0);
+      }
+      _scheduleGaze();
+    });
+  }
+
+  void _scheduleBlink() {
+    final delay = Duration(milliseconds: 3000 + _rng.nextInt(5000));
+    _blinkTimer = Timer(delay, () async {
+      if (!mounted) return;
+      await _blinkController.forward(from: 0.0);
+      if (mounted) await _blinkController.reverse();
+      _scheduleBlink();
+    });
+  }
+
   @override
   void dispose() {
-    _eyeController.dispose();
+    _gazeAnim.dispose();
+    _blinkController.dispose();
+    _gazeTimer?.cancel();
+    _blinkTimer?.cancel();
     _typer?.cancel();
     super.dispose();
   }
@@ -97,8 +160,9 @@ class _OnboardStudyStyleState extends State<OnboardStudyStyle>
 
     setState(() => _selected = style);
 
-    // Stop the eyes darting
-    _eyeController.stop();
+    // Lock the eyes to center — stop darting.
+    _gazeTimer?.cancel();
+    setState(() => _gazeTarget = 0);
 
     OnboardingAnswers.instance.studyStyle = style;
     MixpanelService.instance.track(
@@ -157,8 +221,8 @@ class _OnboardStudyStyleState extends State<OnboardStudyStyle>
       if (!mounted) return;
     }
 
-    // Brief pause, then navigate
-    await Future.delayed(const Duration(milliseconds: 600));
+    // Hold on the final line so the user reads it, then navigate.
+    await Future.delayed(const Duration(seconds: 3));
     if (!mounted) return;
 
     final navigator = Navigator.of(context);
@@ -173,7 +237,8 @@ class _OnboardStudyStyleState extends State<OnboardStudyStyle>
         _showTerminal = false;
         _terminalLines.clear();
       });
-      _eyeController.repeat(reverse: true);
+      // Restart the idle eye behavior.
+      _scheduleGaze();
     }
   }
 
@@ -250,70 +315,92 @@ class _OnboardStudyStyleState extends State<OnboardStudyStyle>
     );
   }
 
-  /// The FSME character — two red eyeballs that dart back and forth,
-  /// watching the options. Stops darting once a selection is made.
+  /// Dave — two glowing red eyeballs that dart left and right,
+  /// watching the options. Matches the Dave_presenter.html aesthetic:
+  /// radial gradient red iris, dark oval pupil, black background, glow.
+  /// The eyes hold center most of the time, snap to a side occasionally,
+  /// and blink every few seconds.
   Widget _fsmeEyes() {
-    return AnimatedBuilder(
-      animation: _eyePosition,
-      builder: (context, _) {
-        final offset = _selected != null ? 0.0 : _eyePosition.value;
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _eyeball(offset),
-              const SizedBox(width: 14),
-              _eyeball(offset),
-            ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _davEye(),
+          const SizedBox(width: 20),
+          Text(
+            'F S M E',
+            style: TextStyle(
+              fontSize: 10,
+              letterSpacing: 3,
+              color: _eyeRed.withValues(alpha: 0.3),
+              fontWeight: FontWeight.w300,
+            ),
           ),
-        );
-      },
+          const SizedBox(width: 20),
+          _davEye(),
+        ],
+      ),
     );
   }
 
-  Widget _eyeball(double offset) {
-    return Container(
-      width: 28,
-      height: 28,
-      decoration: BoxDecoration(
-        color: _darkBg,
-        shape: BoxShape.circle,
-        border: Border.all(color: _softWhite.withValues(alpha: 0.15), width: 1),
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Transform.translate(
-            offset: Offset(offset * 5, 0),
-            child: Container(
-              width: 12,
-              height: 12,
-              decoration: BoxDecoration(
-                color: _eyeRed,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: _eyeRed.withValues(alpha: 0.6),
-                    blurRadius: 6,
-                    spreadRadius: 1,
-                  ),
+  Widget _davEye() {
+    return AnimatedBuilder(
+      // Rebuild on both gaze slides and blink pinches.
+      animation: Listenable.merge([_gazeAnim, _blinkController]),
+      builder: (context, _) {
+        // Blink squashes the whole eye vertically.
+        final blink = 1.0 - _blinkController.value * 0.92;
+        return Transform(
+          alignment: Alignment.center,
+          transform: Matrix4.identity()..scale(1.0, blink),
+          child: Container(
+            width: 65,
+            height: 65,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const RadialGradient(
+                colors: [
+                  Color(0xFFFF2200),
+                  Color(0xFFCC1100),
+                  Color(0xFF660000),
+                  Color(0xFF1A0000),
                 ],
+                stops: [0.0, 0.35, 0.7, 1.0],
               ),
-              child: Center(
-                child: Container(
-                  width: 4,
-                  height: 4,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF0A0A0F),
-                    shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: _eyeRed.withValues(alpha: 0.6),
+                  blurRadius: 18,
+                  spreadRadius: 4,
+                ),
+                BoxShadow(
+                  color: _eyeRed.withValues(alpha: 0.25),
+                  blurRadius: 35,
+                  spreadRadius: 8,
+                ),
+              ],
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Pupil — oval, shifts left/right with the gaze.
+                Transform.translate(
+                  offset: Offset(_gazeCurrent * 12, 2),
+                  child: Container(
+                    width: 22,
+                    height: 26,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0A0000),
+                      borderRadius: BorderRadius.circular(11),
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
