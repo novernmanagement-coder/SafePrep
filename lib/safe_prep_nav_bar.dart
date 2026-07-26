@@ -85,9 +85,9 @@ class _SafePrepNavBarState extends State<SafePrepNavBar> {
     setState(() => _purchaseInFlight = false);
 
     if (result == IAPResult.success) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("You're unlocked! 🎉")));
+      ScaffoldMessenger.of().showSnackBar(
+        const SnackBar(content: Text("You're unlocked! 🎉")),
+      );
       return; // isUnlocked flips on next build — Unlock button disappears
     }
 
