@@ -207,7 +207,7 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Spacer(flex: 2),
+        const SizedBox(height: 30),
 
         Text(
           'YOUR PLAN IS READY',
@@ -279,7 +279,7 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
 
         _declineLink(),
 
-        const Spacer(flex: 3),
+        const SizedBox(height: 40),
       ],
     );
   }
@@ -340,7 +340,7 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Spacer(flex: 2),
+        const SizedBox(height: 30),
 
         Text(
           'SUPERIOR QUIZ RESULTS',
@@ -415,7 +415,7 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
 
         _declineLink(),
 
-        const Spacer(flex: 3),
+        const SizedBox(height: 40),
       ],
     );
   }
@@ -426,7 +426,7 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Spacer(flex: 2),
+        const SizedBox(height: 30),
 
         Text(
           'BEFORE YOU GO',
@@ -532,7 +532,7 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
           onTap: _declinePresenter,
         ),
 
-        const Spacer(flex: 3),
+        const SizedBox(height: 40),
       ],
     );
   }
@@ -671,7 +671,7 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
     return Scaffold(
       backgroundColor: _darkBg,
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(22, 22, 22, 26),
           child: _showDecline
               ? _declineScreen()
