@@ -453,7 +453,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Spacer(flex: 2),
+          const SizedBox(height: 30),
 
           Icon(Icons.lock_outline, size: 32, color: _gold),
 
@@ -532,7 +532,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage> {
               ),
             ),
 
-          const Spacer(flex: 3),
+          const SizedBox(height: 40),
         ],
       ),
     );
@@ -549,7 +549,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Spacer(flex: 2),
+          const SizedBox(height: 30),
 
           Text(
             'LIMITED VERSION COMPLETE',
@@ -628,7 +628,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage> {
 
           const SizedBox(height: 14),
 
-          const Spacer(flex: 3),
+          const SizedBox(height: 40),
         ],
       ),
     );
@@ -650,11 +650,13 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage> {
           children: [
             _limitedBanner(),
             Expanded(
-              child: _allDone
-                  ? _completionView()
-                  : _showingLimit
-                  ? _categoryLimitView()
-                  : _questionView(),
+              child: SingleChildScrollView(
+                child: _allDone
+                    ? _completionView()
+                    : _showingLimit
+                    ? _categoryLimitView()
+                    : _questionView(),
+              ),
             ),
           ],
         ),

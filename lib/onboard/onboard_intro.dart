@@ -23,11 +23,11 @@ class OnboardIntro extends StatelessWidget {
     return Scaffold(
       backgroundColor: _darkBg,
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(22, 40, 22, 26),
           child: Column(
             children: [
-              const Spacer(flex: 2),
+              const SizedBox(height: 30),
 
               // Shield icon
               Icon(Icons.verified_user_outlined, size: 44, color: _gold),
@@ -89,7 +89,7 @@ class OnboardIntro extends StatelessWidget {
                 ),
               ),
 
-              const Spacer(flex: 3),
+              const SizedBox(height: 40),
 
               // NEXT button
               SizedBox(

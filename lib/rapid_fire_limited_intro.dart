@@ -41,12 +41,12 @@ class RapidFireLimitedIntro extends StatelessWidget {
     return Scaffold(
       backgroundColor: _darkBg,
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(22, 36, 22, 26),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Spacer(flex: 2),
+              const SizedBox(height: 30),
 
               // Icon
               Icon(Icons.bolt_rounded, size: 40, color: _gold),
@@ -176,7 +176,7 @@ class RapidFireLimitedIntro extends StatelessWidget {
                 }).toList(),
               ),
 
-              const Spacer(flex: 3),
+              const SizedBox(height: 40),
 
               // Start button
               SizedBox(
