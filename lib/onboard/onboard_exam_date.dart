@@ -373,14 +373,12 @@ class _OnboardExamDateState extends State<OnboardExamDate>
           const SizedBox(height: 14),
           Container(
             width: double.infinity,
+            constraints: const BoxConstraints(minHeight: 44),
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
             decoration: BoxDecoration(
               color: const Color(0xFF0A0E14),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: _gold.withValues(alpha: 0.25),
-                width: 1,
-              ),
+              border: Border.all(color: _gold.withValues(alpha: 0.4), width: 1),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -392,10 +390,11 @@ class _OnboardExamDateState extends State<OnboardExamDate>
                     child: Text(
                       '> $line',
                       style: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 11,
+                        fontFamily: 'Menlo',
+                        fontFamilyFallback: const ['Courier', 'monospace'],
+                        fontSize: 12,
                         height: 1.5,
-                        color: _gold.withValues(alpha: 0.8),
+                        color: _gold,
                       ),
                     ),
                   ),
