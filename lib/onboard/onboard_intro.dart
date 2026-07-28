@@ -98,7 +98,7 @@ class OnboardIntro extends StatelessWidget {
                 child: ElevatedButton(
                   onPressed: () {
                     MixpanelService.instance.track(
-                      'onboarding_intro_next',
+                      'SpOn_Intro_Next',
                       properties: {'app_name': 'SP'},
                     );
 

@@ -273,6 +273,55 @@ class DiagnosticResult {
     return ((sum / (total * 10)) * 100).round();
   }
 
+  /// Mean confidence across every answered question (1–5), regardless of
+  /// correctness. Drives the readiness confidence band.
+  double get avgStars {
+    if (total == 0) return 0;
+    final conf = _conf;
+    return conf.reduce((a, b) => a + b) / conf.length;
+  }
+
+  /// Overall readiness score, 0–100 — the number the readiness verdict
+  /// screen shows. Distinct from [weightedScore] (which uses a
+  /// per-question points matrix and drives the category breakdown).
+  ///
+  /// Model: correctness sets the base (Correct × 10); a confidence-
+  /// calibration penalty then adjusts it. The penalty is NOT a confidence
+  /// bonus — it only docks when the user's self-rated confidence is out
+  /// of line with how they actually did. When confidence matches
+  /// performance, the penalty is ~1.0 and the base stands.
+  ///
+  ///   Correct tier:  1–5 / 6–7 / 8–10
+  ///   Confidence band (avg stars):  L1 <3 · L2 3–4 · L3 >4
+  ///
+  ///   Correct │ L1(<3) │ L2(3-4) │ L3(>4)
+  ///   ────────┼────────┼─────────┼───────
+  ///    1–5    │  1.00  │  0.80   │  0.60   sure+wrong = the overconfidence trap
+  ///    6–7    │  0.80  │  0.90   │  0.95
+  ///    8–10   │  0.74  │  0.90   │  1.00   right+unsure docked; right+sure full
+  ///
+  /// The bottom-left corner (bombed but honest about it) keeps full
+  /// credit — we penalize enough to signal "not ready," not so hard the
+  /// score reads as broken. The top-left (aced it but doubts themselves)
+  /// is the harshest practical dock: they know it cold but their nerves
+  /// will sink them, and that self-report is the point.
+  int get readinessScore {
+    if (total == 0) return 0;
+
+    final int correctTier = correct <= 5 ? 0 : (correct <= 7 ? 1 : 2);
+    final double avg = avgStars;
+    final int confBand = avg < 3 ? 0 : (avg <= 4 ? 1 : 2);
+
+    const List<List<double>> penalty = [
+      [1.00, 0.80, 0.60], // 1–5 correct
+      [0.80, 0.90, 0.95], // 6–7 correct
+      [0.74, 0.90, 1.00], // 8–10 correct
+    ];
+
+    final double score = (correct * 10) * penalty[correctTier][confBand];
+    return score.round().clamp(0, 100);
+  }
+
   /// Anxiety gate.
   ///
   /// The stars are not a measurement to be corrected for — they are the
@@ -374,18 +423,19 @@ class DiagnosticResult {
     };
   }
 
-  /// Qualitative label per category — Strong / Shaky / Gap.
-  /// Keyed off the weighted score so it reflects confidence, not just
-  /// raw accuracy.
+  /// Qualitative label per category — Confident / Mixed / Unsure.
+  /// Keyed off the weighted score, which blends correctness with the
+  /// user's confidence stars, so the label reads as a confidence state
+  /// rather than raw accuracy.
   Map<String, String> get categoryLabel {
     final scores = categoryWeightedScore;
     return {
       for (final cat in scores.keys)
         cat: scores[cat]! >= 70
-            ? 'Strong'
+            ? 'Confident'
             : scores[cat]! >= 40
-            ? 'Shaky'
-            : 'Gap',
+            ? 'Mixed'
+            : 'Unsure',
     };
   }
 

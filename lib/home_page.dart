@@ -14,7 +14,6 @@ import 'about_proctors_page.dart';
 import 'final_exam_intro_page.dart';
 import 'peace_of_mind_page.dart';
 import 'trial_timer_service.dart';
-import 'preview/preview_cinematic_splash.dart';
 import 'mixpanel_service.dart';
 import 'preview/preview_reveal_page.dart';
 import 'safe_prep_nav_bar.dart';
@@ -31,8 +30,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   String _currentFact = '';
   List<MilestoneModel> _milestones = [];
 
-  // Local display-only ticker for the "Trial — mm:ss" countdown on Home.
-  // Reads TrialTimerService.remainingSeconds; does not affect trial logic.
   Timer? _displayTicker;
 
   @override
@@ -52,12 +49,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
 
     if (!_state.hasUnlockedApp) {
-      // trial_started should represent the trial beginning ONCE per
-      // install, not "user returned to Home." HomePage gets rebuilt on
-      // every navigation back here (pushAndRemoveUntil from the intro
-      // page, the splash-icon shortcut, etc), so without this guard the
-      // event — and TrialTimerService.start() below — would re-fire on
-      // every single visit.
       if (!_state.trialStarted) {
         MixpanelService.instance.track(
           'trial_started',
@@ -79,7 +70,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void _startDisplayTicker() {
     _displayTicker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
-      setState(() {}); // repaint to reflect TrialTimerService.remainingSeconds
+      setState(() {});
     });
   }
 
@@ -92,11 +83,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused)
+    if (state == AppLifecycleState.paused) {
       MixpanelService.instance.track(
         'session_end',
         properties: {'app_name': 'SP'},
       );
+    }
   }
 
   void _onTrialExpired() {
@@ -123,10 +115,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   Future<void> _loadFacts() async {
     final facts = await FactLoader.loadAll();
-    if (mounted)
+    if (mounted) {
       setState(() {
         _currentFact = facts.map((f) => f.fact).join('  •  ');
       });
+    }
   }
 
   Future<void> _loadMilestones() async {
@@ -433,8 +426,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: List.generate(4, (i) {
-                          if (i >= earnedSlots.length)
+                          if (i >= earnedSlots.length) {
                             return const SizedBox(width: 26);
+                          }
                           return Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 2),
                             child: Container(
@@ -461,8 +455,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: List.generate(4, (i) {
                             final idx = i + 4;
-                            if (idx >= earnedSlots.length)
+                            if (idx >= earnedSlots.length) {
                               return const SizedBox(width: 26);
+                            }
                             return Padding(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 2,
@@ -497,10 +492,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
-  // Flat seeded display value shown on the Home readiness meter before any
-  // real assessment/quiz data exists. Display-only — never written to
-  // _state.readinessScore, so trophies, the Final Exam gate, and the real
-  // ReadinessEngine calculation are completely unaffected.
   static const int _seededReadinessDisplay = 62;
 
   Widget _buildReadinessMeter() {
@@ -512,18 +503,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         : (showSeeded ? _seededReadinessDisplay : _state.readinessScore);
     final isGreenLight = score >= 100;
     String label;
-    if (showSeeded)
+    if (showSeeded) {
       label = 'National avg — adapts as you study';
-    else if (score >= 100)
+    } else if (score >= 100) {
       label = '🟢 Green Light';
-    else if (score >= 85)
+    } else if (score >= 85) {
       label = 'Nearly Ready';
-    else if (score >= 66)
+    } else if (score >= 66) {
       label = 'Almost There';
-    else if (score >= 41)
+    } else if (score >= 41) {
       label = 'Building Momentum';
-    else
+    } else {
       label = 'Keep Going';
+    }
 
     return GestureDetector(
       onTap: () => _showInfoModal(
@@ -590,10 +582,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         final starMin = i * 20.0;
         final starMax = (i + 1) * 20.0;
         double fillFraction = 0.0;
-        if (score >= starMax)
+        if (score >= starMax) {
           fillFraction = 1.0;
-        else if (score > starMin)
+        } else if (score > starMin) {
           fillFraction = (score - starMin) / 20.0;
+        }
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 2),
           child: _buildPartialStar(fillFraction),
@@ -739,13 +732,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
-  // ── Trial countdown display (replaces the curriculum button during trial) ──
-  // Tappable — routes to PreviewRevealPage rather than firing a direct
-  // purchase (unlike the nav bar's "Unlock" button). This widget reads
-  // as a status display, not a buy button, so a tap should lead to
-  // context and a price choice, not an immediate App Store sheet — that
-  // distinction matters for a widget this prominent; an unexpected
-  // purchase prompt here would read as a bait-and-switch.
   Widget _buildTrialCountdown() {
     final remaining = TrialTimerService.instance.remainingSeconds;
     final minutes = (remaining ~/ 60).toString().padLeft(2, '0');
@@ -913,7 +899,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 if (!mounted) return;
 
                 if (result == IAPResult.success) {
-                  setState(() {}); // canUpgradeToLifetime flips false now
+                  setState(() {});
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text("You're upgraded to Lifetime! 🎉"),
@@ -923,7 +909,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 }
 
                 if (result == IAPResult.canceled) {
-                  return; // user backed out — intentional, nothing to show
+                  return;
                 }
 
                 final message = result.userMessage;
@@ -1082,8 +1068,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   child: Column(
                     spacing: AppSizes.cardSpacing,
                     children: [
-                      // Top slot: trial countdown (unpurchased) OR
-                      // curriculum/assessment button (purchased).
                       _state.hasUnlockedApp
                           ? Column(
                               spacing: 2,
@@ -1135,7 +1119,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             )
                           : _buildTrialCountdown(),
 
-                      // Dashboard button
                       Column(
                         spacing: 2,
                         children: [
@@ -1159,9 +1142,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         ],
                       ),
 
-                      // Final exam button — hidden entirely when locked,
-                      // rather than shown grayed out. Reappears automatically
-                      // for paid users, or trial users who reach 100% readiness.
                       Builder(
                         builder: (context) {
                           final isLocked =
@@ -1220,7 +1200,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         ),
                       ),
 
-                      // Peace of Mind button
                       Column(
                         spacing: 2,
                         children: [

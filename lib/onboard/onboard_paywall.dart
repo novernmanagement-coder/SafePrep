@@ -74,11 +74,11 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
   void initState() {
     super.initState();
     MixpanelService.instance.track(
-      'onboarding_paywall_viewed',
+      'SpOn_Pay_Viewed',
       properties: {
         'app_name': 'SP',
-        'mode': widget.isRefresher ? 'refresher' : 'full_plan',
-        'readiness': _result.weightedScore,
+        'tier': widget.isRefresher ? 'refresher' : 'sp',
+        'readiness': _result.readinessScore,
       },
     );
   }
@@ -93,10 +93,11 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
     if (_purchasing) return;
 
     MixpanelService.instance.track(
-      'onboarding_paywall_purchase',
+      'SpOn_Purchase',
       properties: {
         'app_name': 'SP',
-        'mode': widget.isRefresher ? 'refresher' : 'full_plan',
+        'tier': widget.isRefresher ? 'refresher' : 'sp',
+        'source': 'paywall',
         'price': _price,
       },
     );
@@ -145,10 +146,10 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
 
   void _decline() {
     MixpanelService.instance.track(
-      'onboarding_paywall_decline',
+      'SpOn_Pay_Decline',
       properties: {
         'app_name': 'SP',
-        'mode': widget.isRefresher ? 'refresher' : 'full_plan',
+        'tier': widget.isRefresher ? 'refresher' : 'sp',
       },
     );
 
@@ -166,7 +167,7 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
 
   void _declineRapidFire() {
     MixpanelService.instance.track(
-      'onboarding_decline_rapid_fire',
+      'SpOn_Pay_DeclineToRapidFire',
       properties: {'app_name': 'SP'},
     );
     if (!mounted) return;
@@ -179,7 +180,7 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
 
   void _declinePresenter() {
     MixpanelService.instance.track(
-      'onboarding_decline_presenter',
+      'SpOn_Pay_DeclineToPresenter',
       properties: {'app_name': 'SP'},
     );
     _launchUrl(_fsmePresenterUrl);
@@ -635,7 +636,7 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
     return GestureDetector(
       onTap: () {
         MixpanelService.instance.track(
-          'onboarding_paywall_rapid_fire_taste',
+          'SpOn_Pay_RapidFireTaste',
           properties: {'app_name': 'SP'},
         );
         if (!mounted) return;

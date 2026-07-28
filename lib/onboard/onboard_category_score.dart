@@ -20,8 +20,8 @@ import 'onboard_readiness.dart';
 /// values (0–20 = 0%–100% in 5% increments). Honest granularity from
 /// data the user supplied, not invented percentages.
 ///
-/// Each category also gets a qualitative label — Strong / Shaky / Gap —
-/// so the read is instant even if the user ignores the numbers.
+/// Each category also gets a qualitative label — Confident / Mixed /
+/// Unsure — so the read is instant even if the user ignores the numbers.
 class OnboardCategoryScore extends StatefulWidget {
   const OnboardCategoryScore({super.key});
 
@@ -55,7 +55,7 @@ class _OnboardCategoryScoreState extends State<OnboardCategoryScore> {
   void initState() {
     super.initState();
     MixpanelService.instance.track(
-      'onboarding_category_score_viewed',
+      'SpOn_Cat_Viewed',
       properties: {'app_name': 'SP', 'score': _result.correct},
     );
   }
@@ -63,7 +63,7 @@ class _OnboardCategoryScoreState extends State<OnboardCategoryScore> {
   void _next() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const OnboardReadiness()),
+      MaterialPageRoute(builder: (_) => OnboardReadiness()),
     );
   }
 
@@ -82,9 +82,9 @@ class _OnboardCategoryScoreState extends State<OnboardCategoryScore> {
 
   Color _colorForLabel(String label) {
     switch (label) {
-      case 'Strong':
+      case 'Confident':
         return _green;
-      case 'Shaky':
+      case 'Mixed':
         return _amber;
       default:
         return _red;
@@ -259,7 +259,7 @@ class _OnboardCategoryScoreState extends State<OnboardCategoryScore> {
               const SizedBox(height: 24),
 
               for (final c in categories)
-                _categoryRow(c, scores[c] ?? 0, labels[c] ?? 'Gap'),
+                _categoryRow(c, scores[c] ?? 0, labels[c] ?? 'Unsure'),
 
               const SizedBox(height: 8),
 

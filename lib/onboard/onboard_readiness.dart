@@ -1,475 +1,529 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../constants.dart';
 import '../mixpanel_service.dart';
 import 'onboard_answers.dart';
 import 'onboard_diagnostic_questions.dart';
 import 'onboard_paywall.dart';
 
-/// Results, beat 2 of 2 — the readiness verdict.
+/// Results, beat 2 of 2 — the readiness verdict, delivered by FSME.
 ///
-/// A short calculating sequence types out what's being done with their
-/// answers, then the score fills in on a ring. The theatre is doing real
-/// work: it makes the number feel measured rather than assigned, and the
-/// sequence states the passing threshold on the way past, so the gap is
-/// already obvious by the time the score lands.
+/// The category screen built the case; this screen delivers it. A score
+/// ring on top ([DiagnosticResult.readinessScore] + band tag), then an
+/// FSME terminal readout that reads out the two raw signals and gives a
+/// per-cell assessment + recommendation.
 ///
-/// Every line in that sequence is literally true of data we hold. Nothing
-/// here claims a capability the app doesn't have — no touch pressure, no
-/// answer-change counts, no "decision process" label that nothing
-/// computes. The confidence profile comes from the star ratings the user
-/// tapped after each answer — their data, not ours.
+/// ── The 3×3 read ──────────────────────────────────────────────────────
+/// FSME's assessment keys off two axes, each in three bands:
+///
+///   Confidence (avg stars):  Low <3 · Mid 3–4 · High >4
+///   Knowledge  (correct):    Low ≤5 · Mid 6–7 · High 8–10
+///
+/// Nine cells, each with its own assessment line and recommendation. The
+/// score ring still shows readinessScore (correctness × confidence-
+/// calibration penalty); the FSME box explains what that score means and
+/// what to do about it — so a high scorer who hedged understands why
+/// they're pointed at the full plan rather than the Refresher.
+///
+/// ── Refresher gate ────────────────────────────────────────────────────
+/// Only the High/High cell (correct ≥8 AND avg stars >4) recommends the
+/// $2.99 Refresher — very good knowledge AND the confidence to sit the
+/// exam today. Every other cell routes to the full $4.99 plan.
 class OnboardReadiness extends StatefulWidget {
   const OnboardReadiness({super.key});
+
+  /// SharedPreferences key holding how many times the user has completed
+  /// onboarding (reached this readiness page). The splash reads it: after
+  /// [maxFreeRuns] completed runs, launches go straight to the paywall
+  /// instead of replaying the funnel.
+  static const String onboardingRunsKey = 'onboarding_runs_completed';
+
+  /// Free onboarding run-throughs before the splash sends the user
+  /// straight to the paywall.
+  static const int maxFreeRuns = 2;
 
   @override
   State<OnboardReadiness> createState() => _OnboardReadinessState();
 }
 
 class _OnboardReadinessState extends State<OnboardReadiness>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   static const Color _gold = Color(0xFFD4AF37);
   static const Color _darkBg = Color(0xFF0A0A0F);
   static const Color _softWhite = Color(0xFFF0EDE8);
-  static const Color _cardBg = Color(0xFF13130F);
   static const Color _green = Color(0xFF639922);
+  static const Color _amber = Color(0xFFEF9F27);
+  static const Color _red = Color(0xFFE24B4A);
+  static const Color _eyeRed = Color(0xFFE24B4A);
 
-  /// ServSafe Manager passing score. 75%, not 70% — worth stating once
-  /// here rather than scattering the number through copy.
-  static const int kPassMark = 75;
+  /// Refresher gate — the one cell that gets the $2.99 route.
+  static const int _refresherMinCorrect = 8;
+  static const double _refresherMinAvgStars = 4.0;
 
-  /// Minutes of targeted work per weak category, capped at the four-hour
-  /// promise. Keep in step with the same constants on the category screen.
-  static const int _minutesPerWeakCategory = 40;
-  static const int _maxEstimateMinutes = 240;
+  // ── FSME animated eyes ──────────────────────────────────────────────
+  int _gazeTarget = 0;
+  double _gazeCurrent = 0.0;
+  Timer? _gazeTimer;
+  late AnimationController _gazeAnim;
+  late AnimationController _blinkController;
+  Timer? _blinkTimer;
+  final math.Random _rng = math.Random();
 
-  late AnimationController _ringController;
-  late Animation<double> _ringAnim;
-
-  final List<_CalcLine> _printed = [];
-  bool _revealed = false;
-  Timer? _typer;
+  /// Terminal lines revealed so far (typed in one at a time).
+  final List<String> _lines = [];
 
   DiagnosticResult get _result =>
       OnboardingAnswers.instance.diagnosticResult ?? const DiagnosticResult([]);
 
-  /// Confidence-weighted readiness score, 0–100.
-  ///
-  /// Factors in how sure the user was alongside whether they were right.
-  /// A 5-star wrong scores 0; a 5-star correct scores 10. The composite
-  /// can't be reverse-engineered from a mental count of correct answers,
-  /// which is the point — it makes the number feel measured.
-  int get _readiness => _result.weightedScore;
+  // ── Bands ───────────────────────────────────────────────────────────
 
-  /// High scorers get the Refresher offer, not the full plan.
-  ///
-  /// Two conditions, both required:
-  ///   1. Raw accuracy — did they actually know the material? (8+ of 10)
-  ///   2. Confidence — are they telling us they feel ready? The stars are
-  ///      self-report, not a measurement to correct for: a rating of 3 or
-  ///      below is a hedge (guessing, nervous, or not wanting to look
-  ///      cocky). If half or more of the answers came in at 3 or below,
-  ///      the user is saying they don't feel ready — and that overrides a
-  ///      strong raw score. Someone who gets 8/10 right but rates low
-  ///      confidence throughout is NOT sold a Refresher; they get the plan
-  ///      that builds the confidence they told us they lack.
-  bool get _isPassing => _result.correct >= 8 && !_result.lowConfidenceDominant;
-
-  int get _estimateMinutes {
-    final raw = _result.weakestCategories.length * _minutesPerWeakCategory;
-    return raw > _maxEstimateMinutes ? _maxEstimateMinutes : raw;
+  /// Band key on readinessScore: 0 = get to work, 1 = almost, 2 = ready.
+  int get _band {
+    final s = _result.readinessScore;
+    if (s >= 80) return 2;
+    if (s >= 65) return 1;
+    return 0;
   }
 
-  String get _estimateLabel {
-    final h = _estimateMinutes ~/ 60;
-    final m = _estimateMinutes % 60;
-    if (h == 0) return '$m min';
-    if (m == 0) return '$h hr';
-    return '$h hr $m min';
-  }
-
-  /// Verdict line, keyed off distance from the pass mark rather than a
-  /// population average. The user's score is theirs; the only comparison
-  /// on screen is the standard.
-  String get _bandLine {
-    if (_isPassing) return "You'd likely pass today";
-    if (_readiness >= 60) return "You\u2019re at $_readiness% readiness";
-    if (_readiness >= 45) return 'You know more than you think';
-    return 'Starting fresh is fine';
-  }
-
-  String get _bandBody {
-    if (_isPassing) {
-      return "You're at $_readiness% readiness. What you "
-          'need now is to stay sharp, not start over.';
+  Color get _bandColor {
+    switch (_band) {
+      case 2:
+        return _green;
+      case 1:
+        return _amber;
+      default:
+        return _red;
     }
-    if (_readiness >= 60) {
-      return 'The good news is we can have you exam-ready '
-          'quicker than you think.';
-    }
-    if (_readiness >= 45) {
-      return "You're at $_readiness% readiness, and almost all of "
-          'that gap sits in a few categories.';
-    }
-    return "You're at $_readiness% readiness. This is a teachable "
-        'test, and it\u2019s what we teach.';
   }
+
+  String get _bandTag {
+    switch (_band) {
+      case 2:
+        return 'READY';
+      case 1:
+        return 'ALMOST READY';
+      default:
+        return 'KEEP GOING';
+    }
+  }
+
+  /// Confidence tier: 0 = Low (<3), 1 = Mid (3–4), 2 = High (>4).
+  int get _confTier {
+    final a = _result.avgStars;
+    if (a < 3) return 0;
+    if (a <= 4) return 1;
+    return 2;
+  }
+
+  /// Knowledge tier: 0 = Low (≤5), 1 = Mid (6–7), 2 = High (8–10).
+  int get _knowTier {
+    final c = _result.correct;
+    if (c <= 5) return 0;
+    if (c <= 7) return 1;
+    return 2;
+  }
+
+  bool get _recommendRefresher =>
+      _result.correct >= _refresherMinCorrect &&
+      _result.avgStars > _refresherMinAvgStars;
+
+  /// Assessment line per 3×3 cell [confTier][knowTier].
+  String get _assessment {
+    const grid = [
+      // Low confidence
+      [
+        "Let's build your knowledge and confidence",
+        'SafePrep is designed to build confidence and improve knowledge',
+        'Excellent knowledge base, just lacking some confidence',
+      ],
+      // Mid confidence
+      [
+        'Confident at test taking — improve the knowledge base',
+        'The perfect student for SafePrep: fast learner and confident',
+        'One of the better scores — knows what they know, just needs '
+            'to see real results',
+      ],
+      // High confidence
+      [
+        'Confident test taker, just needs to learn the material',
+        'The perfect student for SafePrep: fast learner and very '
+            'confident',
+        'No need for a full study app — stay in tune with the Refresher',
+      ],
+    ];
+    return grid[_confTier][_knowTier];
+  }
+
+  /// Recommendation line per 3×3 cell [confTier][knowTier].
+  String get _recommendation {
+    const grid = [
+      // Low confidence
+      [
+        'Full study plan',
+        'Full study plan + 60-Second Trainers',
+        'Build confidence with a targeted study plan + 60-Second '
+            'Trainers',
+      ],
+      // Mid confidence
+      [
+        'Full study course — prepared in less than 4 hours',
+        'Targeted study course, reinforce with 60-Second Trainers',
+        'Targeted study course, reinforce with 60-Second Trainers',
+      ],
+      // High confidence
+      [
+        'Full study course, then drive home results with 60-Second '
+            'Trainers',
+        'Start with targeted study, reinforce with 60-Second Trainers',
+        'Move to the SafePrep Refresher — powerful, and designed just '
+            'for you',
+      ],
+    ];
+    return grid[_confTier][_knowTier];
+  }
+
+  // ── Lifecycle ───────────────────────────────────────────────────────
 
   @override
   void initState() {
     super.initState();
 
+    _gazeAnim = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    )..addListener(_advanceGaze);
+    _gazeAnim.repeat();
+
+    _blinkController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 180),
+    );
+
+    _scheduleGaze();
+    _scheduleBlink();
+
     MixpanelService.instance.track(
-      'onboarding_readiness_viewed',
+      'SpOn_Ready_Viewed',
       properties: {
         'app_name': 'SP',
-        'score': _result.correct,
-        'readiness': _readiness,
-        'calibration': _result.calibrationLabel,
+        'band': _bandTag,
+        'readiness_score': _result.readinessScore,
+        'conf_tier': _confTier,
+        'know_tier': _knowTier,
+        'refresher_eligible': _recommendRefresher,
       },
     );
 
-    _ringController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1100),
-    );
-    _ringAnim = CurvedAnimation(
-      parent: _ringController,
-      curve: Curves.easeOutCubic,
-    );
+    _recordOnboardingRun();
+    _revealLines();
+  }
 
-    _startTyping();
+  /// Reaching this screen counts as one completed onboarding run — the
+  /// splash uses the tally to cap free runs. See
+  /// [OnboardReadiness.onboardingRunsKey] / [OnboardReadiness.maxFreeRuns].
+  Future<void> _recordOnboardingRun() async {
+    final prefs = await SharedPreferences.getInstance();
+    final current = prefs.getInt(OnboardReadiness.onboardingRunsKey) ?? 0;
+    await prefs.setInt(OnboardReadiness.onboardingRunsKey, current + 1);
+  }
+
+  /// Types the terminal readout in one line at a time.
+  Future<void> _revealLines() async {
+    final avg = _result.avgStars.toStringAsFixed(1);
+    final knowPct = _result.correct * 10;
+
+    final script = <String>[
+      'Confidence level $avg',
+      'Knowledge level $knowPct%',
+      'Assessment: $_assessment',
+      'Recommend: $_recommendation',
+    ];
+
+    await Future.delayed(const Duration(milliseconds: 400));
+    for (final line in script) {
+      if (!mounted) return;
+      setState(() => _lines.add(line));
+      await Future.delayed(const Duration(milliseconds: 700));
+    }
+  }
+
+  void _advanceGaze() {
+    final target = _gazeTarget.toDouble();
+    final next = _gazeCurrent + (target - _gazeCurrent) * 0.18;
+    if ((next - _gazeCurrent).abs() > 0.001) {
+      setState(() => _gazeCurrent = next);
+    }
+  }
+
+  void _scheduleGaze() {
+    final delay = Duration(milliseconds: 1800 + _rng.nextInt(2200));
+    _gazeTimer = Timer(delay, () {
+      if (!mounted) return;
+      if (_rng.nextDouble() < 0.30) {
+        setState(() => _gazeTarget = _rng.nextBool() ? -1 : 1);
+        Timer(Duration(milliseconds: 700 + _rng.nextInt(400)), () {
+          if (mounted) setState(() => _gazeTarget = 0);
+        });
+      } else {
+        setState(() => _gazeTarget = 0);
+      }
+      _scheduleGaze();
+    });
+  }
+
+  void _scheduleBlink() {
+    final delay = Duration(milliseconds: 3000 + _rng.nextInt(5000));
+    _blinkTimer = Timer(delay, () async {
+      if (!mounted) return;
+      await _blinkController.forward(from: 0.0);
+      if (mounted) await _blinkController.reverse();
+      _scheduleBlink();
+    });
   }
 
   @override
   void dispose() {
-    _typer?.cancel();
-    _ringController.dispose();
+    _gazeAnim.dispose();
+    _blinkController.dispose();
+    _gazeTimer?.cancel();
+    _blinkTimer?.cancel();
     super.dispose();
   }
 
-  /// Lines are built from real values — question count, category count,
-  /// their actual weakest area, and their confidence calibration — so
-  /// nothing on screen is invented.
-  ///
-  /// The confidence profile line comes from the star ratings the user
-  /// tapped after each answer. "overconfident" means they gave 4-5 stars
-  /// on 2+ questions they got wrong. "underconfident" means 1-2 stars on
-  /// 3+ they got right. "well-calibrated" means neither threshold hit.
-  /// All three are defensible descriptions of data they supplied.
-  List<_CalcLine> get _script {
-    final weakest = _result.weakestCategories.isNotEmpty
-        ? _result.weakestCategories.first.toLowerCase()
-        : 'no gaps found';
+  void _next() {
+    final bool refresher = _recommendRefresher;
 
-    return [
-      _CalcLine('> Reading ${kDiagnosticQuestions.length} responses'),
-      _CalcLine(
-        '  mapped to ${_result.categoryTotal.length} exam categories',
-        dim: true,
-      ),
-      _CalcLine('> Building confidence profile'),
-      _CalcLine('  calibration: ${_result.calibrationLabel}', dim: true),
-      _CalcLine('> Weighting against exam blueprint'),
-      _CalcLine('  $weakest flagged', dim: true),
-      _CalcLine('> Comparing to passing threshold'),
-      _CalcLine('  $kPassMark% required to pass', dim: true),
-      _CalcLine('> Readiness calculated'),
-    ];
-  }
-
-  void _startTyping() {
-    final script = _script;
-    int lineIndex = 0;
-    int charIndex = 0;
-
-    _typer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-
-      if (lineIndex >= script.length) {
-        timer.cancel();
-        Future.delayed(const Duration(milliseconds: 400), () {
-          if (!mounted) return;
-          setState(() => _revealed = true);
-          _ringController.forward();
-        });
-        return;
-      }
-
-      final source = script[lineIndex];
-
-      setState(() {
-        if (charIndex == 0) {
-          _printed.add(_CalcLine('', dim: source.dim));
-        }
-        charIndex++;
-        _printed[_printed.length - 1] = _CalcLine(
-          source.text.substring(0, charIndex),
-          dim: source.dim,
-        );
-      });
-
-      if (charIndex >= source.text.length) {
-        lineIndex++;
-        charIndex = 0;
-      }
-    });
-  }
-
-  void _continue() {
     MixpanelService.instance.track(
-      'onboarding_readiness_continue',
+      'SpOn_Ready_Continue',
       properties: {
         'app_name': 'SP',
-        'readiness': _readiness,
-        'calibration': _result.calibrationLabel,
-        'branch': _isPassing ? 'refresher_offer' : 'full_paywall',
+        'band': _bandTag,
+        'readiness_score': _result.readinessScore,
+        'tier': refresher ? 'refresher' : 'sp',
       },
     );
-
-    // High scorers get the $2.99 Refresher recommendation instead of the
-    // full plan — selling someone a study plan they demonstrably don't
-    // need is how you lose them.
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => OnboardPaywall(isRefresher: _isPassing),
-      ),
+      MaterialPageRoute(builder: (_) => OnboardPaywall(isRefresher: refresher)),
     );
   }
 
-  Widget _calcBox() {
-    return Container(
-      width: double.infinity,
-      constraints: const BoxConstraints(minHeight: 172),
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0A0E14),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: _gold.withValues(alpha: 0.25), width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final line in _printed)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 5),
-              child: Text(
-                line.text,
-                style: TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 11.5,
-                  height: 1.6,
-                  color: line.dim ? _softWhite.withValues(alpha: 0.4) : _gold,
+  // ── FSME eye ────────────────────────────────────────────────────────
+
+  Widget _davEye() {
+    return AnimatedBuilder(
+      animation: Listenable.merge([_gazeAnim, _blinkController]),
+      builder: (context, _) {
+        final blink = 1.0 - _blinkController.value * 0.92;
+        return Transform(
+          alignment: Alignment.center,
+          transform: Matrix4.identity()..scale(1.0, blink),
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const RadialGradient(
+                colors: [
+                  Color(0xFFFF2200),
+                  Color(0xFFCC1100),
+                  Color(0xFF660000),
+                  Color(0xFF1A0000),
+                ],
+                stops: [0.0, 0.35, 0.7, 1.0],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: _eyeRed.withValues(alpha: 0.6),
+                  blurRadius: 12,
+                  spreadRadius: 2,
+                ),
+                BoxShadow(
+                  color: _eyeRed.withValues(alpha: 0.25),
+                  blurRadius: 24,
+                  spreadRadius: 5,
+                ),
+              ],
+            ),
+            child: Center(
+              child: Transform.translate(
+                offset: Offset(_gazeCurrent * 7, 1),
+                child: Container(
+                  width: 13,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0A0000),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
                 ),
               ),
             ),
-        ],
-      ),
-    );
-  }
-
-  Widget _ring() {
-    return AnimatedBuilder(
-      animation: _ringAnim,
-      builder: (context, _) {
-        final shown = (_readiness * _ringAnim.value).round();
-        return SizedBox(
-          width: 132,
-          height: 132,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              CustomPaint(
-                size: const Size(132, 132),
-                painter: _ReadinessRingPainter(
-                  progress: (_readiness / 100) * _ringAnim.value,
-                  arcColor: _isPassing ? _green : _gold,
-                  trackColor: _softWhite.withValues(alpha: 0.1),
-                ),
-              ),
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '$shown%',
-                    style: const TextStyle(
-                      fontSize: 36,
-                      fontWeight: FontWeight.w600,
-                      color: _softWhite,
-                      height: 1,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'READY',
-                    style: TextStyle(
-                      fontSize: 10,
-                      letterSpacing: 1.6,
-                      color: _softWhite.withValues(alpha: 0.5),
-                    ),
-                  ),
-                ],
-              ),
-            ],
           ),
         );
       },
     );
   }
 
+  /// FSME readout box — animated eyes + typed terminal lines. The
+  /// Assessment and Recommend lines render in the band color so the
+  /// verdict reads at a glance; the two data lines stay gold.
+  Widget _fsmeBox() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _davEye(),
+            const SizedBox(width: 16),
+            Text(
+              'F S M E',
+              style: TextStyle(
+                fontSize: 10,
+                letterSpacing: 3,
+                color: _eyeRed.withValues(alpha: 0.3),
+                fontWeight: FontWeight.w300,
+              ),
+            ),
+            const SizedBox(width: 16),
+            _davEye(),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Container(
+          width: double.infinity,
+          constraints: const BoxConstraints(minHeight: 120),
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0A0E14),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: _gold.withValues(alpha: 0.4), width: 1),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final line in _lines)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 7),
+                  child: Text(
+                    '> $line',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11.5,
+                      height: 1.5,
+                      color:
+                          (line.startsWith('Assessment:') ||
+                              line.startsWith('Recommend:'))
+                          ? _bandColor
+                          : _gold.withValues(alpha: 0.85),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final int score = _result.readinessScore;
+
     return Scaffold(
       backgroundColor: _darkBg,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(22, 22, 22, 26),
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 30),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const SizedBox(height: 8),
+
               Text(
-                'READINESS ENGINE',
+                'YOUR READINESS',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: _gold.withValues(alpha: 0.8),
                   letterSpacing: 1.6,
-                  color: _softWhite.withValues(alpha: 0.45),
                 ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
 
-              _calcBox(),
-
-              AnimatedOpacity(
-                opacity: _revealed ? 1 : 0,
-                duration: const Duration(milliseconds: 600),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const SizedBox(height: 20),
-
-                    Text(
-                      'YOUR SCORE',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 11,
-                        letterSpacing: 1.5,
-                        fontWeight: FontWeight.w600,
-                        color: _gold,
-                      ),
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    Center(child: _ring()),
-
-                    const SizedBox(height: 16),
-
-                    Text(
-                      _bandLine,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 19,
-                        fontWeight: FontWeight.w600,
-                        color: _isPassing ? _green : _softWhite,
-                      ),
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    Text(
-                      _bandBody,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        color: _softWhite.withValues(alpha: 0.6),
-                        height: 1.6,
-                      ),
-                    ),
-
-                    const SizedBox(height: 18),
-
-                    if (!_isPassing)
-                      Container(
-                        padding: const EdgeInsets.fromLTRB(15, 13, 15, 13),
-                        decoration: BoxDecoration(
-                          color: _cardBg,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: _gold.withValues(alpha: 0.3),
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.local_fire_department_outlined,
-                              size: 18,
-                              color: _gold,
-                            ),
-                            const SizedBox(width: 9),
-                            Expanded(
-                              child: RichText(
-                                text: TextSpan(
-                                  style: TextStyle(
-                                    fontSize: 12.5,
-                                    color: _softWhite.withValues(alpha: 0.75),
-                                    height: 1.5,
-                                  ),
-                                  children: [
-                                    TextSpan(
-                                      text: _estimateLabel,
-                                      style: const TextStyle(
-                                        color: _gold,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    const TextSpan(
-                                      text: ' of targeted work closes it.',
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
+              // ── Score ring ────────────────────────────────────────
+              Center(
+                child: Container(
+                  width: 132,
+                  height: 132,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _bandColor.withValues(alpha: 0.10),
+                    border: Border.all(color: _bandColor, width: 2.5),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        '$score%',
+                        style: TextStyle(
+                          fontSize: 38,
+                          fontWeight: FontWeight.w700,
+                          color: _bandColor,
+                          height: 1.0,
                         ),
                       ),
-
-                    const SizedBox(height: 18),
-
-                    SizedBox(
-                      height: 52,
-                      child: ElevatedButton(
-                        onPressed: _revealed ? _continue : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _gold,
-                          foregroundColor: _darkBg,
-                          elevation: 4,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(
-                              AppSizes.buttonCornerRadius,
-                            ),
-                          ),
-                        ),
-                        child: Text(
-                          _isPassing
-                              ? 'What I need  \u2192'
-                              : 'Build my plan  \u2192',
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                          ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _bandTag,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: _bandColor,
+                          letterSpacing: 1.0,
                         ),
                       ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 26),
+
+              // ── FSME readout ──────────────────────────────────────
+              _fsmeBox(),
+
+              const SizedBox(height: 28),
+
+              // ── CTA ───────────────────────────────────────────────
+              SizedBox(
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: _next,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _gold,
+                    foregroundColor: _darkBg,
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(
+                        AppSizes.buttonCornerRadius,
+                      ),
                     ),
-                  ],
+                  ),
+                  child: Text(
+                    _recommendRefresher
+                        ? 'See the Refresher  \u2192'
+                        : 'Build my study plan  \u2192',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -478,51 +532,4 @@ class _OnboardReadinessState extends State<OnboardReadiness>
       ),
     );
   }
-}
-
-class _CalcLine {
-  final String text;
-  final bool dim;
-  const _CalcLine(this.text, {this.dim = false});
-}
-
-/// Track and progress arc. No pass-mark tick — the readiness score
-/// stands on its own against 100, not against 75. A 63% ring that's
-/// visibly short of full is more ominous than 63% with a tick nearby
-/// showing you're almost at 75.
-class _ReadinessRingPainter extends CustomPainter {
-  final double progress; // 0..1
-  final Color arcColor;
-  final Color trackColor;
-
-  _ReadinessRingPainter({
-    required this.progress,
-    required this.arcColor,
-    required this.trackColor,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.width / 2) - 10;
-    final rect = Rect.fromCircle(center: center, radius: radius);
-    const start = -math.pi / 2; // twelve o'clock
-
-    final track = Paint()
-      ..color = trackColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 9;
-    canvas.drawCircle(center, radius, track);
-
-    final arc = Paint()
-      ..color = arcColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 9
-      ..strokeCap = StrokeCap.round;
-    canvas.drawArc(rect, start, 2 * math.pi * progress, false, arc);
-  }
-
-  @override
-  bool shouldRepaint(_ReadinessRingPainter old) =>
-      old.progress != progress || old.arcColor != arcColor;
 }

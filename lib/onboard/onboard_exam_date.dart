@@ -40,7 +40,6 @@ class _OnboardExamDateState extends State<OnboardExamDate>
   static const Color _softWhite = Color(0xFFF0EDE8);
   static const Color _cardBg = Color(0xFF13130F);
   static const Color _eyeRed = Color(0xFFE24B4A);
-  static const Color _green = Color(0xFF639922);
 
   ExamWindow? _selected;
 
@@ -51,6 +50,10 @@ class _OnboardExamDateState extends State<OnboardExamDate>
   // ── FSME reaction box ───────────────────────────────────────────────
   bool _fsmeActive = false;
   final List<String> _fsmeLines = [];
+
+  /// Bumped on every band (re)selection. An in-flight reaction loop
+  /// checks it and stops appending if a newer selection has started.
+  int _fsmeGen = 0;
 
   int _gazeTarget = 0;
   double _gazeCurrent = 0.0;
@@ -65,7 +68,8 @@ class _OnboardExamDateState extends State<OnboardExamDate>
   /// Keeps the newest FSME line in view as lines print in.
   final ScrollController _scroll = ScrollController();
 
-  /// Clean band label per window, for the SP_exam_band_selected event.
+  /// Clean band label per window (1/2/3), sent as the `band` property on
+  /// SpOn_Date_Selected.
   static String _bandTag(ExamWindow w) {
     switch (w) {
       case ExamWindow.oneToThree:
@@ -135,7 +139,7 @@ class _OnboardExamDateState extends State<OnboardExamDate>
     );
 
     MixpanelService.instance.track(
-      'onboarding_exam_date_viewed',
+      'SpOn_Date_Viewed',
       properties: {'app_name': 'SP'},
     );
   }
@@ -185,21 +189,33 @@ class _OnboardExamDateState extends State<OnboardExamDate>
   }
 
   Future<void> _choose(ExamWindow window) async {
-    if (_selected != null) return; // ignore double taps mid-transition
+    // Re-tapping the same band does nothing; tapping a different one
+    // re-selects and replays that band's reaction. The Continue button
+    // means the choice isn't final until they proceed, so there's no
+    // reason to lock it.
+    if (_selected == window) return;
 
-    setState(() => _selected = window);
+    // Bump the generation so any in-flight reaction from a previous pick
+    // stops appending lines.
+    _fsmeGen++;
+
+    setState(() {
+      _selected = window;
+      _peekUsed = false; // a new band selection re-arms the peek
+    });
 
     OnboardingAnswers.instance.examWindow = window;
 
-    // Existing event — unchanged tag, keeps downstream analytics intact.
+    // One selection event carrying both the raw window tag and the clean
+    // band number (1/2/3) as properties — break down on `band` in
+    // Mixpanel to see the urgency distribution.
     MixpanelService.instance.track(
-      'onboarding_exam_date_selected',
-      properties: {'app_name': 'SP', 'exam_window': window.tag},
-    );
-    // New clean band event for the urgency funnel.
-    MixpanelService.instance.track(
-      'SP_exam_band_selected',
-      properties: {'app_name': 'SP', 'band': _bandTag(window)},
+      'SpOn_Date_Selected',
+      properties: {
+        'app_name': 'SP',
+        'exam_window': window.tag,
+        'band': _bandTag(window),
+      },
     );
 
     await _runFsme(window);
@@ -209,6 +225,8 @@ class _OnboardExamDateState extends State<OnboardExamDate>
   /// two peek bands it ends by offering the sneak peek; otherwise it just
   /// shows the Next button.
   Future<void> _runFsme(ExamWindow window) async {
+    final int gen = _fsmeGen;
+
     setState(() {
       _fsmeActive = true;
       _fsmeLines.clear();
@@ -220,7 +238,7 @@ class _OnboardExamDateState extends State<OnboardExamDate>
 
     await Future.delayed(const Duration(milliseconds: 450));
     for (final line in lines) {
-      if (!mounted) return;
+      if (!mounted || gen != _fsmeGen) return;
       setState(() => _fsmeLines.add(line));
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scroll.hasClients) {
@@ -264,7 +282,7 @@ class _OnboardExamDateState extends State<OnboardExamDate>
     }
 
     MixpanelService.instance.track(
-      'SP_peek_offered',
+      'SpOn_Date_PeekOffered',
       properties: {
         'app_name': 'SP',
         'band': _selected != null ? _bandTag(_selected!) : 'unknown',
@@ -282,14 +300,14 @@ class _OnboardExamDateState extends State<OnboardExamDate>
 
     if (accepted == true) {
       MixpanelService.instance.track(
-        'SP_peek_watched',
+        'SpOn_Date_PeekWatched',
         properties: {'app_name': 'SP'},
       );
       _peekUsed = true;
       await _runPeek();
     } else {
       MixpanelService.instance.track(
-        'SP_peek_declined',
+        'SpOn_Date_PeekDeclined',
         properties: {'app_name': 'SP'},
       );
       _peekUsed = true;
@@ -310,8 +328,6 @@ class _OnboardExamDateState extends State<OnboardExamDate>
       builder: (_) => _PeekQuestionsDialog(
         questions: _peekQuestions,
         gold: _gold,
-        green: _green,
-        eyeRed: _eyeRed,
         softWhite: _softWhite,
       ),
     );
@@ -676,12 +692,17 @@ class _PeekOfferDialog extends StatelessWidget {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: gold.withValues(alpha: 0.7),
                       side: BorderSide(color: gold.withValues(alpha: 0.3)),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      minimumSize: const Size(0, 40),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    child: const Text('No thanks'),
+                    child: const Text(
+                      'No thanks',
+                      maxLines: 1,
+                      style: TextStyle(fontSize: 13),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -691,7 +712,8 @@ class _PeekOfferDialog extends StatelessWidget {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: gold,
                       foregroundColor: const Color(0xFF0A0A0F),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      minimumSize: const Size(0, 40),
                       elevation: 3,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -699,7 +721,11 @@ class _PeekOfferDialog extends StatelessWidget {
                     ),
                     child: const Text(
                       'Yes, show me',
-                      style: TextStyle(fontWeight: FontWeight.w700),
+                      maxLines: 1,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ),
@@ -716,14 +742,10 @@ class _PeekOfferDialog extends StatelessWidget {
 class _PeekQuestionsDialog extends StatefulWidget {
   final List<_PeekQ> questions;
   final Color gold;
-  final Color green;
-  final Color eyeRed;
   final Color softWhite;
   const _PeekQuestionsDialog({
     required this.questions,
     required this.gold,
-    required this.green,
-    required this.eyeRed,
     required this.softWhite,
   });
 
@@ -733,7 +755,18 @@ class _PeekQuestionsDialog extends StatefulWidget {
 
 class _PeekQuestionsDialogState extends State<_PeekQuestionsDialog> {
   int _index = 0;
-  bool _revealed = false;
+  bool _showAnswer = false;
+  double _timerProgress = 0.0;
+
+  /// Category color for the question bubble, matching the real
+  /// 60-Second Refresh tool. All peek questions are Time & Temperature.
+  static const Color _catColor = Color(0xFFC0392B);
+
+  /// Answer bubble green, matching the real tool.
+  static const Color _answerGreen = Color(0xFF3BA776);
+
+  static const int _questionMs = 3000;
+  static const int _answerMs = 2000;
 
   @override
   void initState() {
@@ -741,24 +774,36 @@ class _PeekQuestionsDialogState extends State<_PeekQuestionsDialog> {
     _run();
   }
 
-  /// Hands-off: show question ~1.6s, reveal the answer, hold ~2s, advance.
-  /// After the last question's answer shows, hold 3s then close.
+  /// Hands-off burst: show question (timer fills), reveal answer (timer
+  /// fills again), advance. Mirrors the real tool's question → answer
+  /// flow. After the last answer, hold briefly then close.
   Future<void> _run() async {
     for (var i = 0; i < widget.questions.length; i++) {
       if (!mounted) return;
       setState(() {
         _index = i;
-        _revealed = false;
+        _showAnswer = false;
+        _timerProgress = 0.0;
       });
-      await Future.delayed(const Duration(milliseconds: 1600));
-      if (!mounted) return;
-      setState(() => _revealed = true);
 
-      final isLast = i == widget.questions.length - 1;
-      // Last answer holds 3s (spec); others hold ~2s before advancing.
-      await Future.delayed(Duration(milliseconds: isLast ? 3000 : 2000));
+      await _animateTimer(_questionMs);
+      if (!mounted) return;
+      setState(() => _showAnswer = true);
+
+      await _animateTimer(_answerMs);
+      if (!mounted) return;
+      await Future.delayed(const Duration(milliseconds: 150));
     }
     if (mounted) Navigator.of(context).pop();
+  }
+
+  Future<void> _animateTimer(int totalMs) async {
+    final steps = totalMs ~/ 50;
+    for (var s = 0; s <= steps; s++) {
+      if (!mounted) return;
+      setState(() => _timerProgress = s / steps);
+      await Future.delayed(const Duration(milliseconds: 50));
+    }
   }
 
   @override
@@ -799,61 +844,81 @@ class _PeekQuestionsDialogState extends State<_PeekQuestionsDialog> {
                 ),
               ],
             ),
-            const SizedBox(height: 14),
-            Text(
-              q.question,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                height: 1.4,
-                color: widget.softWhite,
+            const SizedBox(height: 16),
+
+            // Question bubble — category color, white bold italic.
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: _catColor,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                q.question,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  fontStyle: FontStyle.italic,
+                  color: Colors.white,
+                  height: 1.35,
+                ),
               ),
             ),
-            const SizedBox(height: 16),
-            for (var i = 0; i < q.options.length; i++) _optionRow(q, i),
+
+            const SizedBox(height: 12),
+
+            // Answer bubble — green, fades in after the question holds.
+            AnimatedOpacity(
+              opacity: _showAnswer ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 300),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: _answerGreen,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  q.options[q.correctIndex],
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 14),
+
+            // Timer bar.
+            Container(
+              height: 3,
+              decoration: BoxDecoration(
+                color: const Color(0xFFDDDDDD),
+                borderRadius: BorderRadius.circular(2),
+              ),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: FractionallySizedBox(
+                  widthFactor: _timerProgress.clamp(0.0, 1.0),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: _catColor,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _optionRow(_PeekQ q, int i) {
-    final bool isCorrect = i == q.correctIndex;
-    final bool showGreen = _revealed && isCorrect;
-
-    Color border = widget.gold.withValues(alpha: 0.25);
-    Color fill = const Color(0xFF13130F);
-    Color text = widget.softWhite.withValues(alpha: 0.85);
-
-    if (showGreen) {
-      border = widget.green;
-      fill = widget.green.withValues(alpha: 0.15);
-      text = const Color(0xFFC0DD97);
-    }
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 250),
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 13),
-      decoration: BoxDecoration(
-        color: fill,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: border, width: showGreen ? 1.5 : 1),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              q.options[i],
-              style: TextStyle(
-                fontSize: 13.5,
-                color: text,
-                fontWeight: showGreen ? FontWeight.w600 : FontWeight.w400,
-              ),
-            ),
-          ),
-          if (showGreen) Icon(Icons.check, size: 16, color: widget.green),
-        ],
       ),
     );
   }

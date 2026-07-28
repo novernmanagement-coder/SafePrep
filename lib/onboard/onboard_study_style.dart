@@ -52,6 +52,14 @@ class _OnboardStudyStyleState extends State<OnboardStudyStyle>
   bool _showTerminal = false;
   Timer? _typer;
 
+  /// True once the terminal readout has printed its last line — gates the
+  /// Continue button.
+  bool _terminalDone = false;
+
+  /// Bumped on every (re)selection so an in-flight terminal sequence from
+  /// a previous pick stops when a newer style is chosen.
+  int _selectGen = 0;
+
   final math.Random _rng = math.Random();
 
   @override
@@ -76,7 +84,7 @@ class _OnboardStudyStyleState extends State<OnboardStudyStyle>
     _scheduleBlink();
 
     MixpanelService.instance.track(
-      'onboarding_study_style_viewed',
+      'SpOn_Style_Viewed',
       properties: {'app_name': 'SP'},
     );
   }
@@ -156,9 +164,19 @@ class _OnboardStudyStyleState extends State<OnboardStudyStyle>
   }
 
   Future<void> _choose(StudyStyle style) async {
-    if (_selected != null) return;
+    // Re-tapping the same style does nothing; a different one re-selects
+    // and replays its terminal readout. Continue drives the advance, so
+    // the choice isn't final until they proceed.
+    if (_selected == style) return;
 
-    setState(() => _selected = style);
+    _selectGen++;
+    _typer?.cancel();
+
+    setState(() {
+      _selected = style;
+      _terminalDone = false;
+      _terminalLines.clear();
+    });
 
     // Lock the eyes to center — stop darting.
     _gazeTimer?.cancel();
@@ -166,7 +184,7 @@ class _OnboardStudyStyleState extends State<OnboardStudyStyle>
 
     OnboardingAnswers.instance.studyStyle = style;
     MixpanelService.instance.track(
-      'onboarding_study_style_selected',
+      'SpOn_Style_Selected',
       properties: {'app_name': 'SP', 'study_style': style.tag},
     );
 
@@ -205,39 +223,48 @@ class _OnboardStudyStyleState extends State<OnboardStudyStyle>
     return [
       '$label mode selected',
       comment,
-      'User//: EXE $tag script',
-      'User//: $tag mode locked in',
+      'EXE $tag script',
+      '$tag mode locked in',
     ];
   }
 
   Future<void> _runTerminalSequence(StudyStyle style) async {
+    final int gen = _selectGen;
+
     setState(() => _showTerminal = true);
 
     final lines = _buildScript(style);
 
     for (final line in lines) {
+      if (!mounted || gen != _selectGen) return;
       await _typeLine(line);
+      if (!mounted || gen != _selectGen) return;
       await Future.delayed(const Duration(milliseconds: 300));
-      if (!mounted) return;
     }
 
-    // Hold on the final line so the user reads it, then navigate.
-    await Future.delayed(const Duration(seconds: 3));
-    if (!mounted) return;
+    // Readout finished — reveal the Continue button. No auto-advance;
+    // the user proceeds on their own tap (and can still re-pick a
+    // different style before then).
+    if (!mounted || gen != _selectGen) return;
+    setState(() => _terminalDone = true);
+  }
 
+  /// Advance to the quiz-intro screen — driven by the Continue button.
+  Future<void> _advance() async {
+    _typer?.cancel();
     final navigator = Navigator.of(context);
     await navigator.push(
       MaterialPageRoute(builder: (_) => const OnboardQuizIntro()),
     );
 
-    // Clear the guard so the screen still works if they come back.
+    // Clear state so the screen still works if they come back.
     if (mounted) {
       setState(() {
         _selected = null;
         _showTerminal = false;
+        _terminalDone = false;
         _terminalLines.clear();
       });
-      // Restart the idle eye behavior.
       _scheduleGaze();
     }
   }
@@ -578,6 +605,33 @@ class _OnboardStudyStyleState extends State<OnboardStudyStyle>
 
               // Terminal confirmation — types out after selection
               _terminalBox(),
+
+              // Continue — appears once the readout finishes. User-driven
+              // advance; they can still re-pick a style before tapping.
+              if (_terminalDone) ...[
+                const SizedBox(height: 20),
+                SizedBox(
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: _advance,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _gold,
+                      foregroundColor: const Color(0xFF0A0A0F),
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Text(
+                      'Continue  \u2192',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

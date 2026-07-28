@@ -81,7 +81,7 @@ class _OnboardQuizIntroState extends State<OnboardQuizIntro>
     _scheduleBlink();
 
     MixpanelService.instance.track(
-      'onboarding_quiz_intro_viewed',
+      'SpOn_QIntro_Viewed',
       properties: {'app_name': 'SP'},
     );
   }
@@ -134,7 +134,7 @@ class _OnboardQuizIntroState extends State<OnboardQuizIntro>
     setState(() => _starting = true);
 
     MixpanelService.instance.track(
-      'onboarding_diagnostic_started',
+      'SpOn_Diag_Viewed',
       properties: {'app_name': 'SP'},
     );
 
@@ -321,17 +321,25 @@ class _OnboardQuizIntroState extends State<OnboardQuizIntro>
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              _terminalLine('User//: Selected Quiz mode'),
+              _terminalLine('Quiz mode confirmed'),
               _terminalLine(_snark),
+              _terminalLine('One question at a time — one selection each'),
+              _terminalLine('Then rate your confidence:'),
+              _terminalLine('1 = basically a guess', indent: true),
               _terminalLine(
-                'User//: Quiz style — answer each question, '
-                'one selection per question',
+                '2 = low confidence, but it feels at least close',
+                indent: true,
               ),
-              _terminalLine('User//: Then rate your confidence:'),
-              _terminalLine('1 = low confidence', indent: true),
-              _terminalLine('3 = normal confidence', indent: true),
               _terminalLine(
-                '5 = high confidence (I absolutely know this is correct)',
+                "3 = eliminate the obvious, expect you're right",
+                indent: true,
+              ),
+              _terminalLine(
+                '4 = you know it\'s right, very little hesitation',
+                indent: true,
+              ),
+              _terminalLine(
+                '5 = no hesitation — your answer IS correct',
                 indent: true,
               ),
             ],

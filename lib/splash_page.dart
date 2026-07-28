@@ -9,12 +9,21 @@ import 'dashboard_page.dart';
 import 'onboard/onboard_intro.dart';
 import 'onboard/onboard_paywall.dart';
 import 'onboard/onboard_answers.dart';
+import 'onboard/onboard_readiness.dart';
 
 // BUILD 27 — Simplified routing.
 //
-// Two paths, nothing else:
-//   purchased  → DashboardPage
-//   not purchased → OnboardIntro (replays every launch until they buy)
+// Three paths:
+//   purchased            → DashboardPage
+//   used up free runs     → OnboardPaywall (decline mode)
+//   still has free runs   → OnboardIntro (the funnel)
+//
+// FREE-RUN CAP: the user gets two full run-throughs of onboarding
+// (each counted when they reach the readiness page — see
+// OnboardReadiness.onboardingRunsKey). On the third launch, once two
+// runs are banked, they skip the funnel and land on the paywall. This
+// replaces the old has_declined_to_limited boolean, which branded a user
+// the instant the limited Rapid Fire opened.
 //
 // The old preview/trial/cinematic flow is dead. The onboarding funnel
 // IS the trial — no free-roam dashboard, no 30-minute timer, no
@@ -99,13 +108,13 @@ class _SplashPageState extends State<SplashPage> {
     // ── Three paths ──────────────────────────────────────────────────
     //
     //   1. Purchased and active → Dashboard
-    //   2. Already declined to limited Rapid Fire → decline page
+    //   2. Two free onboarding runs used up → decline paywall
     //      (purchase button + Rapid Fire + Student Presenter)
-    //   3. First time / hasn't declined yet → full onboarding funnel
+    //   3. Still has a free run left → full onboarding funnel
     //
     if (state.hasUnlockedApp && !state.isExpired) {
       MixpanelService.instance.track(
-        'splash_route',
+        'SpOn_Splash_Route',
         properties: {'app_name': 'SP', 'path': 'purchased'},
       );
       Navigator.pushReplacement(
@@ -122,14 +131,15 @@ class _SplashPageState extends State<SplashPage> {
     if (!mounted) return;
 
     final prefs = await SharedPreferences.getInstance();
-    final hasDeclined = prefs.getBool('has_declined_to_limited') ?? false;
+    final runs = prefs.getInt(OnboardReadiness.onboardingRunsKey) ?? 0;
 
     if (!mounted) return;
 
-    if (hasDeclined) {
+    if (runs >= OnboardReadiness.maxFreeRuns) {
+      // Free runs exhausted — straight to the decline paywall.
       MixpanelService.instance.track(
-        'splash_route',
-        properties: {'app_name': 'SP', 'path': 'returner_declined'},
+        'SpOn_Splash_Route',
+        properties: {'app_name': 'SP', 'path': 'runs_exhausted', 'runs': runs},
       );
       Navigator.pushReplacement(
         context,
@@ -139,13 +149,16 @@ class _SplashPageState extends State<SplashPage> {
       );
     } else {
       // Clear stale diagnostic data from any previous onboarding run.
-      // Without this, a returning user who declined gets the old
-      // DiagnosticResult on the readiness screen instead of their new
-      // answers.
+      // Without this, a returning user gets the old DiagnosticResult on
+      // the readiness screen instead of their new answers.
       OnboardingAnswers.instance.reset();
       MixpanelService.instance.track(
-        'splash_route',
-        properties: {'app_name': 'SP', 'path': 'fresh_onboarding'},
+        'SpOn_Splash_Route',
+        properties: {
+          'app_name': 'SP',
+          'path': 'fresh_onboarding',
+          'runs': runs,
+        },
       );
       Navigator.pushReplacement(
         context,

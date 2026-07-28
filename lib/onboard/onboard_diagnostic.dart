@@ -28,10 +28,10 @@ import 'onboard_category_score.dart';
 /// Q1 ONLY: after the confidence star is tapped, the FSME character
 /// (animated red eyeballs + terminal box) takes over. It reacts to the
 /// star level, announces an incoming call, bails, and we overhear his
-/// side of it. Then the screen auto-advances to Q2 — no Next button on
-/// Q1 regardless of study style. FSME does not appear again for the rest
-/// of the diagnostic. It's a one-time personality beat, not a per-question
-/// feature.
+/// side of it. Then a Continue button (Q1 only) advances to Q2 — no
+/// auto-advance, no Next button. FSME does not appear again for the rest
+/// of the diagnostic. It's a one-time personality beat, not a
+/// per-question feature.
 ///
 /// Timer is deliberately absent. A countdown would make people rush, and
 /// a rushed answer measures reaction time rather than knowledge — which
@@ -53,6 +53,11 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic>
   static const Color _red = Color(0xFFE24B4A);
   static const Color _eyeRed = Color(0xFFE24B4A);
 
+  /// The one FSME line that renders red instead of gold — matched
+  /// exactly against the string pushed in [_runFsmeReaction].
+  static const String _callLine =
+      'I have a call coming in... you\'re on your own';
+
   int _index = 0;
   int? _picked;
 
@@ -68,6 +73,10 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic>
   /// True once the Q1 star is tapped — drives the FSME takeover. While
   /// this is on, the normal advance/Next path is suppressed on Q1.
   bool _fsmeActive = false;
+
+  /// True once the FSME reaction has printed its last line. Gates the
+  /// Q1 Continue button so it only appears after the gag finishes.
+  bool _fsmeDone = false;
 
   /// Lines revealed so far in the FSME terminal box.
   final List<String> _fsmeLines = [];
@@ -86,13 +95,11 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic>
 
   /// Confidence line keyed to the star the user tapped on Q1.
   static const Map<int, String> _confidenceLines = {
-    1: "I'm basically guessing",
-    2: 'In between a guess and kind of confident',
-    3: "I'm fairly confident",
-    4:
-        "I'd go 5, but I just got an other-worldly inkling there's a "
-        '.0001% chance I might be wrong',
-    5: 'Duh, you bet I know this answer',
+    1: 'Basically a guess',
+    2: 'Low confidence but something tells me this answer is at least close',
+    3: 'I can eliminate the obvious and expect my answer is correct',
+    4: 'I know this is correct, very little hesitation',
+    5: 'No hesitation... my answer IS correct',
   };
 
   @override
@@ -175,7 +182,7 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic>
     });
 
     MixpanelService.instance.track(
-      'onboarding_diagnostic_answered',
+      'SpOn_Diag_Answered',
       properties: {
         'app_name': 'SP',
         'question_number': _index + 1,
@@ -186,7 +193,7 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic>
 
     // Q1: FSME appears the moment the answer is picked, opening with an
     // explanation of the star system. The stars then sit below his box;
-    // tapping one prints his reaction and drives the advance.
+    // tapping one prints his reaction and reveals the Continue button.
     if (_isFirst) {
       _openFsme();
     }
@@ -198,6 +205,7 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic>
   Future<void> _openFsme() async {
     setState(() {
       _fsmeActive = true;
+      _fsmeDone = false;
       _fsmeLines.clear();
     });
     _scheduleGaze();
@@ -208,11 +216,11 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic>
     setState(() {
       _fsmeLines.addAll([
         'Rate your confidence below.',
-        "1 star = you're guessing.",
-        '2 = between a guess and sort of sure.',
-        '3 = fairly sure.',
-        '4 = sure, minus a .0001% inkling.',
-        "5 = you'd bet your certification on it.",
+        '1 = basically a guess.',
+        '2 = low confidence, but it feels at least close.',
+        "3 = eliminate the obvious, expect you're right.",
+        "4 = you know it's right, very little hesitation.",
+        '5 = no hesitation — your answer IS correct.',
       ]);
     });
   }
@@ -226,7 +234,7 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic>
     });
 
     MixpanelService.instance.track(
-      'onboarding_diagnostic_confidence',
+      'SpOn_Diag_Confidence',
       properties: {
         'app_name': 'SP',
         'question_number': _index + 1,
@@ -236,7 +244,7 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic>
     );
 
     // Q1: FSME is already on screen (opened at pick). The star tap prints
-    // his reaction lines and drives the advance.
+    // his reaction lines, then reveals the Continue button.
     if (_isFirst) {
       _runFsmeReaction(stars);
       return;
@@ -250,11 +258,12 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic>
 
   /// Q1 star-tap beat. The opening star-system line is already showing.
   /// This appends the confidence reaction, then the call gag, one line at
-  /// a time, then holds two seconds and advances to Q2.
+  /// a time. When the last line lands, [_fsmeDone] flips true and the
+  /// Continue button appears — the user advances on their own tap.
   Future<void> _runFsmeReaction(int stars) async {
     final lines = <String>[
-      _confidenceLines[stars] ?? "I'm basically guessing",
-      'I have a call coming in... you\'re on your own',
+      _confidenceLines[stars] ?? 'Basically a guess',
+      _callLine,
       "Hello... FSME here. No, I don't want to renew my subscription "
           'to Byte Me Quarterly',
     ];
@@ -266,11 +275,10 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic>
       await Future.delayed(const Duration(milliseconds: 1100));
     }
 
-    // Hold on the last line, then move on.
-    await Future.delayed(const Duration(seconds: 6));
+    // Reaction finished — reveal the Continue button and let the user
+    // move on when they're ready.
     if (!mounted) return;
-    _fsmeActive = false;
-    _advance();
+    setState(() => _fsmeDone = true);
   }
 
   void _advance() {
@@ -284,7 +292,7 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic>
       OnboardingAnswers.instance.diagnosticResult = result;
 
       MixpanelService.instance.track(
-        'onboarding_diagnostic_completed',
+        'SpOn_Diag_Completed',
         properties: {
           'app_name': 'SP',
           'score': result.correct,
@@ -308,6 +316,7 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic>
       _picked = null;
       _confidence = null;
       _fsmeActive = false;
+      _fsmeDone = false;
       _fsmeLines.clear();
     });
   }
@@ -571,7 +580,8 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic>
   }
 
   /// FSME takeover box (Q1 only) — animated eyes + terminal readout that
-  /// fills in one line at a time.
+  /// fills in one line at a time. The call line renders red; every other
+  /// line renders gold.
   Widget _fsmeBox() {
     return Padding(
       padding: const EdgeInsets.only(top: 18),
@@ -621,7 +631,9 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic>
                         fontFamily: 'monospace',
                         fontSize: 11,
                         height: 1.5,
-                        color: _gold.withValues(alpha: 0.8),
+                        color: line == _callLine
+                            ? _eyeRed.withValues(alpha: 0.9)
+                            : _gold.withValues(alpha: 0.8),
                       ),
                     ),
                   ),
@@ -635,9 +647,14 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic>
 
   @override
   Widget build(BuildContext context) {
-    // On Q1, FSME owns the advance — the normal Next button never shows.
+    // Q2+ Next button (feedback modes). Q1 never uses this path — it has
+    // its own Continue button gated on the FSME gag finishing.
     final bool showNext =
         _hasConfidence && _style.showsImmediateFeedback && !_isFirst;
+
+    // Q1 Continue button — appears only after the FSME reaction prints
+    // its last line.
+    final bool showFirstContinue = _isFirst && _fsmeDone;
 
     return Scaffold(
       backgroundColor: _darkBg,
@@ -682,6 +699,35 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic>
                   _style.showsExplanations &&
                   !_isFirst)
                 _explanation(),
+
+              // Q1 Continue button — user-driven advance to Q2 once the
+              // FSME gag has finished playing.
+              if (showFirstContinue) ...[
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: _advance,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _gold,
+                      foregroundColor: _darkBg,
+                      elevation: 3,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(
+                          AppSizes.buttonCornerRadius,
+                        ),
+                      ),
+                    ),
+                    child: const Text(
+                      'Continue  \u2192',
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
 
               if (showNext) ...[
                 const SizedBox(height: 16),
