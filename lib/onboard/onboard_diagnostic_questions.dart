@@ -273,6 +273,36 @@ class DiagnosticResult {
     return ((sum / (total * 10)) * 100).round();
   }
 
+  /// Anxiety gate.
+  ///
+  /// The stars are not a measurement to be corrected for — they are the
+  /// user telling us how they feel. A rating of 3 or below is a hedge:
+  /// guessing, nervous, or not wanting to look cocky. Genuine confidence
+  /// commits to a 4 or a 5. So if half or more of the answers came in at
+  /// 3 stars or below, the user is telling us they don't feel ready — and
+  /// that self-report is the headline, not the score.
+  ///
+  /// "Half or more" uses ceil: on 10 questions, exactly 5 low-confidence
+  /// answers trips the gate.
+  bool get lowConfidenceDominant {
+    if (total == 0) return false;
+    final conf = _conf;
+    final lowCount = conf.where((s) => s <= 3).length;
+    return lowCount >= (total / 2).ceil();
+  }
+
+  /// Final readiness verdict.
+  ///
+  /// Confidence is the primary gate. If the user is telling us they don't
+  /// feel ready (see [lowConfidenceDominant]), they are not ready — no
+  /// matter what the score says. Only once that clears does the weighted
+  /// score decide it, against a 75% pass line. There is no raw-correct
+  /// override: 8 right with low confidence is a not-ready, by design.
+  bool get isReady {
+    if (lowConfidenceDominant) return false;
+    return weightedScore >= 75;
+  }
+
   /// How well the user's confidence predicted their accuracy.
   ///
   /// Derived entirely from data they gave us — their star taps and their

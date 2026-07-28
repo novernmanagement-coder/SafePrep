@@ -627,6 +627,10 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
 
   /// Rapid Fire taste — positioned near the decline link so someone
   /// about to bail has a third door. Only on the full plan paywall.
+  ///
+  /// Uses a returnable push (not pushAndRemoveUntil): the taste is a
+  /// hook, not an exit. When they back out of or finish the limited
+  /// Rapid Fire, they land back on the paywall, still able to buy.
   Widget _rapidFireTaste() {
     return GestureDetector(
       onTap: () {
@@ -634,8 +638,11 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
           'onboarding_paywall_rapid_fire_taste',
           properties: {'app_name': 'SP'},
         );
-        // TODO: open inline Rapid Fire demo drawn from their weakest
-        // categories. Track tap rate vs conversion after.
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const RapidFireLimitedIntro()),
+        );
       },
       child: Text(
         'Try the Rapid Fire tool for 60 seconds',

@@ -62,11 +62,19 @@ class _OnboardReadinessState extends State<OnboardReadiness>
   /// which is the point — it makes the number feel measured.
   int get _readiness => _result.weightedScore;
 
-  /// High scorers get the Refresher offer, not the full plan. This
-  /// checks raw accuracy (did they know the material?) rather than the
-  /// weighted score (which folds in confidence). Someone who gets 8/10
-  /// right but taps 1 star on everything shouldn't be sold a study plan.
-  bool get _isPassing => _result.correct >= 8;
+  /// High scorers get the Refresher offer, not the full plan.
+  ///
+  /// Two conditions, both required:
+  ///   1. Raw accuracy — did they actually know the material? (8+ of 10)
+  ///   2. Confidence — are they telling us they feel ready? The stars are
+  ///      self-report, not a measurement to correct for: a rating of 3 or
+  ///      below is a hedge (guessing, nervous, or not wanting to look
+  ///      cocky). If half or more of the answers came in at 3 or below,
+  ///      the user is saying they don't feel ready — and that overrides a
+  ///      strong raw score. Someone who gets 8/10 right but rates low
+  ///      confidence throughout is NOT sold a Refresher; they get the plan
+  ///      that builds the confidence they told us they lack.
+  bool get _isPassing => _result.correct >= 8 && !_result.lowConfidenceDominant;
 
   int get _estimateMinutes {
     final raw = _result.weakestCategories.length * _minutesPerWeakCategory;

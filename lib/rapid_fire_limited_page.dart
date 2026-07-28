@@ -4,7 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'constants.dart';
 import 'csv_loader.dart';
 import 'mixpanel_service.dart';
-import 'dashboard_page.dart';
+import 'iap_service.dart';
+import 'category_study_page.dart';
 import 'onboard/onboard_answers.dart';
 import 'onboard/onboard_diagnostic_questions.dart';
 
@@ -248,12 +249,47 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage> {
         'total_correct': _totalCorrect,
       },
     );
+    // Free tool never grants app access — pop back to the paywall.
+    if (Navigator.canPop(context)) Navigator.pop(context);
+  }
 
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const DashboardPage()),
-      (_) => false,
+  /// Shared $4.99 unlock. Triggers the real IAP; only a VERIFIED success
+  /// opens the app (straight to the user's weakest category, matching the
+  /// post-purchase route). Cancel or failure returns to the paywall.
+  bool _purchasing = false;
+
+  Future<void> _unlock(String source) async {
+    if (_purchasing) return;
+    setState(() => _purchasing = true);
+
+    MixpanelService.instance.track(
+      'rapid_fire_limited_purchase',
+      properties: {'app_name': 'SP', 'source': source, 'price': '\$4.99'},
     );
+
+    final result = await IAPService.instance.buySevenDay();
+    if (!mounted) return;
+    setState(() => _purchasing = false);
+
+    if (result == IAPResult.success) {
+      final weakest = _result.weakestCategories.isNotEmpty
+          ? _result.weakestCategories.first
+          : 'Time & Temperature';
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => CategoryStudyPage(category: weakest)),
+        (_) => false,
+      );
+    } else {
+      // Cancel or fail → back to the paywall to decide again.
+      if (Navigator.canPop(context)) Navigator.pop(context);
+      final message = result.userMessage;
+      if (message != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+        );
+      }
+    }
   }
 
   // ── Build methods ───────────────────────────────────────────────
@@ -488,14 +524,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage> {
           SizedBox(
             height: 50,
             child: ElevatedButton(
-              onPressed: () {
-                MixpanelService.instance.track(
-                  'rapid_fire_limited_unlock_tap',
-                  properties: {'app_name': 'SP', 'category': cat},
-                );
-                // TODO: trigger $4.99 IAP purchase flow.
-                // On success: navigate to full RapidFirePage or dashboard.
-              },
+              onPressed: _purchasing ? null : () => _unlock('category_limit'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _gold,
                 foregroundColor: _darkBg,
@@ -602,13 +631,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage> {
           SizedBox(
             height: 50,
             child: ElevatedButton(
-              onPressed: () {
-                MixpanelService.instance.track(
-                  'rapid_fire_limited_final_unlock_tap',
-                  properties: {'app_name': 'SP'},
-                );
-                // TODO: trigger $4.99 IAP purchase flow.
-              },
+              onPressed: _purchasing ? null : () => _unlock('completion'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _gold,
                 foregroundColor: _darkBg,
