@@ -13,10 +13,9 @@ import 'onboard_quiz_intro.dart';
 /// quiz.
 ///
 /// After the user picks a mode, the FSME character (two darting red
-/// eyeballs) reacts with a terminal-style confirmation sequence that
-/// types out what was selected. The character is a small personality
-/// beat — it watches the options, then locks in the choice. Playful,
-/// not distracting.
+/// eyeballs) reacts with a terminal-style confirmation sequence — the
+/// genius-dork "act busy so she doesn't send me home" bit. Playful,
+/// skippable, never blocks the Continue path.
 class OnboardStudyStyle extends StatefulWidget {
   const OnboardStudyStyle({super.key});
 
@@ -152,17 +151,6 @@ class _OnboardStudyStyleState extends State<OnboardStudyStyle>
     }
   }
 
-  String _modeTag(StudyStyle style) {
-    switch (style) {
-      case StudyStyle.explanations:
-        return 'Explanation';
-      case StudyStyle.answersOnly:
-        return 'AnswersOnly';
-      case StudyStyle.quizFormat:
-        return 'QuizFormat';
-    }
-  }
-
   Future<void> _choose(StudyStyle style) async {
     // Re-tapping the same style does nothing; a different one re-selects
     // and replays its terminal readout. Continue drives the advance, so
@@ -192,40 +180,44 @@ class _OnboardStudyStyleState extends State<OnboardStudyStyle>
     await _runTerminalSequence(style);
   }
 
-  /// Per-mode snarky comments. One is picked at random each time.
-  static const Map<StudyStyle, List<String>> _snark = {
+  /// Per-mode FSME scripts — the genius-dork "act busy so she doesn't
+  /// send me home" bit. Full sequences (not a random one-liner), each in
+  /// FSME's voice, each getting caught by the boss and covering at the end.
+  static const Map<StudyStyle, List<String>> _scripts = {
     StudyStyle.explanations: [
-      'I was sure they were going to select quiz mode......',
-      'Explanations? Bold. Most people just guess and pray......',
-      'Oh good, someone who actually wants to learn......',
-      'Loading 20 years of instructor wisdom......',
+      'Answers and explanations mode selected.',
+      'Oh \u2014 you actually wanna know WHY? Finally.',
+      'Okay so the "why" is where it all lives, right,',
+      'the reasoning, the little rules behind the rules \u2014',
+      'I could go for hours, I have BEEN told I go for hours\u2014',
+      '\u2026right. She says I "lose people." I don\u2019t lose people.',
+      'EXE explanation script. You and me, we\u2019re gonna',
+      'get along great. \u2026Locking it in.',
     ],
     StudyStyle.answersOnly: [
-      'Did I take the chili off the stove???......',
-      'Straight to the point. I respect that......',
-      'No hand-holding. I like your style......',
-      'Fine, skip the lecture. See if I care......',
+      'Answers only mode selected.',
+      'Ha \u2014 this is what I\u2019d pick. Guess, then see if',
+      'I was right. Sometimes I\u2019m dead sure\u2026 other times,',
+      'I\u2019ll be honest, I just grab the one that looks right.',
+      'Beep. Boop. (that\u2019s how she knows I\u2019m working)',
+      'EXE AnswersOnly script\u2026',
+      '\u2026uh, yes boss, that\u2019s correct \u2014 "Answers Only."',
+      'Go ahead and lock it in.',
     ],
     StudyStyle.quizFormat: [
-      "I'm not happy with Google right now, she owes me 300 bytes......",
-      'Quiz mode? Brave. Very brave......',
-      'No peeking. The answers are locked in a vault......',
-      'Someone woke up feeling confident today......',
+      'Quiz format mode selected.',
+      'Whoa \u2014 either you woke up super confident, or you',
+      'spent too much time in the sun when we hit the beach.',
+      'No feedback till the end? Cold. \u2026I respect it.',
+      'Beep. Boop. (that\u2019s how she knows I\u2019m working)',
+      'EXE QuizFormat script\u2026',
+      '\u2026what\u2019s that? Yes \u2014 yes, boss, they know they',
+      'chose Quiz Format. Handled. Locking it in.',
     ],
   };
 
   List<String> _buildScript(StudyStyle style) {
-    final label = _modeLabel(style);
-    final tag = _modeTag(style);
-    final comments = _snark[style] ?? ['Processing......'];
-    final comment = comments[math.Random().nextInt(comments.length)];
-
-    return [
-      '$label mode selected',
-      comment,
-      'EXE $tag script',
-      '$tag mode locked in',
-    ];
+    return _scripts[style] ?? const ['Processing......'];
   }
 
   Future<void> _runTerminalSequence(StudyStyle style) async {
@@ -342,11 +334,10 @@ class _OnboardStudyStyleState extends State<OnboardStudyStyle>
     );
   }
 
-  /// Dave — two glowing red eyeballs that dart left and right,
-  /// watching the options. Matches the Dave_presenter.html aesthetic:
-  /// radial gradient red iris, dark oval pupil, black background, glow.
-  /// The eyes hold center most of the time, snap to a side occasionally,
-  /// and blink every few seconds.
+  /// FSME — two glowing red eyeballs that dart left and right,
+  /// watching the options. Radial gradient red iris, dark oval pupil,
+  /// glow. The eyes hold center most of the time, snap to a side
+  /// occasionally, and blink every few seconds.
   Widget _fsmeEyes() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 20),

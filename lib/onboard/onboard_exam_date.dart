@@ -88,38 +88,41 @@ class _OnboardExamDateState extends State<OnboardExamDate>
       w == ExamWindow.fourToTen || w == ExamWindow.tenPlus;
 
   /// Band-specific reaction lines, split for terminal-style display.
+  /// FSME voice: genius dork — built the award-winning tools, can't say
+  /// it smoothly, air-quotes the boss's jargon, grudging respect for her.
   static const Map<ExamWindow, List<String>> _reactions = {
-    // 1-2 days — no time for games, straight cram pitch.
+    // 1-2 days — workload grumble + real reassurance.
     ExamWindow.oneToThree: [
-      'Ok so I bet you crammed for your',
-      'history test the night before...',
-      'but this time you have this app —',
-      'designed just for you.',
-      "Yup, that's right.",
-      "I'll have you ready in less than 4 hours.",
+      "It's not enough I gotta greet everyone...",
+      'now she wants your timeframe so she can build a',
+      '"time-attentive curriculum" and feed it into the',
+      '"intuitive SafePrep engine."',
+      '...Two days. Okay. Here\u2019s the actual thing:',
+      'you crammed in high school, it worked, and this',
+      'is that \u2014 except built right. Four hours, you\u2019re fine.',
+      '...Now I get why she got the promotion and I didn\u2019t.',
     ],
-    // 3-4 days — the "sleep 3 of them" / World History bit, then peek.
+    // 3-4 days — the Byte-Me grievance + genuine confidence.
     ExamWindow.fourToTen: [
-      'ha... 3+ days until the exam,',
-      'with this app you can sleep for 3 of those days',
-      '(you know just like world history in High School)',
-      'My App is so good we can get you ready',
-      'in less than 4 hours, plus, keep you',
-      'in-tune with our 60 second trainers',
+      "Here's what I don't get \u2014 I MADE the 60-second",
+      'trainers, and somehow SHE gets the promotion.',
+      'Okay fine, she built the "intuitive engine" and the',
+      '"readiness algorithm"\u2026 but my six tools took first',
+      'place at the Byte-Me conference. First. Place.',
+      '...anyway. Back to you: 3\u20134 days? Shoot \u2014',
+      "I'll have you ready in less than four hours.",
+      "That's when you use my 60-second trainers to",
+      'stay frosty. ...See? I AM genius.',
     ],
-    // 5+ days — the relaxed "how do you wanna do this" bit, then peek.
+    // 5+ days — relaxed buddy energy + grudging respect for the boss.
     ExamWindow.tenPlus: [
-      'Dude, how do you wanna do this?',
-      'I get you ready in 4 hours, you use the',
-      '60-second trainers to keep it fresh',
-      'up until exam day...',
-      'or we hit the beach, kick back,',
-      'and wait till the day before.',
-      "Either way, I'm cool.",
-      'This app adapts to whatever you want.',
-      "(don't tell the boss — I can guarantee",
-      'without a doubt that you will 100%',
-      'more than likely pass the exam)',
+      "Dude, we got nothing but time. Here's what I think:",
+      'we go through the tour, she does her magic, comes up',
+      'with the perfect plan for you (it\u2019s annoying how good',
+      "she is at that)\u2026 and then you and I hit the beach,",
+      'catch a movie, whatever you like.',
+      'The app adapts to however you wanna do this.',
+      "That's the whole point.",
     ],
   };
 

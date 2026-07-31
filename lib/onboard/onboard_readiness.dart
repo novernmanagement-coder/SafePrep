@@ -56,7 +56,7 @@ class _OnboardReadinessState extends State<OnboardReadiness>
   static const Color _green = Color(0xFF639922);
   static const Color _amber = Color(0xFFEF9F27);
   static const Color _red = Color(0xFFE24B4A);
-  static const Color _eyeRed = Color(0xFFE24B4A);
+  static const Color _eyeBlue = Color(0xFF4A9BE2);
 
   /// Refresher gate — the one cell that gets the $2.99 route.
   static const int _refresherMinCorrect = 8;
@@ -235,10 +235,15 @@ class _OnboardReadinessState extends State<OnboardReadiness>
     final knowPct = _result.correct * 10;
 
     final script = <String>[
+      "I'll take it from here, FSME. ...Go sit down.",
+      'Hi. I run the analysis around here.',
+      'Here is exactly what your answers tell us:',
       'Confidence level $avg',
       'Knowledge level $knowPct%',
       'Assessment: $_assessment',
       'Recommend: $_recommendation',
+      'The plan corrects exactly this. Four hours.',
+      "I've done the math.",
     ];
 
     await Future.delayed(const Duration(milliseconds: 400));
@@ -327,21 +332,21 @@ class _OnboardReadinessState extends State<OnboardReadiness>
               shape: BoxShape.circle,
               gradient: const RadialGradient(
                 colors: [
-                  Color(0xFFFF2200),
-                  Color(0xFFCC1100),
-                  Color(0xFF660000),
-                  Color(0xFF1A0000),
+                  Color(0xFF33AAFF),
+                  Color(0xFF1177CC),
+                  Color(0xFF004466),
+                  Color(0xFF00121A),
                 ],
                 stops: [0.0, 0.35, 0.7, 1.0],
               ),
               boxShadow: [
                 BoxShadow(
-                  color: _eyeRed.withValues(alpha: 0.6),
+                  color: _eyeBlue.withValues(alpha: 0.6),
                   blurRadius: 12,
                   spreadRadius: 2,
                 ),
                 BoxShadow(
-                  color: _eyeRed.withValues(alpha: 0.25),
+                  color: _eyeBlue.withValues(alpha: 0.25),
                   blurRadius: 24,
                   spreadRadius: 5,
                 ),
@@ -354,7 +359,7 @@ class _OnboardReadinessState extends State<OnboardReadiness>
                   width: 13,
                   height: 16,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0A0000),
+                    color: const Color(0xFF001018),
                     borderRadius: BorderRadius.circular(6),
                   ),
                 ),
@@ -366,6 +371,44 @@ class _OnboardReadinessState extends State<OnboardReadiness>
     );
   }
 
+  /// The Boss's eyes with a thin blue spectacle frame drawn on top —
+  /// two rounded lenses over the eyes, a bridge between them, and short
+  /// temple arms. Signals the precise, brainy one.
+  Widget _bossEyesWithGlasses() {
+    const double eye = 40;
+    const double gap = 16;
+    const double lensPad = 5;
+    const double frameW = eye * 2 + gap + lensPad * 2 + 22;
+    const double frameH = eye + lensPad * 2 + 8;
+    return SizedBox(
+      width: frameW,
+      height: frameH,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _davEye(),
+              const SizedBox(width: gap),
+              _davEye(),
+            ],
+          ),
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _GlassesPainter(
+                color: _eyeBlue,
+                eyeSize: eye,
+                gap: gap,
+                lensPad: lensPad,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// FSME readout box — animated eyes + typed terminal lines. The
   /// Assessment and Recommend lines render in the band color so the
   /// verdict reads at a glance; the two data lines stay gold.
@@ -373,22 +416,19 @@ class _OnboardReadinessState extends State<OnboardReadiness>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        Column(
           children: [
-            _davEye(),
-            const SizedBox(width: 16),
+            _bossEyesWithGlasses(),
+            const SizedBox(height: 6),
             Text(
-              'F S M E',
+              'THE BOSS',
               style: TextStyle(
                 fontSize: 10,
                 letterSpacing: 3,
-                color: _eyeRed.withValues(alpha: 0.3),
+                color: _eyeBlue.withValues(alpha: 0.4),
                 fontWeight: FontWeight.w300,
               ),
             ),
-            const SizedBox(width: 16),
-            _davEye(),
           ],
         ),
         const SizedBox(height: 14),
@@ -532,4 +572,69 @@ class _OnboardReadinessState extends State<OnboardReadiness>
       ),
     );
   }
+}
+
+/// Draws a thin spectacle frame over the Boss's two eyes: a rounded
+/// lens around each eye, a bridge across the nose, and short temple
+/// arms out to the sides. Purely decorative — sits on top of the eyes.
+class _GlassesPainter extends CustomPainter {
+  final Color color;
+  final double eyeSize;
+  final double gap;
+  final double lensPad;
+
+  _GlassesPainter({
+    required this.color,
+    required this.eyeSize,
+    required this.gap,
+    required this.lensPad,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.4
+      ..strokeCap = StrokeCap.round;
+
+    final cy = size.height / 2;
+    final double lens = eyeSize + lensPad * 2;
+    // Centre x of each lens, mirrored around the middle.
+    final double halfSpan = (eyeSize + gap) / 2;
+    final double leftCx = size.width / 2 - halfSpan;
+    final double rightCx = size.width / 2 + halfSpan;
+
+    final double half = lens / 2;
+
+    // Round lens per eye — clean circles, no cat-eye.
+    canvas.drawCircle(Offset(leftCx, cy), half, paint);
+    canvas.drawCircle(Offset(rightCx, cy), half, paint);
+
+    // Short bridge: inner edge to inner edge only.
+    canvas.drawLine(
+      Offset(leftCx + half, cy),
+      Offset(rightCx - half, cy),
+      paint,
+    );
+
+    // Temple arms attach at mid-eye (outer widest point) and angle back.
+    canvas.drawLine(
+      Offset(leftCx - half, cy),
+      Offset(leftCx - half - 12, cy - 3),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(rightCx + half, cy),
+      Offset(rightCx + half + 12, cy - 3),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _GlassesPainter oldDelegate) =>
+      oldDelegate.color != color ||
+      oldDelegate.eyeSize != eyeSize ||
+      oldDelegate.gap != gap ||
+      oldDelegate.lensPad != lensPad;
 }

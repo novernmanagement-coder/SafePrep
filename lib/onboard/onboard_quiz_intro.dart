@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../constants.dart';
 import '../mixpanel_service.dart';
+import 'onboard_answers.dart';
 import 'onboard_diagnostic.dart';
 
 /// Onboarding screen 4 of 5 — the beat before the diagnostic.
@@ -16,10 +17,11 @@ import 'onboard_diagnostic.dart';
 /// expected result defuses the sting when the real number lands.
 ///
 /// Below the CTA sits the FSME command box — two glowing red eyeballs that
-/// dart and blink, then a terminal readout confirming Quiz mode and
-/// spelling out how confidence rating works. Same dark-terminal + gold-mono
-/// aesthetic as the study-style screen, so the character reads as one
-/// continuous presence across the funnel.
+/// dart and blink, then a terminal readout. FSME hypes up the "reward"
+/// (the wildest thing he can offer is upsizing a fast-food combo), then
+/// hands off to the confidence legend as "the technical stuff I'm supposed
+/// to tell you." The confirmation line reflects the mode the user actually
+/// chose on the study-style screen, not a hard-coded "Quiz mode."
 class OnboardQuizIntro extends StatefulWidget {
   const OnboardQuizIntro({super.key});
 
@@ -37,15 +39,21 @@ class _OnboardQuizIntroState extends State<OnboardQuizIntro>
 
   bool _starting = false;
 
-  /// One snark line, chosen once when the screen builds so it stays
-  /// stable across rebuilds.
-  late final String _snark;
-
-  static const List<String> _quizSnark = [
-    'No peeking. The answers are locked in a vault......',
-    'Quiz mode? Brave. Very brave......',
-    'Someone woke up feeling confident today......',
-  ];
+  /// The mode the user picked on the study-style screen, so FSME's
+  /// confirmation line matches ("Answers only confirmed", etc.) instead
+  /// of always claiming "Quiz mode."
+  String get _modeLabel {
+    switch (OnboardingAnswers.instance.studyStyle) {
+      case StudyStyle.explanations:
+        return 'Answers and explanations';
+      case StudyStyle.answersOnly:
+        return 'Answers only';
+      case StudyStyle.quizFormat:
+        return 'Quiz format';
+      case null:
+        return 'Study mode';
+    }
+  }
 
   // Eye gaze — discrete look states matching the website: the eyes hold
   // center most of the time and occasionally snap left or right.
@@ -64,7 +72,6 @@ class _OnboardQuizIntroState extends State<OnboardQuizIntro>
   @override
   void initState() {
     super.initState();
-    _snark = _quizSnark[_rng.nextInt(_quizSnark.length)];
 
     _gazeAnim = AnimationController(
       vsync: this,
@@ -284,6 +291,8 @@ class _OnboardQuizIntroState extends State<OnboardQuizIntro>
   }
 
   /// FSME command box — animated eyes + label, then the terminal readout.
+  /// FSME hypes the "reward" (a large combo — the wildest thing he can
+  /// offer), then hands off to the confidence legend as the technical bit.
   Widget _fsmeBox() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -321,8 +330,14 @@ class _OnboardQuizIntroState extends State<OnboardQuizIntro>
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              _terminalLine('Quiz mode confirmed'),
-              _terminalLine(_snark),
+              _terminalLine('$_modeLabel confirmed.'),
+              _terminalLine('Okay my friend \u2014 let\u2019s knock this out.'),
+              _terminalLine('Just ten questions, then we get CRAZY.'),
+              _terminalLine('Maybe this time, wait for it\u2026 we order'),
+              _terminalLine('a large combo. Yeah. I said it. LARGE.'),
+              _terminalLine('...anyway. Here\u2019s the technical stuff'),
+              _terminalLine('I\u2019m supposed to tell you\u2014'),
+              const SizedBox(height: 4),
               _terminalLine('One question at a time — one selection each'),
               _terminalLine('Then rate your confidence:'),
               _terminalLine('1 = basically a guess', indent: true),

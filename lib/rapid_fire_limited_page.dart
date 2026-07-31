@@ -137,17 +137,19 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
 
   /// FSME's snarky completion readout, typed one line at a time.
   static const List<String> _fsmeScript = [
-    'Ok, you got a taste of the SafePrep experience',
-    'Run assessment script ..........',
-    'Subject is intelligent... Subject is plenty capable... '
-        'Subject needs to pass the exam ........',
-    'Conclusion: subject somehow gained all the knowledge they '
-        'needed to pass the exam (maybe my mind-meld phase program '
-        'actually worked!) ... act professional',
-    'Recommendation: since you obviously somehow got and retained the '
-        'necessary knowledge within the last few moments, I will offer '
-        'you my free proctor finder — search for a proctor in your area '
-        'within a few clicks ... congratulations',
+    'Okay. You got a taste of the SafePrep experience.',
+    'Running assessment script ..........',
+    'Subject is intelligent... subject is capable...',
+    'Subject retained an ALARMING amount of food safety '
+        'knowledge in a very short window ............',
+    'Conclusion: ...divine intervention? Mind-meld program '
+        'actually worked? ...No. Nobody learns THAT fast.',
+    '...Subject is a robot. Subject has to be a robot.',
+    '...wait. Boss? Is that you? Are you messing with me again?',
+    "...Okay. Okay, I'll play along.",
+    'Since you already know everything, all that\u2019s left is to '
+        'find a local proctor and make it official.',
+    'Here \u2014 use this. It\u2019s free. Congratulations.',
   ];
 
   DiagnosticResult get _result =>

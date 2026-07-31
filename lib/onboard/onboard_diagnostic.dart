@@ -215,6 +215,10 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic>
     if (!mounted) return;
     setState(() {
       _fsmeLines.addAll([
+        "Okay \u2014 heads up. This part's the boss's pride",
+        'and joy. Her engine, her algorithm, the whole',
+        'brain of the thing. So we keep this professional.',
+        '...I mean it. Serious face. (this is my serious face)',
         'Rate your confidence below.',
         '1 = basically a guess.',
         '2 = low confidence, but it feels at least close.',

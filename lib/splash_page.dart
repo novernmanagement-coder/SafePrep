@@ -15,15 +15,8 @@ import 'onboard/onboard_readiness.dart';
 //
 // Three paths:
 //   purchased            → DashboardPage
-//   used up free runs     → OnboardPaywall (decline mode)
-//   still has free runs   → OnboardIntro (the funnel)
-//
-// FREE-RUN CAP: the user gets two full run-throughs of onboarding
-// (each counted when they reach the readiness page — see
-// OnboardReadiness.onboardingRunsKey). On the third launch, once two
-// runs are banked, they skip the funnel and land on the paywall. This
-// replaces the old has_declined_to_limited boolean, which branded a user
-// the instant the limited Rapid Fire opened.
+//   wrong / no code       → OnboardPaywall (decline mode)
+//   correct access code   → OnboardIntro (the funnel)
 //
 // The old preview/trial/cinematic flow is dead. The onboarding funnel
 // IS the trial — no free-roam dashboard, no 30-minute timer, no
@@ -37,6 +30,11 @@ class SplashPage extends StatefulWidget {
 
 class _SplashPageState extends State<SplashPage> {
   static const String _seenSplashPrefKey = 'has_seen_splash_before';
+
+  // Access code. Correct entry → funnel (OnboardIntro). Anything else,
+  // blank, or dismissed → decline paywall. For a $4.99 app this is a
+  // deliberate, low-stakes gate; the string ships in the bundle.
+  static const String _accessCode = 'Novern2026!';
 
   static const int _firstLaunchHoldSeconds = 8;
   static const int _returningHoldSeconds = 5;
@@ -105,13 +103,8 @@ class _SplashPageState extends State<SplashPage> {
     }
     if (!mounted) return;
 
-    // ── Three paths ──────────────────────────────────────────────────
-    //
-    //   1. Purchased and active → Dashboard
-    //   2. Two free onboarding runs used up → decline paywall
-    //      (purchase button + Rapid Fire + Student Presenter)
-    //   3. Still has a free run left → full onboarding funnel
-    //
+    // ── Path 1: purchased and active → Dashboard ─────────────────────
+    // Checked FIRST so a paying customer never sees the access prompt.
     if (state.hasUnlockedApp && !state.isExpired) {
       MixpanelService.instance.track(
         'SpOn_Splash_Route',
@@ -135,22 +128,13 @@ class _SplashPageState extends State<SplashPage> {
 
     if (!mounted) return;
 
-    if (runs >= OnboardReadiness.maxFreeRuns) {
-      // Free runs exhausted — straight to the decline paywall.
-      MixpanelService.instance.track(
-        'SpOn_Splash_Route',
-        properties: {'app_name': 'SP', 'path': 'runs_exhausted', 'runs': runs},
-      );
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const OnboardPaywall(startOnDecline: true),
-        ),
-      );
-    } else {
-      // Clear stale diagnostic data from any previous onboarding run.
-      // Without this, a returning user gets the old DiagnosticResult on
-      // the readiness screen instead of their new answers.
+    // ── Access-code fork ─────────────────────────────────────────────
+    // Correct code → funnel. Anything else → decline paywall.
+    final entered = await _promptAccessCode();
+    if (!mounted) return;
+
+    if (entered == _accessCode) {
+      // Clear stale diagnostic data so each run starts clean.
       OnboardingAnswers.instance.reset();
       MixpanelService.instance.track(
         'SpOn_Splash_Route',
@@ -164,7 +148,64 @@ class _SplashPageState extends State<SplashPage> {
         context,
         MaterialPageRoute(builder: (_) => const OnboardIntro()),
       );
+    } else {
+      MixpanelService.instance.track(
+        'SpOn_Splash_Route',
+        properties: {'app_name': 'SP', 'path': 'runs_exhausted', 'runs': runs},
+      );
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const OnboardPaywall(startOnDecline: true),
+        ),
+      );
     }
+  }
+
+  /// Shows a modal asking for the access code. Returns the entered
+  /// string, or null if dismissed. A null / wrong return routes to the
+  /// paywall.
+  Future<String?> _promptAccessCode() {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF13130F),
+          title: const Text(
+            'Access code',
+            style: TextStyle(color: Color(0xFFF0EDE8), fontSize: 16),
+          ),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            obscureText: true,
+            style: const TextStyle(color: Color(0xFFF0EDE8)),
+            decoration: const InputDecoration(
+              hintText: 'Enter code',
+              hintStyle: TextStyle(color: Color(0x66F0EDE8)),
+              enabledBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: Color(0x33D4AF37)),
+              ),
+              focusedBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: Color(0xFFD4AF37)),
+              ),
+            ),
+            onSubmitted: (v) => Navigator.pop(ctx, v),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, controller.text),
+              child: const Text(
+                'Continue',
+                style: TextStyle(color: Color(0xFFD4AF37)),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override

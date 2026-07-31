@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../constants.dart';
@@ -44,7 +46,8 @@ class OnboardPaywall extends StatefulWidget {
   State<OnboardPaywall> createState() => _OnboardPaywallState();
 }
 
-class _OnboardPaywallState extends State<OnboardPaywall> {
+class _OnboardPaywallState extends State<OnboardPaywall>
+    with TickerProviderStateMixin {
   static const Color _gold = Color(0xFFD4AF37);
   static const Color _darkBg = Color(0xFF0A0A0F);
   static const Color _softWhite = Color(0xFFF0EDE8);
@@ -58,6 +61,25 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
 
   late bool _showDecline = widget.startOnDecline;
   bool _purchasing = false;
+
+  // FSME testimonial pop-up (full-plan paywall only): fades in 2s after
+  // the screen appears, types one line, then leaves 1s after finishing.
+  static const Color _eyeRed = Color(0xFFE24B4A);
+  bool _fsmeVisible = false;
+  String _fsmeTyped = '';
+  Timer? _fsmeInTimer;
+  Timer? _fsmeTypeTimer;
+  Timer? _fsmeOutTimer;
+  int _gazeTarget = 0;
+  double _gazeCurrent = 0.0;
+  Timer? _gazeTimer;
+  AnimationController? _gazeAnim;
+  AnimationController? _blinkController;
+  Timer? _blinkTimer;
+  final math.Random _rng = math.Random();
+  static const String _fsmeLine =
+      "Dude, I didn't know a thing about food safety. Then I "
+      'came to work here. Man — this system works.';
 
   DiagnosticResult get _result =>
       OnboardingAnswers.instance.diagnosticResult ?? const DiagnosticResult([]);
@@ -81,14 +103,107 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
         'readiness': _result.readinessScore,
       },
     );
+
+    // FSME testimonial only on the full-plan paywall (not decline entry,
+    // not refresher tier).
+    if (!widget.startOnDecline && !widget.isRefresher) {
+      _gazeAnim = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 400),
+      )..addListener(_advanceGaze);
+      _gazeAnim!.repeat();
+      _blinkController = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 180),
+      );
+      _fsmeInTimer = Timer(const Duration(seconds: 2), _startFsme);
+    }
+  }
+
+  void _advanceGaze() {
+    final target = _gazeTarget.toDouble();
+    final next = _gazeCurrent + (target - _gazeCurrent) * 0.18;
+    if ((next - _gazeCurrent).abs() > 0.001) {
+      setState(() => _gazeCurrent = next);
+    }
+  }
+
+  void _scheduleGaze() {
+    final delay = Duration(milliseconds: 1800 + _rng.nextInt(2200));
+    _gazeTimer = Timer(delay, () {
+      if (!mounted || !_fsmeVisible) return;
+      if (_rng.nextDouble() < 0.30) {
+        setState(() => _gazeTarget = _rng.nextBool() ? -1 : 1);
+        Timer(Duration(milliseconds: 700 + _rng.nextInt(400)), () {
+          if (mounted) setState(() => _gazeTarget = 0);
+        });
+      } else {
+        setState(() => _gazeTarget = 0);
+      }
+      _scheduleGaze();
+    });
+  }
+
+  void _scheduleBlink() {
+    final delay = Duration(milliseconds: 3000 + _rng.nextInt(5000));
+    _blinkTimer = Timer(delay, () async {
+      if (!mounted || !_fsmeVisible) return;
+      await _blinkController?.forward(from: 0.0);
+      if (mounted) await _blinkController?.reverse();
+      _scheduleBlink();
+    });
+  }
+
+  /// Fade in, type the line char-by-char, then leave 1s after the last
+  /// character lands.
+  void _startFsme() {
+    if (!mounted) return;
+    setState(() => _fsmeVisible = true);
+    _scheduleGaze();
+    _scheduleBlink();
+    int i = 0;
+    _fsmeTypeTimer = Timer.periodic(const Duration(milliseconds: 32), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      i++;
+      setState(
+        () => _fsmeTyped = _fsmeLine.substring(0, i.clamp(0, _fsmeLine.length)),
+      );
+      if (i >= _fsmeLine.length) {
+        timer.cancel();
+        _fsmeOutTimer = Timer(const Duration(seconds: 1), () {
+          if (!mounted) return;
+          // Fade out first...
+          setState(() => _fsmeVisible = false);
+          // ...then collapse the height (clear text) so the button slides
+          // back up under the readiness box, after the fade completes.
+          Timer(const Duration(milliseconds: 320), () {
+            if (mounted) setState(() => _fsmeTyped = '');
+          });
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _fsmeInTimer?.cancel();
+    _fsmeTypeTimer?.cancel();
+    _fsmeOutTimer?.cancel();
+    _gazeTimer?.cancel();
+    _blinkTimer?.cancel();
+    _gazeAnim?.dispose();
+    _blinkController?.dispose();
+    super.dispose();
   }
 
   /// Refresher app's App Store page. The $2.99 purchase happens in the
   /// Refresher app, not here — Apple only lets an app sell its own IAPs.
   /// Once the Refresher clears review this link goes live automatically.
   static const String _refresherAppStoreUrl =
-      'https://apps.apple.com/app/safeprep-refresher/id6785239029';
-
+      'https://apps.apple.com/app/safeprep-refresher/id6785238865';
   void _purchase() async {
     if (_purchasing) return;
 
@@ -269,6 +384,8 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
         ),
 
         const SizedBox(height: 24),
+
+        _fsmeTestimonial(),
 
         _priceButton(),
 
@@ -578,6 +695,110 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
   }
 
   // ── Shared widgets ──────────────────────────────────────────────────
+
+  /// FSME testimonial pop-up — reserves fixed vertical space so the
+  /// unlock button never reflows as he appears/leaves. Fades in, types
+  /// his line, fades out.
+  Widget _fsmeTestimonial() {
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeInOut,
+      alignment: Alignment.topCenter,
+      child: AnimatedOpacity(
+        opacity: _fsmeVisible ? 1.0 : 0.0,
+        duration: const Duration(milliseconds: 300),
+        // Height collapses to 0 when he's gone, so the unlock button
+        // slides back up under the readiness box; expands when he appears.
+        child: _fsmeVisible || _fsmeTyped.isNotEmpty
+            ? Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: _davEye(),
+                    ),
+                    const SizedBox(width: 6),
+                    _davEye(),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _fsmeTyped,
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 12,
+                          height: 1.5,
+                          fontStyle: FontStyle.italic,
+                          color: _softWhite.withValues(alpha: 0.85),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : const SizedBox(width: double.infinity, height: 0),
+      ),
+    );
+  }
+
+  Widget _davEye() {
+    final gaze = _gazeAnim;
+    final blinkC = _blinkController;
+    if (gaze == null || blinkC == null)
+      return const SizedBox(width: 24, height: 24);
+    return AnimatedBuilder(
+      animation: Listenable.merge([gaze, blinkC]),
+      builder: (context, _) {
+        final blink = 1.0 - blinkC.value * 0.92;
+        return Transform(
+          alignment: Alignment.center,
+          transform: Matrix4.identity()..scale(1.0, blink),
+          child: Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const RadialGradient(
+                colors: [
+                  Color(0xFFFF2200),
+                  Color(0xFFCC1100),
+                  Color(0xFF660000),
+                  Color(0xFF1A0000),
+                ],
+                stops: [0.0, 0.35, 0.7, 1.0],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: _eyeRed.withValues(alpha: 0.6),
+                  blurRadius: 9,
+                  spreadRadius: 1.5,
+                ),
+              ],
+            ),
+            child: Center(
+              child: Transform.translate(
+                offset: Offset(_gazeCurrent * 4, 0.5),
+                child: Container(
+                  width: 7,
+                  height: 9,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0A0000),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   Widget _priceButton() {
     return SizedBox(
