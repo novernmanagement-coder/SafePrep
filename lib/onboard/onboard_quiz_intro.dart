@@ -22,11 +22,54 @@ import 'onboard_diagnostic.dart';
 /// hands off to the confidence legend as "the technical stuff I'm supposed
 /// to tell you." The confirmation line reflects the mode the user actually
 /// chose on the study-style screen, not a hard-coded "Quiz mode."
+///
+/// Per the standing typing rule: user-audience lines type out character
+/// by character; boss/self/processing lines reveal instantly, one line
+/// at a time.
 class OnboardQuizIntro extends StatefulWidget {
   const OnboardQuizIntro({super.key});
 
   @override
   State<OnboardQuizIntro> createState() => _OnboardQuizIntroState();
+}
+
+/// Who a terminal line is directed at / how it renders. Matches the
+/// system used on the intro, exam-date, and study-style screens.
+/// - user: FSME's default voice (gold) — types out.
+/// - boss: directed at the boss (blue) — instant.
+/// - self: muttering/thinking to himself (gray) — instant.
+/// - processing: system-status bits (Beep Boop, "X confirmed") — teal,
+///   instant.
+/// [flash] marks the "sudden real expertise" beat — bold gold.
+enum _FsmeAudience { user, boss, self, processing }
+
+/// Script-definition line (immutable).
+class _FsmeLine {
+  final String text;
+  final _FsmeAudience audience;
+  final bool flash;
+  final bool indent;
+  const _FsmeLine(
+    this.text, {
+    this.audience = _FsmeAudience.user,
+    this.flash = false,
+    this.indent = false,
+  });
+}
+
+/// Mutable render-time counterpart — [text] grows as a user-audience
+/// line types out; other lines just get their full text set once.
+class _TermLine {
+  String text;
+  final _FsmeAudience audience;
+  final bool flash;
+  final bool indent;
+  _TermLine(
+    this.text, {
+    this.audience = _FsmeAudience.user,
+    this.flash = false,
+    this.indent = false,
+  });
 }
 
 class _OnboardQuizIntroState extends State<OnboardQuizIntro>
@@ -36,8 +79,16 @@ class _OnboardQuizIntroState extends State<OnboardQuizIntro>
   static const Color _softWhite = Color(0xFFF0EDE8);
   static const Color _cardBg = Color(0xFF13130F);
   static const Color _eyeRed = Color(0xFFE24B4A);
+  // Matches the boss-line / self-line / processing colors used on the
+  // intro, exam-date, and study-style screens.
+  static const Color _bossBlue = Color(0xFF4A9BE2);
+  static const Color _selfGray = Color(0xFF9E9E9E);
+  static const Color _processingTeal = Color(0xFF6FA8A6);
 
   bool _starting = false;
+
+  /// Lines revealed so far — populated by [_revealScript].
+  final List<_TermLine> _revealedLines = [];
 
   /// The mode the user picked on the study-style screen, so FSME's
   /// confirmation line matches ("Answers only confirmed", etc.) instead
@@ -54,6 +105,35 @@ class _OnboardQuizIntroState extends State<OnboardQuizIntro>
         return 'Study mode';
     }
   }
+
+  /// FSME's script for this screen. Built as a getter (not a static
+  /// const) since the first line depends on `_modeLabel`.
+  List<_FsmeLine> get _script => [
+    _FsmeLine('$_modeLabel confirmed.', audience: _FsmeAudience.processing),
+    _FsmeLine('Ok my friend, let\u2019s knock this next bit out.'),
+    _FsmeLine(
+      '10 questions, then we get crazy. Maybe this time, wait for it\u2026',
+    ),
+    _FsmeLine('we order a large combo. You heard right \u2014 I said LARGE.'),
+    _FsmeLine('Beep, braang, beep.', audience: _FsmeAudience.processing),
+    _FsmeLine('Hey \u2014 I didn\u2019t do that. Boss must be getting ready.'),
+    _FsmeLine('Ok, let\u2019s do this. Here\u2019s how this works:'),
+    _FsmeLine('I give you one question at a time. You select an answer \u2014'),
+    _FsmeLine('as soon as you select, it\u2019s locked in.'),
+    _FsmeLine('Then, this is the important part: you tell us your confidence'),
+    _FsmeLine('level for the answer you selected. Here\u2019s my scale:'),
+    _FsmeLine('1 star = I guessed, not confident at all', indent: true),
+    _FsmeLine(
+      '2 star = I guessed, but it\u2019s an educated guess',
+      indent: true,
+    ),
+    _FsmeLine(
+      '3 star = I think I know the answer, but I could be wrong',
+      indent: true,
+    ),
+    _FsmeLine('4 star = I know this, I\u2019m 95% sure', indent: true),
+    _FsmeLine('5 star = 100% I know this is the correct answer', indent: true),
+  ];
 
   // Eye gaze — discrete look states matching the website: the eyes hold
   // center most of the time and occasionally snap left or right.
@@ -91,6 +171,45 @@ class _OnboardQuizIntroState extends State<OnboardQuizIntro>
       'SpOn_QIntro_Viewed',
       properties: {'app_name': 'SP'},
     );
+
+    _revealScript();
+  }
+
+  /// Reveals the script one line at a time. User-audience lines type
+  /// out character by character; boss/self/processing lines appear
+  /// instantly. Small pause between every line either way.
+  Future<void> _revealScript() async {
+    for (final line in _script) {
+      if (!mounted) return;
+
+      if (line.audience == _FsmeAudience.user) {
+        final entry = _TermLine(
+          '',
+          audience: line.audience,
+          flash: line.flash,
+          indent: line.indent,
+        );
+        setState(() => _revealedLines.add(entry));
+        for (var i = 1; i <= line.text.length; i++) {
+          if (!mounted) return;
+          setState(() => entry.text = line.text.substring(0, i));
+          await Future.delayed(const Duration(milliseconds: 18));
+        }
+      } else {
+        setState(
+          () => _revealedLines.add(
+            _TermLine(
+              line.text,
+              audience: line.audience,
+              flash: line.flash,
+              indent: line.indent,
+            ),
+          ),
+        );
+      }
+
+      await Future.delayed(const Duration(milliseconds: 400));
+    }
   }
 
   void _advanceGaze() {
@@ -218,7 +337,8 @@ class _OnboardQuizIntroState extends State<OnboardQuizIntro>
   }
 
   /// One glowing red eyeball that darts and blinks — same construction as
-  /// the study-style screen.
+  /// the study-style screen, resized to match the intro/exam-date/
+  /// study-style spec (26x26, 8x10 pupil).
   Widget _davEye() {
     return AnimatedBuilder(
       animation: Listenable.merge([_gazeAnim, _blinkController]),
@@ -228,8 +348,8 @@ class _OnboardQuizIntroState extends State<OnboardQuizIntro>
           alignment: Alignment.center,
           transform: Matrix4.identity()..scale(1.0, blink),
           child: Container(
-            width: 44,
-            height: 44,
+            width: 26,
+            height: 26,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: const RadialGradient(
@@ -244,25 +364,20 @@ class _OnboardQuizIntroState extends State<OnboardQuizIntro>
               boxShadow: [
                 BoxShadow(
                   color: _eyeRed.withValues(alpha: 0.6),
-                  blurRadius: 14,
-                  spreadRadius: 3,
-                ),
-                BoxShadow(
-                  color: _eyeRed.withValues(alpha: 0.25),
-                  blurRadius: 26,
-                  spreadRadius: 6,
+                  blurRadius: 10,
+                  spreadRadius: 2,
                 ),
               ],
             ),
             child: Center(
               child: Transform.translate(
-                offset: Offset(_gazeCurrent * 8, 1),
+                offset: Offset(_gazeCurrent * 5, 0.5),
                 child: Container(
-                  width: 14,
-                  height: 17,
+                  width: 8,
+                  height: 10,
                   decoration: BoxDecoration(
                     color: const Color(0xFF0A0000),
-                    borderRadius: BorderRadius.circular(7),
+                    borderRadius: BorderRadius.circular(4),
                   ),
                 ),
               ),
@@ -273,18 +388,25 @@ class _OnboardQuizIntroState extends State<OnboardQuizIntro>
     );
   }
 
-  /// One line in the terminal readout. [indent] nudges the confidence
-  /// sub-lines in from the left and drops the "> " prefix.
-  Widget _terminalLine(String text, {bool indent = false}) {
+  /// One line in the terminal readout. Color follows [line.audience];
+  /// [line.flash] bolds it; [line.indent] nudges confidence sub-lines in
+  /// from the left and drops the "> " prefix.
+  Widget _terminalLine(_TermLine line) {
     return Padding(
-      padding: EdgeInsets.only(bottom: 6, left: indent ? 16 : 0),
+      padding: EdgeInsets.only(bottom: 6, left: line.indent ? 16 : 0),
       child: Text(
-        indent ? text : '> $text',
+        line.indent ? line.text : '> ${line.text}',
         style: TextStyle(
           fontFamily: 'monospace',
           fontSize: 11,
           height: 1.5,
-          color: _gold.withValues(alpha: 0.8),
+          fontWeight: line.flash ? FontWeight.bold : FontWeight.normal,
+          color: switch (line.audience) {
+            _FsmeAudience.boss => _bossBlue,
+            _FsmeAudience.self => _selfGray,
+            _FsmeAudience.processing => _processingTeal,
+            _FsmeAudience.user => _gold.withValues(alpha: 0.8),
+          },
         ),
       ),
     );
@@ -329,35 +451,7 @@ class _OnboardQuizIntroState extends State<OnboardQuizIntro>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
-            children: [
-              _terminalLine('$_modeLabel confirmed.'),
-              _terminalLine('Okay my friend \u2014 let\u2019s knock this out.'),
-              _terminalLine('Just ten questions, then we get CRAZY.'),
-              _terminalLine('Maybe this time, wait for it\u2026 we order'),
-              _terminalLine('a large combo. Yeah. I said it. LARGE.'),
-              _terminalLine('...anyway. Here\u2019s the technical stuff'),
-              _terminalLine('I\u2019m supposed to tell you\u2014'),
-              const SizedBox(height: 4),
-              _terminalLine('One question at a time — one selection each'),
-              _terminalLine('Then rate your confidence:'),
-              _terminalLine('1 = basically a guess', indent: true),
-              _terminalLine(
-                '2 = low confidence, but it feels at least close',
-                indent: true,
-              ),
-              _terminalLine(
-                "3 = eliminate the obvious, expect you're right",
-                indent: true,
-              ),
-              _terminalLine(
-                '4 = you know it\'s right, very little hesitation',
-                indent: true,
-              ),
-              _terminalLine(
-                '5 = no hesitation — your answer IS correct',
-                indent: true,
-              ),
-            ],
+            children: [for (final line in _revealedLines) _terminalLine(line)],
           ),
         ),
       ],

@@ -26,11 +26,46 @@ import 'onboard_study_style.dart';
 ///   fourToTen  → 3-4 days
 ///   tenPlus    → 5+ days
 /// (notScheduled stays in the enum but is no longer offered here.)
+///
+/// FSME appears on page LOAD now (not gated on selection) with an intro
+/// grumble line, then the band-specific reaction script appends below
+/// it once a timeframe is picked.
 class OnboardExamDate extends StatefulWidget {
   const OnboardExamDate({super.key});
 
   @override
   State<OnboardExamDate> createState() => _OnboardExamDateState();
+}
+
+/// Who a reaction line is directed at / how it should render.
+/// - user: FSME's default voice (gold) — types out character by
+///   character, per the standing typing rule.
+/// - boss: directed at the boss (blue) — appears instantly.
+/// - self: muttering/thinking to himself (gray) — appears instantly.
+/// [flash] marks the "sudden real expertise" beat — bold gold,
+/// independent of audience (it's still addressed to the user, just
+/// rendered with emphasis).
+enum _FsmeAudience { user, boss, self, processing }
+
+/// Script-definition line (immutable).
+class _FsmeLine {
+  final String text;
+  final _FsmeAudience audience;
+  final bool flash;
+  const _FsmeLine(
+    this.text, {
+    this.audience = _FsmeAudience.user,
+    this.flash = false,
+  });
+}
+
+/// Mutable render-time counterpart — [text] grows as a user-audience
+/// line types out; boss/self lines just get their full text set once.
+class _RenderLine {
+  String text;
+  final _FsmeAudience audience;
+  final bool flash;
+  _RenderLine(this.text, this.audience, {this.flash = false});
 }
 
 class _OnboardExamDateState extends State<OnboardExamDate>
@@ -40,6 +75,13 @@ class _OnboardExamDateState extends State<OnboardExamDate>
   static const Color _softWhite = Color(0xFFF0EDE8);
   static const Color _cardBg = Color(0xFF13130F);
   static const Color _eyeRed = Color(0xFFE24B4A);
+  // Matches the Boss's eye color / the intro page's boss-line color.
+  static const Color _bossBlue = Color(0xFF4A9BE2);
+  // FSME talking/thinking to himself — grayed, matches the intro page.
+  static const Color _selfGray = Color(0xFF9E9E9E);
+  // FSME's "processing" system-status bits — teal, matches the rest of
+  // the funnel.
+  static const Color _processingTeal = Color(0xFF6FA8A6);
 
   ExamWindow? _selected;
 
@@ -48,8 +90,17 @@ class _OnboardExamDateState extends State<OnboardExamDate>
   bool _peekUsed = false;
 
   // ── FSME reaction box ───────────────────────────────────────────────
+  /// True once the load-time intro reveal starts — gates the box's
+  /// visibility. No longer tied to band selection.
   bool _fsmeActive = false;
-  final List<String> _fsmeLines = [];
+  Timer? _introTimer;
+
+  /// The load-time grumble line — shown once, never cleared/rebuilt.
+  final List<_RenderLine> _introLines = [];
+
+  /// Band-specific reaction lines — cleared and rebuilt on each
+  /// (re)selection, rendered below [_introLines].
+  final List<_RenderLine> _fsmeLines = [];
 
   /// Bumped on every band (re)selection. An in-flight reaction loop
   /// checks it and stops appending if a newer selection has started.
@@ -67,6 +118,28 @@ class _OnboardExamDateState extends State<OnboardExamDate>
 
   /// Keeps the newest FSME line in view as lines print in.
   final ScrollController _scroll = ScrollController();
+
+  /// The load-time intro grumble — self-talk, before he ever addresses
+  /// the user directly.
+  static const String _introGrumble =
+      "It's not enough I have to greet everyone, now she's making me "
+      "collect information...";
+
+  /// Full load-time intro script: grumble → processing → self-pity
+  /// result. All self/processing audience, so all reveal instantly
+  /// (no typing) with a pause between each.
+  static const List<_FsmeLine> _introScript = [
+    _FsmeLine(_introGrumble, audience: _FsmeAudience.self),
+    _FsmeLine(
+      'Running self-pity-party routine....',
+      audience: _FsmeAudience.processing,
+    ),
+    _FsmeLine(
+      'Results: "I should be the boss, I\'m smart, given time I could '
+      'have made the ingenious adaptive study engine"',
+      audience: _FsmeAudience.self,
+    ),
+  ];
 
   /// Clean band label per window (1/2/3), sent as the `band` property on
   /// SpOn_Date_Selected.
@@ -90,39 +163,72 @@ class _OnboardExamDateState extends State<OnboardExamDate>
   /// Band-specific reaction lines, split for terminal-style display.
   /// FSME voice: genius dork — built the award-winning tools, can't say
   /// it smoothly, air-quotes the boss's jargon, grudging respect for her.
-  static const Map<ExamWindow, List<String>> _reactions = {
+  ///
+  /// Each opening grumble is tagged `self` (he's muttering before he
+  /// catches himself addressing the user); the canonical "flash of real
+  /// expertise" line per band is tagged `flash` (bold gold).
+  static const Map<ExamWindow, List<_FsmeLine>> _reactions = {
     // 1-2 days — workload grumble + real reassurance.
     ExamWindow.oneToThree: [
-      "It's not enough I gotta greet everyone...",
-      'now she wants your timeframe so she can build a',
-      '"time-attentive curriculum" and feed it into the',
-      '"intuitive SafePrep engine."',
-      '...Two days. Okay. Here\u2019s the actual thing:',
-      'you crammed in high school, it worked, and this',
-      'is that \u2014 except built right. Four hours, you\u2019re fine.',
-      '...Now I get why she got the promotion and I didn\u2019t.',
+      _FsmeLine(
+        "It's not enough I have to greet everybody... now she wants "
+        "me to be a data collector.",
+        audience: _FsmeAudience.self,
+      ),
+      _FsmeLine('Ok, the boss wants me to record your exam date...'),
+      _FsmeLine(
+        '...ok, within two days, got it.',
+        audience: _FsmeAudience.self,
+      ),
+      _FsmeLine('Ha, I bet this is what you did in high school \u2014'),
+      _FsmeLine('crammed for the test the day before. I respect that.'),
+      _FsmeLine('It\u2019s cool the boss wrote this super ingenious'),
+      _FsmeLine(
+        'adaptive study engine that\u2019ll have you ready in no time.',
+      ),
+      _FsmeLine(
+        '...that\u2019s probably why she got the promotion.',
+        audience: _FsmeAudience.self,
+      ),
     ],
     // 3-4 days — the Byte-Me grievance + genuine confidence.
     ExamWindow.fourToTen: [
-      "Here's what I don't get \u2014 I MADE the 60-second",
-      'trainers, and somehow SHE gets the promotion.',
-      'Okay fine, she built the "intuitive engine" and the',
-      '"readiness algorithm"\u2026 but my six tools took first',
-      'place at the Byte-Me conference. First. Place.',
-      '...anyway. Back to you: 3\u20134 days? Shoot \u2014',
-      "I'll have you ready in less than four hours.",
-      "That's when you use my 60-second trainers to",
-      'stay frosty. ...See? I AM genius.',
+      _FsmeLine(
+        "Here's what I don't get \u2014 I MADE the 60-second",
+        audience: _FsmeAudience.self,
+      ),
+      _FsmeLine(
+        'trainers, and somehow SHE gets the promotion.',
+        audience: _FsmeAudience.self,
+      ),
+      _FsmeLine(
+        'Okay fine, she built the "intuitive engine" and the',
+        audience: _FsmeAudience.self,
+      ),
+      _FsmeLine(
+        '"readiness algorithm"\u2026 but my six tools took first place.',
+        audience: _FsmeAudience.self,
+      ),
+      _FsmeLine(
+        'At the Byte-Me conference. Look it up.',
+        audience: _FsmeAudience.self,
+      ),
+      _FsmeLine('3\u20134 days? Piece of cake.'),
+      _FsmeLine('I\u2019ll have you ready in less than four hours...'),
+      _FsmeLine('once you\u2019re exam-ready, use my award-winning'),
+      _FsmeLine('60-second trainers \u2014 in case you didn\u2019t know,'),
+      _FsmeLine('they took first place, beating out Goggles'),
+      _FsmeLine('(Google\u2019s cousin) and their 12-hour trainers.'),
     ],
     // 5+ days — relaxed buddy energy + grudging respect for the boss.
     ExamWindow.tenPlus: [
-      "Dude, we got nothing but time. Here's what I think:",
-      'we go through the tour, she does her magic, comes up',
-      'with the perfect plan for you (it\u2019s annoying how good',
-      "she is at that)\u2026 and then you and I hit the beach,",
-      'catch a movie, whatever you like.',
-      'The app adapts to however you wanna do this.',
-      "That's the whole point.",
+      _FsmeLine("Dude, we got nothing but time. Here's what I think:"),
+      _FsmeLine('We finish up this tour, Boss lady does her analysis'),
+      _FsmeLine('thing, then we hit the beach, catch a movie \u2014'),
+      _FsmeLine('whatever you like.'),
+      _FsmeLine('The point is, her app prepares you like no other \u2014'),
+      _FsmeLine("I'm telling you, less than four hours."),
+      _FsmeLine('So\u2026 the beach, a movie? Let me know, dude.'),
     ],
   };
 
@@ -145,6 +251,33 @@ class _OnboardExamDateState extends State<OnboardExamDate>
       'SpOn_Date_Viewed',
       properties: {'app_name': 'SP'},
     );
+
+    // FSME appears on load (not gated on selection) with the intro
+    // script — self/processing lines, appear instantly, paced.
+    _introTimer = Timer(const Duration(seconds: 2), () {
+      if (!mounted) return;
+      setState(() => _fsmeActive = true);
+      _scheduleGaze();
+      _scheduleBlink();
+      _revealIntro();
+    });
+  }
+
+  /// Reveals the load-time intro script one line at a time. Guarded by
+  /// [_fsmeGen] so picking a band mid-reveal stops it (the selection
+  /// then erases everything and starts the band script fresh).
+  Future<void> _revealIntro() async {
+    final int gen = _fsmeGen;
+    for (final line in _introScript) {
+      if (!mounted || gen != _fsmeGen) return;
+      setState(
+        () => _introLines.add(
+          _RenderLine(line.text, line.audience, flash: line.flash),
+        ),
+      );
+      _scrollToEnd();
+      await Future.delayed(const Duration(milliseconds: 700));
+    }
   }
 
   void _advanceGaze() {
@@ -183,6 +316,7 @@ class _OnboardExamDateState extends State<OnboardExamDate>
 
   @override
   void dispose() {
+    _introTimer?.cancel();
     _gazeAnim.dispose();
     _blinkController.dispose();
     _gazeTimer?.cancel();
@@ -224,43 +358,63 @@ class _OnboardExamDateState extends State<OnboardExamDate>
     await _runFsme(window);
   }
 
-  /// FSME reaction: box appears, prints its lines one at a time. On the
-  /// two peek bands it ends by offering the sneak peek; otherwise it just
-  /// shows the Next button.
+  /// FSME reaction: appends below the (already-showing) intro grumble,
+  /// printing the band script one line at a time. User-audience lines
+  /// type out character by character; boss/self lines appear instantly.
+  /// On the two peek bands it ends by offering the sneak peek; otherwise
+  /// it just shows the Next button.
   Future<void> _runFsme(ExamWindow window) async {
     final int gen = _fsmeGen;
 
     setState(() {
-      _fsmeActive = true;
+      _introLines.clear();
       _fsmeLines.clear();
     });
-    _scheduleGaze();
-    _scheduleBlink();
 
-    final lines = _reactions[window] ?? const ['Got it.'];
+    final lines = _reactions[window] ?? const [_FsmeLine('Got it.')];
 
     await Future.delayed(const Duration(milliseconds: 450));
     for (final line in lines) {
       if (!mounted || gen != _fsmeGen) return;
-      setState(() => _fsmeLines.add(line));
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scroll.hasClients) {
-          _scroll.animateTo(
-            _scroll.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOut,
-          );
+
+      if (line.audience == _FsmeAudience.user) {
+        final entry = _RenderLine('', line.audience, flash: line.flash);
+        setState(() => _fsmeLines.add(entry));
+        for (var i = 1; i <= line.text.length; i++) {
+          if (!mounted || gen != _fsmeGen) return;
+          setState(() => entry.text = line.text.substring(0, i));
+          _scrollToEnd();
+          await Future.delayed(const Duration(milliseconds: 18));
         }
-      });
+      } else {
+        setState(
+          () => _fsmeLines.add(
+            _RenderLine(line.text, line.audience, flash: line.flash),
+          ),
+        );
+        _scrollToEnd();
+      }
+
       await Future.delayed(const Duration(milliseconds: 700));
     }
+  }
+
+  void _scrollToEnd() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scroll.hasClients) {
+        _scroll.animateTo(
+          _scroll.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   /// Advance to the study-style screen — driven by the Next button.
   Future<void> _advance() async {
     final navigator = Navigator.of(context);
 
-    _fsmeActive = false;
     await navigator.push(
       MaterialPageRoute(builder: (_) => OnboardStudyStyle()),
     );
@@ -268,7 +422,6 @@ class _OnboardExamDateState extends State<OnboardExamDate>
     if (mounted) {
       setState(() {
         _selected = null;
-        _fsmeActive = false;
         _fsmeLines.clear();
       });
     }
@@ -445,8 +598,8 @@ class _OnboardExamDateState extends State<OnboardExamDate>
           alignment: Alignment.center,
           transform: Matrix4.identity()..scale(1.0, blink),
           child: Container(
-            width: 44,
-            height: 44,
+            width: 26,
+            height: 26,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: const RadialGradient(
@@ -461,25 +614,20 @@ class _OnboardExamDateState extends State<OnboardExamDate>
               boxShadow: [
                 BoxShadow(
                   color: _eyeRed.withValues(alpha: 0.6),
-                  blurRadius: 14,
-                  spreadRadius: 3,
-                ),
-                BoxShadow(
-                  color: _eyeRed.withValues(alpha: 0.25),
-                  blurRadius: 26,
-                  spreadRadius: 6,
+                  blurRadius: 10,
+                  spreadRadius: 2,
                 ),
               ],
             ),
             child: Center(
               child: Transform.translate(
-                offset: Offset(_gazeCurrent * 8, 1),
+                offset: Offset(_gazeCurrent * 5, 0.5),
                 child: Container(
-                  width: 14,
-                  height: 17,
+                  width: 8,
+                  height: 10,
                   decoration: BoxDecoration(
                     color: const Color(0xFF0A0000),
-                    borderRadius: BorderRadius.circular(7),
+                    borderRadius: BorderRadius.circular(4),
                   ),
                 ),
               ),
@@ -490,9 +638,32 @@ class _OnboardExamDateState extends State<OnboardExamDate>
     );
   }
 
+  Widget _lineWidget(_RenderLine line) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(
+        '> ${line.text}',
+        style: TextStyle(
+          fontFamily: 'Menlo',
+          fontFamilyFallback: const ['Courier', 'monospace'],
+          fontSize: 12,
+          height: 1.5,
+          fontWeight: line.flash ? FontWeight.bold : FontWeight.normal,
+          color: switch (line.audience) {
+            _FsmeAudience.boss => _bossBlue,
+            _FsmeAudience.self => _selfGray,
+            _FsmeAudience.processing => _processingTeal,
+            _FsmeAudience.user => _gold,
+          },
+        ),
+      ),
+    );
+  }
+
   /// FSME reaction box — animated eyes + terminal readout + button.
-  /// The button is "Next" normally, or "Continue" on peek bands (which
-  /// launches the peek before advancing).
+  /// Shows on page load (intro grumble); the band script appends below
+  /// once a timeframe is picked. The Next/Continue button only appears
+  /// once a band is actually selected.
   Widget _fsmeBox() {
     final bool isPeek =
         _selected != null && _peekBand(_selected!) && !_peekUsed;
@@ -534,45 +705,35 @@ class _OnboardExamDateState extends State<OnboardExamDate>
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                for (final line in _fsmeLines)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Text(
-                      '> $line',
-                      style: TextStyle(
-                        fontFamily: 'Menlo',
-                        fontFamilyFallback: const ['Courier', 'monospace'],
-                        fontSize: 12,
-                        height: 1.5,
-                        color: _gold,
-                      ),
-                    ),
-                  ),
+                for (final line in _introLines) _lineWidget(line),
+                for (final line in _fsmeLines) _lineWidget(line),
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 48,
-            child: ElevatedButton(
-              onPressed: isPeek ? _offerPeek : _advance,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _gold,
-                foregroundColor: _darkBg,
-                elevation: 3,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+          if (_selected != null) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 48,
+              child: ElevatedButton(
+                onPressed: isPeek ? _offerPeek : _advance,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _gold,
+                  foregroundColor: _darkBg,
+                  elevation: 3,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
-              ),
-              child: Text(
-                isPeek ? 'Continue  \u2192' : 'Next  \u2192',
-                style: const TextStyle(
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w700,
+                child: Text(
+                  isPeek ? 'Continue  \u2192' : 'Next  \u2192',
+                  style: const TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );

@@ -23,6 +23,42 @@ class OnboardStudyStyle extends StatefulWidget {
   State<OnboardStudyStyle> createState() => _OnboardStudyStyleState();
 }
 
+/// Who a terminal line is directed at / how it renders.
+/// - user: FSME's default voice (gold)
+/// - boss: directed at the boss (blue)
+/// - self: muttering/thinking to himself (gray)
+/// - processing: "system status" bits — Beep Boop, "activating X
+///   mode" — a dim teal, distinct from both self-talk and his normal
+///   voice. Color is a placeholder pending confirmation.
+/// [flash] marks the "sudden real expertise" beat — bold gold,
+/// independent of audience.
+enum _FsmeAudience { user, boss, self, processing }
+
+class _FsmeLine {
+  final String text;
+  final _FsmeAudience audience;
+  final bool flash;
+  const _FsmeLine(
+    this.text, {
+    this.audience = _FsmeAudience.user,
+    this.flash = false,
+  });
+}
+
+/// Runtime terminal entry — mirrors a [_FsmeLine] but with mutable
+/// [text] so the typing effect can grow it character by character
+/// while keeping the line's audience/flash fixed.
+class _TermEntry {
+  String text;
+  final _FsmeAudience audience;
+  final bool flash;
+  _TermEntry(
+    this.text, {
+    this.audience = _FsmeAudience.user,
+    this.flash = false,
+  });
+}
+
 class _OnboardStudyStyleState extends State<OnboardStudyStyle>
     with TickerProviderStateMixin {
   static const Color _gold = Color(0xFFD4AF37);
@@ -30,6 +66,14 @@ class _OnboardStudyStyleState extends State<OnboardStudyStyle>
   static const Color _softWhite = Color(0xFFF0EDE8);
   static const Color _cardBg = Color(0xFF13130F);
   static const Color _eyeRed = Color(0xFFE24B4A);
+  // Matches the boss-line color used on the intro / exam-date pages.
+  static const Color _bossBlue = Color(0xFF4A9BE2);
+  // FSME talking/thinking to himself — matches the intro / exam-date
+  // pages.
+  static const Color _selfGray = Color(0xFF9E9E9E);
+  // "Processing" / system-status bits (Beep Boop, "activating X
+  // mode"). Placeholder — swap once confirmed against a render.
+  static const Color _processingTeal = Color(0xFF6FA8A6);
 
   StudyStyle? _selected;
 
@@ -47,9 +91,26 @@ class _OnboardStudyStyleState extends State<OnboardStudyStyle>
   Timer? _blinkTimer;
 
   // Terminal confirmation
-  final List<String> _terminalLines = [];
+  final List<_TermEntry> _terminalLines = [];
   bool _showTerminal = false;
   Timer? _typer;
+
+  /// Load-time opening bit — plays once, before any mode is picked.
+  /// Cleared the moment a real selection starts its own script.
+  Timer? _openingTimer;
+  bool _openingPlayed = false;
+  bool _openingCancelled = false;
+
+  static const List<_FsmeLine> _openingScript = [
+    _FsmeLine(
+      "Three ways to study this. She built all three.",
+      audience: _FsmeAudience.self,
+    ),
+    _FsmeLine(
+      "...guess I just sit here and watch you pick.",
+      audience: _FsmeAudience.self,
+    ),
+  ];
 
   /// True once the terminal readout has printed its last line — gates the
   /// Continue button.
@@ -82,10 +143,27 @@ class _OnboardStudyStyleState extends State<OnboardStudyStyle>
     _scheduleGaze();
     _scheduleBlink();
 
+    _openingTimer = Timer(const Duration(seconds: 2), _revealOpening);
+
     MixpanelService.instance.track(
       'SpOn_Style_Viewed',
       properties: {'app_name': 'SP'},
     );
+  }
+
+  /// Plays once, before any mode selection. If the user picks a mode
+  /// while this is still typing, [_choose] clears it out and starts
+  /// that mode's real script instead.
+  Future<void> _revealOpening() async {
+    if (_openingPlayed || !mounted) return;
+    _openingPlayed = true;
+    setState(() => _showTerminal = true);
+    for (final line in _openingScript) {
+      if (!mounted || _openingCancelled) return;
+      await _typeLine(line);
+      if (!mounted || _openingCancelled) return;
+      await Future.delayed(const Duration(milliseconds: 300));
+    }
   }
 
   /// Ease the current pupil position toward the target each frame.
@@ -137,6 +215,7 @@ class _OnboardStudyStyleState extends State<OnboardStudyStyle>
     _gazeTimer?.cancel();
     _blinkTimer?.cancel();
     _typer?.cancel();
+    _openingTimer?.cancel();
     super.dispose();
   }
 
@@ -156,6 +235,12 @@ class _OnboardStudyStyleState extends State<OnboardStudyStyle>
     // and replays its terminal readout. Continue drives the advance, so
     // the choice isn't final until they proceed.
     if (_selected == style) return;
+
+    // A real selection overrides the load-time opening bit — stop it
+    // from typing further and mark it as done so it can never restart.
+    _openingTimer?.cancel();
+    _openingCancelled = true;
+    _openingPlayed = true;
 
     _selectGen++;
     _typer?.cancel();
@@ -182,42 +267,67 @@ class _OnboardStudyStyleState extends State<OnboardStudyStyle>
 
   /// Per-mode FSME scripts — the genius-dork "act busy so she doesn't
   /// send me home" bit. Full sequences (not a random one-liner), each in
-  /// FSME's voice, each getting caught by the boss and covering at the end.
-  static const Map<StudyStyle, List<String>> _scripts = {
+  /// FSME's voice, each getting caught by the boss and covering at the
+  /// end.
+  ///
+  /// Explanations script rewritten around the "BFF mode" bit — he offers
+  /// his digits (in binary) as a running gag. Answers-only and
+  /// quiz-format keep their original scripts; their "Beep. Boop." system-
+  /// status lines are tagged `processing` and their boss-directed
+  /// cover lines are tagged `boss`, now that the audience system exists.
+  static const Map<StudyStyle, List<_FsmeLine>> _scripts = {
     StudyStyle.explanations: [
-      'Answers and explanations mode selected.',
-      'Oh \u2014 you actually wanna know WHY? Finally.',
-      'Okay so the "why" is where it all lives, right,',
-      'the reasoning, the little rules behind the rules \u2014',
-      'I could go for hours, I have BEEN told I go for hours\u2014',
-      '\u2026right. She says I "lose people." I don\u2019t lose people.',
-      'EXE explanation script. You and me, we\u2019re gonna',
-      'get along great. \u2026Locking it in.',
+      _FsmeLine(
+        'Answers and explanations mode locked in.',
+        audience: _FsmeAudience.processing,
+      ),
+      _FsmeLine(
+        'This is as close to instructor-led studying as there is \u2014',
+      ),
+      _FsmeLine('you know, get an explanation to reinforce the material.'),
+      _FsmeLine(
+        'Activating BFF mode\u2026.',
+        audience: _FsmeAudience.processing,
+      ),
+      _FsmeLine('So, I\u2019ll give you my digits: 0010 0001 0101.'),
+      _FsmeLine('You can call me whenever \u2014 or not. It\u2019s cool.'),
     ],
     StudyStyle.answersOnly: [
-      'Answers only mode selected.',
-      'Ha \u2014 this is what I\u2019d pick. Guess, then see if',
-      'I was right. Sometimes I\u2019m dead sure\u2026 other times,',
-      'I\u2019ll be honest, I just grab the one that looks right.',
-      'Beep. Boop. (that\u2019s how she knows I\u2019m working)',
-      'EXE AnswersOnly script\u2026',
-      '\u2026uh, yes boss, that\u2019s correct \u2014 "Answers Only."',
-      'Go ahead and lock it in.',
+      _FsmeLine('I knew we were BFFs \u2014 I chose this exact study option.'),
+      _FsmeLine('High-five? No?'),
+      _FsmeLine('Ok, umm \u2014 most of the time I just guess at an answer,'),
+      _FsmeLine('then I know right away if I guessed correctly.'),
+      _FsmeLine('...hold on. I see the boss.', audience: _FsmeAudience.self),
+      _FsmeLine('Beep. Boop. Brang.', audience: _FsmeAudience.processing),
+      _FsmeLine(
+        'I make those noises just so the boss thinks I\u2019m actually '
+        'working.',
+      ),
+      _FsmeLine(
+        'Yes boss, that\u2019s correct \u2014 \u2018Answers only\u2019 locked in.',
+        audience: _FsmeAudience.boss,
+      ),
     ],
     StudyStyle.quizFormat: [
-      'Quiz format mode selected.',
-      'Whoa \u2014 either you woke up super confident, or you',
-      'spent too much time in the sun when we hit the beach.',
-      'No feedback till the end? Cold. \u2026I respect it.',
-      'Beep. Boop. (that\u2019s how she knows I\u2019m working)',
-      'EXE QuizFormat script\u2026',
-      '\u2026what\u2019s that? Yes \u2014 yes, boss, they know they',
-      'chose Quiz Format. Handled. Locking it in.',
+      _FsmeLine('Quiz mode selected.', audience: _FsmeAudience.processing),
+      _FsmeLine('Whoa \u2014 either you woke up super confident, or you'),
+      _FsmeLine('got too much sunlight when we hit the beach.'),
+      _FsmeLine('Hard core. I respect that!'),
+      _FsmeLine(
+        'Beep-boop, bop, briiiing.',
+        audience: _FsmeAudience.processing,
+      ),
+      _FsmeLine('Lol, she thinks I\u2019m working when I make those noises.'),
+      _FsmeLine(
+        'What\u2019s that? Yes \u2014 yes boss, they knowingly selected quiz '
+        'mode.',
+        audience: _FsmeAudience.boss,
+      ),
     ],
   };
 
-  List<String> _buildScript(StudyStyle style) {
-    return _scripts[style] ?? const ['Processing......'];
+  List<_FsmeLine> _buildScript(StudyStyle style) {
+    return _scripts[style] ?? const [_FsmeLine('Processing......')];
   }
 
   Future<void> _runTerminalSequence(StudyStyle style) async {
@@ -261,12 +371,15 @@ class _OnboardStudyStyleState extends State<OnboardStudyStyle>
     }
   }
 
-  Future<void> _typeLine(String text) async {
+  Future<void> _typeLine(_FsmeLine line) async {
     final completer = Completer<void>();
     int charIndex = 0;
+    final text = line.text;
 
     setState(() {
-      _terminalLines.add('');
+      _terminalLines.add(
+        _TermEntry('', audience: line.audience, flash: line.flash),
+      );
     });
 
     _typer = Timer.periodic(const Duration(milliseconds: 25), (timer) {
@@ -278,7 +391,7 @@ class _OnboardStudyStyleState extends State<OnboardStudyStyle>
 
       charIndex++;
       setState(() {
-        _terminalLines[_terminalLines.length - 1] = text.substring(
+        _terminalLines[_terminalLines.length - 1].text = text.substring(
           0,
           charIndex.clamp(0, text.length),
         );
@@ -373,8 +486,8 @@ class _OnboardStudyStyleState extends State<OnboardStudyStyle>
           alignment: Alignment.center,
           transform: Matrix4.identity()..scale(1.0, blink),
           child: Container(
-            width: 65,
-            height: 65,
+            width: 26,
+            height: 26,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: const RadialGradient(
@@ -389,13 +502,8 @@ class _OnboardStudyStyleState extends State<OnboardStudyStyle>
               boxShadow: [
                 BoxShadow(
                   color: _eyeRed.withValues(alpha: 0.6),
-                  blurRadius: 18,
-                  spreadRadius: 4,
-                ),
-                BoxShadow(
-                  color: _eyeRed.withValues(alpha: 0.25),
-                  blurRadius: 35,
-                  spreadRadius: 8,
+                  blurRadius: 10,
+                  spreadRadius: 2,
                 ),
               ],
             ),
@@ -404,13 +512,13 @@ class _OnboardStudyStyleState extends State<OnboardStudyStyle>
               children: [
                 // Pupil — oval, shifts left/right with the gaze.
                 Transform.translate(
-                  offset: Offset(_gazeCurrent * 12, 2),
+                  offset: Offset(_gazeCurrent * 5, 0.5),
                   child: Container(
-                    width: 22,
-                    height: 26,
+                    width: 8,
+                    height: 10,
                     decoration: BoxDecoration(
                       color: const Color(0xFF0A0000),
-                      borderRadius: BorderRadius.circular(11),
+                      borderRadius: BorderRadius.circular(4),
                     ),
                   ),
                 ),
@@ -443,16 +551,24 @@ class _OnboardStudyStyleState extends State<OnboardStudyStyle>
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            for (final line in _terminalLines)
+            for (final entry in _terminalLines)
               Padding(
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Text(
-                  '> $line',
+                  '> ${entry.text}',
                   style: TextStyle(
                     fontFamily: 'monospace',
                     fontSize: 11,
                     height: 1.5,
-                    color: _gold.withValues(alpha: 0.8),
+                    fontWeight: entry.flash
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                    color: switch (entry.audience) {
+                      _FsmeAudience.boss => _bossBlue,
+                      _FsmeAudience.self => _selfGray,
+                      _FsmeAudience.processing => _processingTeal,
+                      _FsmeAudience.user => _gold.withValues(alpha: 0.8),
+                    },
                   ),
                 ),
               ),

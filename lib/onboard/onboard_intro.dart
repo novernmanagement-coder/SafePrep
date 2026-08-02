@@ -24,6 +24,25 @@ class OnboardIntro extends StatefulWidget {
   State<OnboardIntro> createState() => _OnboardIntroState();
 }
 
+/// Who a beat-two line is directed at — governs color.
+enum _FsmeAudience { user, boss, self }
+
+/// One line of FSME's beat-two script.
+class _FsmeLine {
+  final String text;
+  final _FsmeAudience audience;
+  const _FsmeLine(this.text, {this.audience = _FsmeAudience.user});
+}
+
+/// Mutable render-time counterpart to [_FsmeLine] — [text] grows as a
+/// user-audience line types out character by character; boss/self
+/// lines just get their full text set once.
+class _RenderLine {
+  String text;
+  final _FsmeAudience audience;
+  _RenderLine(this.text, this.audience);
+}
+
 class _OnboardIntroState extends State<OnboardIntro>
     with TickerProviderStateMixin {
   static const Color _gold = Color(0xFFD4AF37);
@@ -31,12 +50,51 @@ class _OnboardIntroState extends State<OnboardIntro>
   static const Color _softWhite = Color(0xFFF0EDE8);
   static const Color _cardBg = Color(0xFF13130F);
   static const Color _eyeRed = Color(0xFFE24B4A);
+  // Matches the Boss's eye color (OnboardReadiness _eyeBlue) — reused
+  // here so boss-directed lines carry the same association wherever
+  // FSME talks to her across the funnel.
+  static const Color _bossBlue = Color(0xFF4A9BE2);
+  // FSME talking/thinking to himself — grayed, distinct from both the
+  // user-facing gold and the boss-facing blue.
+  static const Color _selfGray = Color(0xFF9E9E9E);
 
-  // FSME shows up after a beat, then delivers a second "official" line.
+  // FSME shows up after a beat, then works through the full script.
   bool _fsmeVisible = false;
-  bool _fsmeBeatTwo = false;
   Timer? _introTimer;
-  Timer? _beatTwoTimer;
+  final List<_RenderLine> _beatTwoLines = [];
+
+  // Full script: arrival → confident recite → stumble → boss check-in →
+  // recovers → delivers the line clean → seeks approval. The arrival
+  // line is now a proper user-audience line in this same list (typed
+  // out, gold), not a separate special-cased static line.
+  static const List<_FsmeLine> _beatTwoScript = [
+    _FsmeLine(
+      'Oh \u2014 hey, didn\u2019t see you come in. '
+      'Boss told me to watch the front door\u2026 '
+      'don\u2019t tell her I was sleeping.',
+    ),
+    _FsmeLine(
+      '\u2026right, okay \u2014 the greeting. Ahem: '
+      '\u201CWelcome to SafePrep, where we prep\u2014',
+    ),
+    _FsmeLine(
+      '\u2026how embarrassing, I can\u2019t read her handwriting. Just a sec.',
+      audience: _FsmeAudience.self,
+    ),
+    _FsmeLine(
+      'Hey boss \u2014 what\u2019s this supposed to say??',
+      audience: _FsmeAudience.boss,
+    ),
+    _FsmeLine('\u2026got it.', audience: _FsmeAudience.boss),
+    _FsmeLine(
+      '\u201CWelcome to SafePrep, where we prepare you for the '
+      'ServSafe exam in under four hours.\u201D',
+    ),
+    _FsmeLine(
+      '\u2026Did ya hear that, boss?? I nailed it!',
+      audience: _FsmeAudience.boss,
+    ),
+  ];
 
   // Gaze + blink machinery (ported from OnboardExamDate).
   int _gazeTarget = 0;
@@ -62,18 +120,42 @@ class _OnboardIntroState extends State<OnboardIntro>
       duration: const Duration(milliseconds: 180),
     );
 
-    // FSME appears after 2 seconds; catches himself 2 seconds later.
+    // FSME appears after 2 seconds, then the full script reveals —
+    // each line paced 3 seconds apart.
     _introTimer = Timer(const Duration(seconds: 2), () {
       if (!mounted) return;
       setState(() => _fsmeVisible = true);
       _scheduleGaze();
       _scheduleBlink();
-
-      _beatTwoTimer = Timer(const Duration(seconds: 2), () {
-        if (!mounted) return;
-        setState(() => _fsmeBeatTwo = true);
-      });
+      _revealBeatTwo();
     });
+  }
+
+  /// Reveals the full script. Per the typing rule: lines addressed to
+  /// the user type out character by character; boss/self lines appear
+  /// all at once. Every line, once fully shown, holds for 3 seconds
+  /// before the next one starts.
+  Future<void> _revealBeatTwo() async {
+    for (final line in _beatTwoScript) {
+      if (!mounted) return;
+
+      if (line.audience == _FsmeAudience.user) {
+        final entry = _RenderLine('', line.audience);
+        setState(() => _beatTwoLines.add(entry));
+        for (var i = 1; i <= line.text.length; i++) {
+          if (!mounted) return;
+          setState(() => entry.text = line.text.substring(0, i));
+          await Future.delayed(const Duration(milliseconds: 18));
+        }
+      } else {
+        setState(
+          () => _beatTwoLines.add(_RenderLine(line.text, line.audience)),
+        );
+      }
+
+      // 3 seconds between every bit, uniformly, per Gerry's pacing call.
+      await Future.delayed(const Duration(seconds: 3));
+    }
   }
 
   void _advanceGaze() {
@@ -113,7 +195,6 @@ class _OnboardIntroState extends State<OnboardIntro>
   @override
   void dispose() {
     _introTimer?.cancel();
-    _beatTwoTimer?.cancel();
     _gazeAnim.dispose();
     _blinkController.dispose();
     _gazeTimer?.cancel();
@@ -310,7 +391,8 @@ class _OnboardIntroState extends State<OnboardIntro>
   }
 
   /// FSME intro tile — empty for 2 seconds, then he fades in with
-  /// darting eyes and a cocky-but-self-aware intro line.
+  /// darting eyes and the arrival line, then the beat-two stumble
+  /// script types in line by line.
   Widget _fsmeTile() {
     return Container(
       width: double.infinity,
@@ -331,38 +413,24 @@ class _OnboardIntroState extends State<OnboardIntro>
               children: [_davEye(), const SizedBox(width: 8), _davEye()],
             ),
             const SizedBox(height: 8),
-            Text(
-              'Oh \u2014 hey, didn\u2019t see you come in. '
-              'Boss told me to watch the front door\u2026 '
-              'don\u2019t tell her I was sleeping.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 9.5,
-                height: 1.4,
-                fontStyle: FontStyle.italic,
-                color: _softWhite.withValues(alpha: 0.7),
-              ),
-            ),
-            AnimatedOpacity(
-              opacity: _fsmeBeatTwo ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 500),
-              child: Padding(
+            for (final line in _beatTwoLines)
+              Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(
-                  '\u2026right, okay \u2014 the greeting. Ahem: '
-                  '\u201CWelcome to SafePrep, where we prepare you for the '
-                  'ServSafe exam in under four hours.\u201D '
-                  '\u2026Did ya hear that, boss?? I nailed it!',
+                  line.text,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 9.5,
                     height: 1.4,
                     fontStyle: FontStyle.italic,
-                    color: _gold.withValues(alpha: 0.8),
+                    color: switch (line.audience) {
+                      _FsmeAudience.boss => _bossBlue.withValues(alpha: 0.9),
+                      _FsmeAudience.self => _selfGray.withValues(alpha: 0.8),
+                      _FsmeAudience.user => _gold.withValues(alpha: 0.8),
+                    },
                   ),
                 ),
               ),
-            ),
           ],
         ),
       ),

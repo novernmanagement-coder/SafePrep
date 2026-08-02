@@ -48,6 +48,22 @@ class OnboardReadiness extends StatefulWidget {
   State<OnboardReadiness> createState() => _OnboardReadinessState();
 }
 
+/// How a readiness-terminal line renders.
+/// - normal: the Boss's default voice (gold) — intro/closing lines.
+/// - processing: "running script..." announcement lines — teal, matching
+///   FSME's processing color elsewhere in the funnel.
+/// - verdict: the assessment/recommendation payoff lines — colored by
+///   the score band (red/amber/green) so the verdict reads at a glance.
+/// - self: the Boss's own aside/thinking — gray, matching FSME's
+///   self-talk color elsewhere in the funnel.
+enum _LineKind { normal, processing, verdict, self }
+
+class _ReadinessLine {
+  final String text;
+  final _LineKind kind;
+  const _ReadinessLine(this.text, {this.kind = _LineKind.normal});
+}
+
 class _OnboardReadinessState extends State<OnboardReadiness>
     with TickerProviderStateMixin {
   static const Color _gold = Color(0xFFD4AF37);
@@ -57,6 +73,11 @@ class _OnboardReadinessState extends State<OnboardReadiness>
   static const Color _amber = Color(0xFFEF9F27);
   static const Color _red = Color(0xFFE24B4A);
   static const Color _eyeBlue = Color(0xFF4A9BE2);
+  // Matches the processing color used on FSME's own pages.
+  static const Color _processingTeal = Color(0xFF6FA8A6);
+  // Matches FSME's self-talk color — reused here for the Boss's own
+  // asides.
+  static const Color _selfGray = Color(0xFF9E9E9E);
 
   /// Refresher gate — the one cell that gets the $2.99 route.
   static const int _refresherMinCorrect = 8;
@@ -72,7 +93,7 @@ class _OnboardReadinessState extends State<OnboardReadiness>
   final math.Random _rng = math.Random();
 
   /// Terminal lines revealed so far (typed in one at a time).
-  final List<String> _lines = [];
+  final List<_ReadinessLine> _lines = [];
 
   DiagnosticResult get _result =>
       OnboardingAnswers.instance.diagnosticResult ?? const DiagnosticResult([]);
@@ -229,21 +250,53 @@ class _OnboardReadinessState extends State<OnboardReadiness>
     await prefs.setInt(OnboardReadiness.onboardingRunsKey, current + 1);
   }
 
-  /// Types the terminal readout in one line at a time.
+  /// Types the terminal readout in one line at a time. Each data point
+  /// (confidence, knowledge, assessment, recommendation) is preceded by
+  /// its own "running script..." processing line.
   Future<void> _revealLines() async {
     final avg = _result.avgStars.toStringAsFixed(1);
     final knowPct = _result.correct * 10;
 
-    final script = <String>[
-      "I'll take it from here, FSME. ...Go sit down.",
-      'Hi. I run the analysis around here.',
-      'Here is exactly what your answers tell us:',
-      'Confidence level $avg',
-      'Knowledge level $knowPct%',
-      'Assessment: $_assessment',
-      'Recommend: $_recommendation',
-      'The plan corrects exactly this. Four hours.',
-      "I've done the math.",
+    final script = <_ReadinessLine>[
+      const _ReadinessLine("I'll take it from here, FSME. ...Go sit down."),
+      const _ReadinessLine('Hi. I run the analysis around here.'),
+      const _ReadinessLine('Here is exactly what your answers tell us:'),
+      const _ReadinessLine(
+        'Running confidence script...',
+        kind: _LineKind.processing,
+      ),
+      _ReadinessLine('Confidence index $avg'),
+      const _ReadinessLine(
+        'Creating knowledge quotient...',
+        kind: _LineKind.processing,
+      ),
+      _ReadinessLine('Knowledge quotient $knowPct%'),
+      const _ReadinessLine(
+        'Running assessment script...',
+        kind: _LineKind.processing,
+      ),
+      _ReadinessLine('"$_assessment"', kind: _LineKind.verdict),
+      const _ReadinessLine(
+        'Running recommendation script...',
+        kind: _LineKind.processing,
+      ),
+      _ReadinessLine(
+        'Assessment indicates $_recommendation',
+        kind: _LineKind.verdict,
+      ),
+      const _ReadinessLine(
+        'Once curriculum is mastered, maintain knowledge with '
+        '60-second trainers.',
+      ),
+      const _ReadinessLine(
+        '...FSME did a great job with those. ...but I still got the '
+        'promotion.',
+        kind: _LineKind.self,
+      ),
+      const _ReadinessLine(
+        'Triangulated results: Readiness achieved in less than 4 hours.',
+      ),
+      const _ReadinessLine("I've done the math."),
     ];
 
     await Future.delayed(const Duration(milliseconds: 400));
@@ -409,9 +462,10 @@ class _OnboardReadinessState extends State<OnboardReadiness>
     );
   }
 
-  /// FSME readout box — animated eyes + typed terminal lines. The
-  /// Assessment and Recommend lines render in the band color so the
-  /// verdict reads at a glance; the two data lines stay gold.
+  /// FSME readout box — animated eyes + typed terminal lines. Color
+  /// follows [_ReadinessLine.kind]: processing lines render teal,
+  /// verdict lines (assessment/recommendation) render in the band
+  /// color, everything else stays the Boss's gold.
   Widget _fsmeBox() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -449,16 +503,17 @@ class _OnboardReadinessState extends State<OnboardReadiness>
                 Padding(
                   padding: const EdgeInsets.only(bottom: 7),
                   child: Text(
-                    '> $line',
+                    '> ${line.text}',
                     style: TextStyle(
                       fontFamily: 'monospace',
                       fontSize: 11.5,
                       height: 1.5,
-                      color:
-                          (line.startsWith('Assessment:') ||
-                              line.startsWith('Recommend:'))
-                          ? _bandColor
-                          : _gold.withValues(alpha: 0.85),
+                      color: switch (line.kind) {
+                        _LineKind.processing => _processingTeal,
+                        _LineKind.verdict => _bandColor,
+                        _LineKind.self => _selfGray,
+                        _LineKind.normal => _gold.withValues(alpha: 0.85),
+                      },
                     ),
                   ),
                 ),
@@ -575,7 +630,7 @@ class _OnboardReadinessState extends State<OnboardReadiness>
 }
 
 /// Draws a thin spectacle frame over the Boss's two eyes: a rounded
-/// lens around each eye, a bridge across the nose, and short temple
+/// lens around each eye, a bridge between them, and short temple
 /// arms out to the sides. Purely decorative — sits on top of the eyes.
 class _GlassesPainter extends CustomPainter {
   final Color color;

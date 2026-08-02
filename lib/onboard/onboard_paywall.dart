@@ -46,6 +46,20 @@ class OnboardPaywall extends StatefulWidget {
   State<OnboardPaywall> createState() => _OnboardPaywallState();
 }
 
+/// Who an FSME line is directed at / how it renders. Matches the system
+/// used across the rest of the onboarding funnel.
+/// - user: FSME's default voice (gold)
+/// - boss: directed at the boss (blue)
+/// - self: muttering/thinking to himself (gray)
+/// - processing: system-status bits — teal
+enum _FsmeAudience { user, boss, self, processing }
+
+class _FsmeLine {
+  final String text;
+  final _FsmeAudience audience;
+  const _FsmeLine(this.text, {this.audience = _FsmeAudience.user});
+}
+
 class _OnboardPaywallState extends State<OnboardPaywall>
     with TickerProviderStateMixin {
   static const Color _gold = Color(0xFFD4AF37);
@@ -53,6 +67,11 @@ class _OnboardPaywallState extends State<OnboardPaywall>
   static const Color _softWhite = Color(0xFFF0EDE8);
   static const Color _cardBg = Color(0xFF13130F);
   static const Color _green = Color(0xFF639922);
+  // Matches the boss-line / self-line / processing colors used across
+  // the rest of the funnel.
+  static const Color _bossBlue = Color(0xFF4A9BE2);
+  static const Color _selfGray = Color(0xFF9E9E9E);
+  static const Color _processingTeal = Color(0xFF6FA8A6);
 
   static const String _fsmeProctorUrl =
       'https://foodsafetymadeeasy.com/find-a-proctor/';
@@ -81,6 +100,49 @@ class _OnboardPaywallState extends State<OnboardPaywall>
       "Dude, I didn't know a thing about food safety. Then I "
       'came to work here. Man — this system works.';
 
+  // ── Decline-screen FSME box ──────────────────────────────────────────
+  // "Undo BFF script" only makes sense if the user actually saw the BFF-
+  // digits bit, which only fires on the "Answers and explanations" study
+  // style. Gated below rather than shown unconditionally.
+  static const List<_FsmeLine> _declineFsmeScriptWithBffCallback = [
+    _FsmeLine('Undo BFF script...', audience: _FsmeAudience.processing),
+    _FsmeLine(
+      'Change digits: XXXX XXXX XXXX',
+      audience: _FsmeAudience.processing,
+    ),
+    _FsmeLine('Dude, really? Was it because I ordered a large combo?'),
+    _FsmeLine(
+      "Seriously \u2014 there's zero risk. If we're not what we say we "
+      'are,',
+    ),
+    _FsmeLine(
+      'we\u2019ll give you your money back. Give it a shot \u2014 this is '
+      'what we do:',
+    ),
+    _FsmeLine('get people ready for the exam.'),
+  ];
+
+  /// Fallback for study styles that never saw the BFF-digits bit — skips
+  /// straight to the reassurance without the callback that wouldn't
+  /// land for them.
+  static const List<_FsmeLine> _declineFsmeScriptPlain = [
+    _FsmeLine("Hey \u2014 before you go."),
+    _FsmeLine(
+      "Seriously \u2014 there's zero risk. If we're not what we say we "
+      'are,',
+    ),
+    _FsmeLine(
+      'we\u2019ll give you your money back. Give it a shot \u2014 this is '
+      'what we do:',
+    ),
+    _FsmeLine('get people ready for the exam.'),
+  ];
+
+  bool _declineFsmeVisible = false;
+  final List<_FsmeLine> _declineFsmeLines = [];
+  Timer? _declineFsmeInTimer;
+  bool _declineFsmeStarted = false;
+
   DiagnosticResult get _result =>
       OnboardingAnswers.instance.diagnosticResult ?? const DiagnosticResult([]);
 
@@ -104,9 +166,9 @@ class _OnboardPaywallState extends State<OnboardPaywall>
       },
     );
 
-    // FSME testimonial only on the full-plan paywall (not decline entry,
-    // not refresher tier).
-    if (!widget.startOnDecline && !widget.isRefresher) {
+    // Eye animation is needed for the full-plan testimonial AND the
+    // decline-screen FSME box — both live outside the refresher tier.
+    if (!widget.isRefresher) {
       _gazeAnim = AnimationController(
         vsync: this,
         duration: const Duration(milliseconds: 400),
@@ -116,7 +178,17 @@ class _OnboardPaywallState extends State<OnboardPaywall>
         vsync: this,
         duration: const Duration(milliseconds: 180),
       );
+    }
+
+    if (!widget.startOnDecline && !widget.isRefresher) {
       _fsmeInTimer = Timer(const Duration(seconds: 2), _startFsme);
+    }
+
+    if (widget.startOnDecline && !widget.isRefresher) {
+      _declineFsmeInTimer = Timer(
+        const Duration(seconds: 2),
+        _startDeclineFsme,
+      );
     }
   }
 
@@ -173,7 +245,7 @@ class _OnboardPaywallState extends State<OnboardPaywall>
       );
       if (i >= _fsmeLine.length) {
         timer.cancel();
-        _fsmeOutTimer = Timer(const Duration(seconds: 1), () {
+        _fsmeOutTimer = Timer(const Duration(seconds: 4), () {
           if (!mounted) return;
           // Fade out first...
           setState(() => _fsmeVisible = false);
@@ -192,6 +264,7 @@ class _OnboardPaywallState extends State<OnboardPaywall>
     _fsmeInTimer?.cancel();
     _fsmeTypeTimer?.cancel();
     _fsmeOutTimer?.cancel();
+    _declineFsmeInTimer?.cancel();
     _gazeTimer?.cancel();
     _blinkTimer?.cancel();
     _gazeAnim?.dispose();
@@ -277,6 +350,10 @@ class _OnboardPaywallState extends State<OnboardPaywall>
     } else {
       // Full-plan decliners get the trust anchor / decline screen.
       setState(() => _showDecline = true);
+      _declineFsmeInTimer ??= Timer(
+        const Duration(seconds: 2),
+        _startDeclineFsme,
+      );
     }
   }
 
@@ -625,6 +702,10 @@ class _OnboardPaywallState extends State<OnboardPaywall>
 
         const SizedBox(height: 20),
 
+        _declineFsmeBox(),
+
+        const SizedBox(height: 20),
+
         // Re-ask: $4.99 unlock button
         _priceButton(),
 
@@ -706,7 +787,7 @@ class _OnboardPaywallState extends State<OnboardPaywall>
       alignment: Alignment.topCenter,
       child: AnimatedOpacity(
         opacity: _fsmeVisible ? 1.0 : 0.0,
-        duration: const Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 2300),
         // Height collapses to 0 when he's gone, so the unlock button
         // slides back up under the readiness box; expands when he appears.
         child: _fsmeVisible || _fsmeTyped.isNotEmpty
@@ -745,6 +826,30 @@ class _OnboardPaywallState extends State<OnboardPaywall>
             : const SizedBox(width: double.infinity, height: 0),
       ),
     );
+  }
+
+  /// Starts the decline-screen FSME box: appears ~2s after landing on
+  /// decline, then the (study-style-gated) script types in one line at
+  /// a time.
+  Future<void> _startDeclineFsme() async {
+    if (!mounted || _declineFsmeStarted) return;
+    _declineFsmeStarted = true;
+
+    setState(() => _declineFsmeVisible = true);
+    _scheduleGaze();
+    _scheduleBlink();
+
+    final sawBffBit =
+        OnboardingAnswers.instance.studyStyle == StudyStyle.explanations;
+    final script = sawBffBit
+        ? _declineFsmeScriptWithBffCallback
+        : _declineFsmeScriptPlain;
+
+    for (final line in script) {
+      if (!mounted) return;
+      setState(() => _declineFsmeLines.add(line));
+      await Future.delayed(const Duration(milliseconds: 750));
+    }
   }
 
   Widget _davEye() {
@@ -797,6 +902,76 @@ class _OnboardPaywallState extends State<OnboardPaywall>
           ),
         );
       },
+    );
+  }
+
+  /// Decline-screen FSME box — a mock-hurt reaction to being declined
+  /// (the "Undo BFF script" callback, when applicable) that pivots into
+  /// a plain-spoken restate of the money-back guarantee.
+  Widget _declineFsmeBox() {
+    return AnimatedOpacity(
+      opacity: _declineFsmeVisible ? 1.0 : 0.0,
+      duration: const Duration(milliseconds: 2300),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _davEye(),
+              const SizedBox(width: 10),
+              Text(
+                'F S M E',
+                style: TextStyle(
+                  fontSize: 10,
+                  letterSpacing: 3,
+                  color: _eyeRed.withValues(alpha: 0.3),
+                  fontWeight: FontWeight.w300,
+                ),
+              ),
+              const SizedBox(width: 10),
+              _davEye(),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0A0E14),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: _gold.withValues(alpha: 0.25),
+                width: 1,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final line in _declineFsmeLines)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text(
+                      '> ${line.text}',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 11,
+                        height: 1.5,
+                        color: switch (line.audience) {
+                          _FsmeAudience.boss => _bossBlue,
+                          _FsmeAudience.self => _selfGray,
+                          _FsmeAudience.processing => _processingTeal,
+                          _FsmeAudience.user => _gold.withValues(alpha: 0.8),
+                        },
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 

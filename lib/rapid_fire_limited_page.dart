@@ -30,11 +30,37 @@ import 'onboard/onboard_diagnostic_questions.dart';
 /// Separate file from rapid_fire_page.dart intentionally. The full
 /// trainer is a tool; this is a funnel stage that uses the tool's
 /// mechanics. Mixing the two would compromise both.
+///
+/// Per the standing typing rule: user-audience FSME lines type out
+/// character by character; boss/self/processing lines reveal instantly,
+/// one line at a time. Eyes match the funnel-wide 26x26 spec.
 class RapidFireLimitedPage extends StatefulWidget {
   const RapidFireLimitedPage({super.key});
 
   @override
   State<RapidFireLimitedPage> createState() => _RapidFireLimitedPageState();
+}
+
+/// Who an FSME completion-screen line is directed at / how it renders.
+/// - user: FSME's default voice (gold) — types out.
+/// - boss: directed at the boss (blue) — instant.
+/// - self: muttering/thinking to himself (gray) — instant.
+/// - processing: the "assessment script" readout bits — teal, instant.
+enum _FsmeAudience { user, boss, self, processing }
+
+/// Script-definition line (immutable).
+class _FsmeLine {
+  final String text;
+  final _FsmeAudience audience;
+  const _FsmeLine(this.text, {this.audience = _FsmeAudience.user});
+}
+
+/// Mutable render-time counterpart — [text] grows as a user-audience
+/// line types out; other lines just get their full text set once.
+class _TermLine {
+  String text;
+  final _FsmeAudience audience;
+  _TermLine(this.text, this.audience);
 }
 
 class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
@@ -44,6 +70,11 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
   static const Color _softWhite = Color(0xFFF0EDE8);
   static const Color _green = Color(0xFF2E7D32);
   static const Color _red = Color(0xFFC62828);
+  // Matches the boss-line / self-line / processing colors used across
+  // the rest of the funnel.
+  static const Color _bossBlue = Color(0xFF4A9BE2);
+  static const Color _selfGray = Color(0xFF9E9E9E);
+  static const Color _processingTeal = Color(0xFF6FA8A6);
 
   static const int _questionsPerCategory = 5;
   static const int _slideInMs = 320;
@@ -122,8 +153,36 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
 
   // ── FSME (completion screen only) ───────────────────────────────────
   /// Terminal lines revealed so far in the completion FSME box.
-  final List<String> _fsmeLines = [];
+  final List<_TermLine> _fsmeLines = [];
   bool _fsmeStarted = false;
+
+  // ── FSME (category-limit screen, first hit only) ─────────────────────
+  /// True once the popup has ever fired — checked before scheduling, so
+  /// picking "Continue to next category" never re-triggers it on the
+  /// 2nd or 3rd category's limit screen.
+  bool _limitFsmeShown = false;
+  bool _limitFsmeVisible = false;
+  final List<_TermLine> _limitFsmeLines = [];
+  Timer? _limitFsmeInTimer;
+
+  /// FSME's one-time pop-up on the first category-limit re-ask: he
+  /// takes credit for the design, explains the real tool's speed
+  /// pressure, then privately gloats about the Byte-Me trophy.
+  static const List<_FsmeLine> _limitFsmeScript = [
+    _FsmeLine(
+      'See, I told you it was cool \u2014 I designed this for maximum '
+      'retention.',
+    ),
+    _FsmeLine(
+      'The real version makes you answer quickly, or it just moves on '
+      'to the next question \u2014 no time to think, react and choose.',
+    ),
+    _FsmeLine(
+      'Yup, I am genius. This bad boy won first place \u2014 suck on it, '
+      'Goggles.',
+      audience: _FsmeAudience.self,
+    ),
+  ];
 
   int _gazeTarget = 0;
   double _gazeCurrent = 0.0;
@@ -136,20 +195,49 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
   static const Color _eyeRed = Color(0xFFE24B4A);
 
   /// FSME's snarky completion readout, typed one line at a time.
-  static const List<String> _fsmeScript = [
-    'Okay. You got a taste of the SafePrep experience.',
-    'Running assessment script ..........',
-    'Subject is intelligent... subject is capable...',
-    'Subject retained an ALARMING amount of food safety '
-        'knowledge in a very short window ............',
-    'Conclusion: ...divine intervention? Mind-meld program '
-        'actually worked? ...No. Nobody learns THAT fast.',
-    '...Subject is a robot. Subject has to be a robot.',
-    '...wait. Boss? Is that you? Are you messing with me again?',
-    "...Okay. Okay, I'll play along.",
-    'Since you already know everything, all that\u2019s left is to '
-        'find a local proctor and make it official.',
-    'Here \u2014 use this. It\u2019s free. Congratulations.',
+  ///
+  /// - "Running assessment script" through "Conclusion: ..." are the
+  ///   script's own readout — tagged `processing`.
+  /// - "Subject is a robot..." is him puzzling it out to himself —
+  ///   `self`.
+  /// - "wait. Boss? Is that you?" through "I'll play along." are
+  ///   addressed at her — `boss`.
+  /// - The opening line and the closing hand-off are addressed to the
+  ///   user — default `user`, type out.
+  static const List<_FsmeLine> _fsmeScript = [
+    _FsmeLine('Okay. You got a taste of the SafePrep experience.'),
+    _FsmeLine(
+      'Running assessment script ..........',
+      audience: _FsmeAudience.processing,
+    ),
+    _FsmeLine(
+      'Subject is intelligent... subject is capable...',
+      audience: _FsmeAudience.processing,
+    ),
+    _FsmeLine(
+      'Subject retained an ALARMING amount of food safety '
+      'knowledge in a very short window ............',
+      audience: _FsmeAudience.processing,
+    ),
+    _FsmeLine(
+      'Conclusion: ...divine intervention? Mind-meld program '
+      'actually worked? ...No. Nobody learns THAT fast.',
+      audience: _FsmeAudience.processing,
+    ),
+    _FsmeLine(
+      '...Subject is a robot. Subject has to be a robot.',
+      audience: _FsmeAudience.self,
+    ),
+    _FsmeLine(
+      '...wait. Boss? Is that you? Are you messing with me again?',
+      audience: _FsmeAudience.boss,
+    ),
+    _FsmeLine("...Okay. Okay, I'll play along.", audience: _FsmeAudience.boss),
+    _FsmeLine(
+      'Since you already know everything, all that\u2019s left is to '
+      'find a local proctor and make it official.',
+    ),
+    _FsmeLine('Here \u2014 use this. It\u2019s free. Congratulations.'),
   ];
 
   DiagnosticResult get _result =>
@@ -179,16 +267,20 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
     _blinkController?.dispose();
     _gazeTimer?.cancel();
     _blinkTimer?.cancel();
+    _limitFsmeInTimer?.cancel();
     super.dispose();
   }
 
-  // ── FSME (completion) ───────────────────────────────────────────────
+  // ── FSME (shared eye animation) ──────────────────────────────────────
 
-  /// Kicks off the FSME eyes + typed readout. Called once, the first
-  /// time the completion view builds.
-  void _startFsme() {
-    if (_fsmeStarted) return;
-    _fsmeStarted = true;
+  bool _eyesStarted = false;
+
+  /// Lazily creates and starts the gaze/blink controllers exactly once,
+  /// no matter which popup (category-limit or completion) triggers it
+  /// first.
+  void _ensureEyeAnimation() {
+    if (_eyesStarted) return;
+    _eyesStarted = true;
 
     _gazeAnim = AnimationController(
       vsync: this,
@@ -203,14 +295,77 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
 
     _scheduleGaze();
     _scheduleBlink();
+  }
+
+  // ── FSME (completion) ───────────────────────────────────────────────
+
+  /// Kicks off the completion FSME readout. Called once, the first
+  /// time the completion view builds.
+  void _startFsme() {
+    if (_fsmeStarted) return;
+    _fsmeStarted = true;
+    _ensureEyeAnimation();
     _revealFsme();
   }
 
+  /// Reveals the completion script one line at a time. User-audience
+  /// lines type out character by character; boss/self/processing lines
+  /// appear instantly. Pause between every line either way.
   Future<void> _revealFsme() async {
     await Future.delayed(const Duration(milliseconds: 400));
     for (final line in _fsmeScript) {
       if (!mounted) return;
-      setState(() => _fsmeLines.add(line));
+
+      if (line.audience == _FsmeAudience.user) {
+        final entry = _TermLine('', line.audience);
+        setState(() => _fsmeLines.add(entry));
+        for (var i = 1; i <= line.text.length; i++) {
+          if (!mounted) return;
+          setState(() => entry.text = line.text.substring(0, i));
+          await Future.delayed(const Duration(milliseconds: 18));
+        }
+      } else {
+        setState(() => _fsmeLines.add(_TermLine(line.text, line.audience)));
+      }
+
+      await Future.delayed(const Duration(milliseconds: 900));
+    }
+  }
+
+  /// Schedules the category-limit popup, but only the very first time
+  /// it's called — subsequent calls (from later categories' limit
+  /// screens) are no-ops.
+  void _maybeStartLimitFsme() {
+    if (_limitFsmeShown) return;
+    _limitFsmeShown = true;
+    _limitFsmeInTimer = Timer(const Duration(seconds: 2), () {
+      if (!mounted) return;
+      _ensureEyeAnimation();
+      setState(() => _limitFsmeVisible = true);
+      _revealLimitFsme();
+    });
+  }
+
+  /// Reveals the category-limit script one line at a time — same
+  /// typing rule as the completion readout.
+  Future<void> _revealLimitFsme() async {
+    for (final line in _limitFsmeScript) {
+      if (!mounted) return;
+
+      if (line.audience == _FsmeAudience.user) {
+        final entry = _TermLine('', line.audience);
+        setState(() => _limitFsmeLines.add(entry));
+        for (var i = 1; i <= line.text.length; i++) {
+          if (!mounted) return;
+          setState(() => entry.text = line.text.substring(0, i));
+          await Future.delayed(const Duration(milliseconds: 18));
+        }
+      } else {
+        setState(
+          () => _limitFsmeLines.add(_TermLine(line.text, line.audience)),
+        );
+      }
+
       await Future.delayed(const Duration(milliseconds: 900));
     }
   }
@@ -750,6 +905,11 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
     final remaining = bankTotal - _questionsPerCategory;
     final hasMoreCategories = _currentCatIndex < _categories.length - 1;
 
+    // Deferred so we never call setState during build; the flag inside
+    // guarantees this only ever fires once, on the very first category-
+    // limit screen the user sees.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeStartLimitFsme());
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(22, 40, 22, 22),
       child: Column(
@@ -783,6 +943,11 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
               height: 1.5,
             ),
           ),
+
+          if (_currentCatIndex == 0 && _limitFsmeVisible) ...[
+            const SizedBox(height: 18),
+            _limitFsmePopup(),
+          ],
 
           const SizedBox(height: 24),
 
@@ -833,7 +998,8 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
     );
   }
 
-  /// One glowing red eye that darts and blinks.
+  /// One glowing red eye that darts and blinks — resized to match the
+  /// funnel-wide 26x26 spec (was 40x40).
   Widget _davEye() {
     return AnimatedBuilder(
       animation: Listenable.merge([
@@ -846,8 +1012,8 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
           alignment: Alignment.center,
           transform: Matrix4.identity()..scale(1.0, blink),
           child: Container(
-            width: 40,
-            height: 40,
+            width: 26,
+            height: 26,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: const RadialGradient(
@@ -862,25 +1028,20 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
               boxShadow: [
                 BoxShadow(
                   color: _eyeRed.withValues(alpha: 0.6),
-                  blurRadius: 12,
+                  blurRadius: 10,
                   spreadRadius: 2,
-                ),
-                BoxShadow(
-                  color: _eyeRed.withValues(alpha: 0.25),
-                  blurRadius: 24,
-                  spreadRadius: 5,
                 ),
               ],
             ),
             child: Center(
               child: Transform.translate(
-                offset: Offset(_gazeCurrent * 7, 1),
+                offset: Offset(_gazeCurrent * 5, 0.5),
                 child: Container(
-                  width: 13,
-                  height: 16,
+                  width: 8,
+                  height: 10,
                   decoration: BoxDecoration(
                     color: const Color(0xFF0A0000),
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(4),
                   ),
                 ),
               ),
@@ -891,8 +1052,71 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
     );
   }
 
+  /// One-time category-limit popup — eyes + typed/instant readout,
+  /// same visual chrome as the completion box but only ever shown once,
+  /// on the first category the user hits the limit on.
+  Widget _limitFsmePopup() {
+    return AnimatedOpacity(
+      opacity: _limitFsmeVisible ? 1.0 : 0.0,
+      duration: const Duration(milliseconds: 2300),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0A0E14),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: _gold.withValues(alpha: 0.25), width: 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _davEye(),
+                const SizedBox(width: 10),
+                Text(
+                  'F S M E',
+                  style: TextStyle(
+                    fontSize: 10,
+                    letterSpacing: 3,
+                    color: _eyeRed.withValues(alpha: 0.3),
+                    fontWeight: FontWeight.w300,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                _davEye(),
+              ],
+            ),
+            const SizedBox(height: 10),
+            for (final line in _limitFsmeLines)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  '> ${line.text}',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 11,
+                    height: 1.5,
+                    color: switch (line.audience) {
+                      _FsmeAudience.boss => _bossBlue,
+                      _FsmeAudience.self => _selfGray,
+                      _FsmeAudience.processing => _processingTeal,
+                      _FsmeAudience.user => _gold.withValues(alpha: 0.85),
+                    },
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// FSME completion box — animated eyes + snarky typed readout, then the
-  /// free proctor-finder offer as a tappable exit.
+  /// free proctor-finder offer as a tappable exit. Color follows each
+  /// line's audience.
   Widget _fsmeBox() {
     final bool done = _fsmeLines.length >= _fsmeScript.length;
 
@@ -935,12 +1159,17 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
                 Padding(
                   padding: const EdgeInsets.only(bottom: 7),
                   child: Text(
-                    '> $line',
+                    '> ${line.text}',
                     style: TextStyle(
                       fontFamily: 'monospace',
                       fontSize: 11.5,
                       height: 1.5,
-                      color: _gold.withValues(alpha: 0.85),
+                      color: switch (line.audience) {
+                        _FsmeAudience.boss => _bossBlue,
+                        _FsmeAudience.self => _selfGray,
+                        _FsmeAudience.processing => _processingTeal,
+                        _FsmeAudience.user => _gold.withValues(alpha: 0.85),
+                      },
                     ),
                   ),
                 ),

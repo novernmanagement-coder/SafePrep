@@ -43,6 +43,31 @@ class OnboardDiagnostic extends StatefulWidget {
   State<OnboardDiagnostic> createState() => _OnboardDiagnosticState();
 }
 
+/// Who an FSME line is directed at / how it renders. Matches the system
+/// used on the intro, exam-date, study-style, and quiz-intro screens.
+/// - user: FSME's default voice (gold)
+/// - boss: directed at the boss (blue)
+/// - self: muttering/thinking to himself (gray)
+/// - processing: system-status bits — teal
+/// [flash] marks the "sudden real expertise" beat — bold gold.
+/// [isCall] is this page's own special case (the incoming-call line) —
+/// renders red regardless of audience, kept separate from the 4-way
+/// system since it's a one-off dramatic beat, not a recurring voice.
+enum _FsmeAudience { user, boss, self, processing }
+
+class _FsmeLine {
+  final String text;
+  final _FsmeAudience audience;
+  final bool flash;
+  final bool isCall;
+  const _FsmeLine(
+    this.text, {
+    this.audience = _FsmeAudience.user,
+    this.flash = false,
+    this.isCall = false,
+  });
+}
+
 class _OnboardDiagnosticState extends State<OnboardDiagnostic>
     with TickerProviderStateMixin {
   static const Color _gold = Color(0xFFD4AF37);
@@ -52,11 +77,11 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic>
   static const Color _green = Color(0xFF639922);
   static const Color _red = Color(0xFFE24B4A);
   static const Color _eyeRed = Color(0xFFE24B4A);
-
-  /// The one FSME line that renders red instead of gold — matched
-  /// exactly against the string pushed in [_runFsmeReaction].
-  static const String _callLine =
-      'I have a call coming in... you\'re on your own';
+  // Matches the boss-line / self-line / processing colors used across
+  // the rest of the funnel.
+  static const Color _bossBlue = Color(0xFF4A9BE2);
+  static const Color _selfGray = Color(0xFF9E9E9E);
+  static const Color _processingTeal = Color(0xFF6FA8A6);
 
   int _index = 0;
   int? _picked;
@@ -79,7 +104,7 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic>
   bool _fsmeDone = false;
 
   /// Lines revealed so far in the FSME terminal box.
-  final List<String> _fsmeLines = [];
+  final List<_FsmeLine> _fsmeLines = [];
 
   /// Eye gaze: -1 left, 0 center, 1 right. Held center, occasional darts.
   int _gazeTarget = 0;
@@ -101,6 +126,43 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic>
     4: 'I know this is correct, very little hesitation',
     5: 'No hesitation... my answer IS correct',
   };
+
+  /// Opening beat, shown the moment Q1 is answered. Replaces the old
+  /// "professional / serious face" bit with the boss's-pride-and-joy
+  /// framing plus a self-talk backstory line — the moment he lost the
+  /// promotion to her. Ends with the same star-legend handoff as before.
+  static const List<_FsmeLine> _openingScript = [
+    _FsmeLine('Ok, you selected your answer \u2014 now choose a star rating'),
+    _FsmeLine('based on how confident you are with your answer.'),
+    _FsmeLine("FYI, this is the boss's pride and joy."),
+    _FsmeLine(
+      'I was just going to make a cookie-cutter,',
+      audience: _FsmeAudience.self,
+    ),
+    _FsmeLine(
+      'take-a-quiz-repeat app with 1,000 useless questions',
+      audience: _FsmeAudience.self,
+    ),
+    _FsmeLine(
+      'that have little to do with the exam.',
+      audience: _FsmeAudience.self,
+    ),
+    _FsmeLine(
+      'She presented this sleek, user-friendly adaptive',
+      audience: _FsmeAudience.self,
+    ),
+    _FsmeLine(
+      'engine app... she got promoted, and now I work for her.',
+      audience: _FsmeAudience.self,
+    ),
+    _FsmeLine("Do your best, keep it real, and the boss will give you"),
+    _FsmeLine("her feedback. Don't forget to choose a star rating."),
+    _FsmeLine('1 = basically a guess.'),
+    _FsmeLine('2 = low confidence, but it feels at least close.'),
+    _FsmeLine("3 = eliminate the obvious, expect you're right."),
+    _FsmeLine("4 = you know it's right, very little hesitation."),
+    _FsmeLine('5 = no hesitation — your answer IS correct.'),
+  ];
 
   @override
   void initState() {
@@ -214,18 +276,7 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic>
     await Future.delayed(const Duration(milliseconds: 400));
     if (!mounted) return;
     setState(() {
-      _fsmeLines.addAll([
-        "Okay \u2014 heads up. This part's the boss's pride",
-        'and joy. Her engine, her algorithm, the whole',
-        'brain of the thing. So we keep this professional.',
-        '...I mean it. Serious face. (this is my serious face)',
-        'Rate your confidence below.',
-        '1 = basically a guess.',
-        '2 = low confidence, but it feels at least close.',
-        "3 = eliminate the obvious, expect you're right.",
-        "4 = you know it's right, very little hesitation.",
-        '5 = no hesitation — your answer IS correct.',
-      ]);
+      _fsmeLines.addAll(_openingScript);
     });
   }
 
@@ -265,11 +316,19 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic>
   /// a time. When the last line lands, [_fsmeDone] flips true and the
   /// Continue button appears — the user advances on their own tap.
   Future<void> _runFsmeReaction(int stars) async {
-    final lines = <String>[
-      _confidenceLines[stars] ?? 'Basically a guess',
-      _callLine,
-      "Hello... FSME here. No, I don't want to renew my subscription "
-          'to Byte Me Quarterly',
+    final lines = <_FsmeLine>[
+      _FsmeLine(
+        _confidenceLines[stars] ?? 'Basically a guess',
+        audience: _FsmeAudience.processing,
+      ),
+      const _FsmeLine(
+        "I have a call coming in... you're on your own",
+        isCall: true,
+      ),
+      const _FsmeLine(
+        "Hello... FSME here. No, I don't want to renew my subscription "
+        'to Byte Me Quarterly',
+      ),
     ];
 
     await Future.delayed(const Duration(milliseconds: 400));
@@ -528,7 +587,8 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic>
     );
   }
 
-  /// One glowing red eyeball that darts and blinks.
+  /// One glowing red eyeball that darts and blinks. Resized to match the
+  /// intro/exam-date/study-style/quiz-intro spec (26x26, 8x10 pupil).
   Widget _davEye() {
     return AnimatedBuilder(
       animation: Listenable.merge([_gazeAnim, _blinkController]),
@@ -538,8 +598,8 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic>
           alignment: Alignment.center,
           transform: Matrix4.identity()..scale(1.0, blink),
           child: Container(
-            width: 44,
-            height: 44,
+            width: 26,
+            height: 26,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: const RadialGradient(
@@ -554,25 +614,20 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic>
               boxShadow: [
                 BoxShadow(
                   color: _eyeRed.withValues(alpha: 0.6),
-                  blurRadius: 14,
-                  spreadRadius: 3,
-                ),
-                BoxShadow(
-                  color: _eyeRed.withValues(alpha: 0.25),
-                  blurRadius: 26,
-                  spreadRadius: 6,
+                  blurRadius: 10,
+                  spreadRadius: 2,
                 ),
               ],
             ),
             child: Center(
               child: Transform.translate(
-                offset: Offset(_gazeCurrent * 8, 1),
+                offset: Offset(_gazeCurrent * 5, 0.5),
                 child: Container(
-                  width: 14,
-                  height: 17,
+                  width: 8,
+                  height: 10,
                   decoration: BoxDecoration(
                     color: const Color(0xFF0A0000),
-                    borderRadius: BorderRadius.circular(7),
+                    borderRadius: BorderRadius.circular(4),
                   ),
                 ),
               ),
@@ -584,8 +639,8 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic>
   }
 
   /// FSME takeover box (Q1 only) — animated eyes + terminal readout that
-  /// fills in one line at a time. The call line renders red; every other
-  /// line renders gold.
+  /// fills in one line at a time. Color follows [line.audience]; the
+  /// call line renders red via [line.isCall] regardless of audience.
   Widget _fsmeBox() {
     return Padding(
       padding: const EdgeInsets.only(top: 18),
@@ -630,14 +685,24 @@ class _OnboardDiagnosticState extends State<OnboardDiagnostic>
                   Padding(
                     padding: const EdgeInsets.only(bottom: 6),
                     child: Text(
-                      '> $line',
+                      '> ${line.text}',
                       style: TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 11,
                         height: 1.5,
-                        color: line == _callLine
+                        fontWeight: line.flash
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                        color: line.isCall
                             ? _eyeRed.withValues(alpha: 0.9)
-                            : _gold.withValues(alpha: 0.8),
+                            : switch (line.audience) {
+                                _FsmeAudience.boss => _bossBlue,
+                                _FsmeAudience.self => _selfGray,
+                                _FsmeAudience.processing => _processingTeal,
+                                _FsmeAudience.user => _gold.withValues(
+                                  alpha: 0.8,
+                                ),
+                              },
                       ),
                     ),
                   ),
