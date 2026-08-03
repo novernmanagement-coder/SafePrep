@@ -9,18 +9,24 @@ import 'dashboard_page.dart';
 import 'onboard/onboard_intro.dart';
 import 'onboard/onboard_paywall.dart';
 import 'onboard/onboard_answers.dart';
-import 'onboard/onboard_readiness.dart';
 
-// BUILD 27 — Simplified routing.
+// BUILD 28 — Simplified routing, updated for the self-report redesign.
 //
 // Three paths:
 //   purchased            → DashboardPage
-//   wrong / no code       → OnboardPaywall (decline mode)
+//   wrong / no code       → OnboardPaywall
 //   correct access code   → OnboardIntro (the funnel)
 //
 // The old preview/trial/cinematic flow is dead. The onboarding funnel
 // IS the trial — no free-roam dashboard, no 30-minute timer, no
 // PreviewCinematicSplash.
+//
+// The free-attempts counter (onboarding_runs_completed) used to be
+// incremented inside OnboardReadiness, on the diagnostic verdict
+// screen. That screen is gone in the self-report redesign, so the
+// increment now happens when the user REACHES THE PAYWALL instead —
+// that's the new equivalent of "completed a full run through the
+// funnel." See OnboardPaywall.initState.
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
 
@@ -32,7 +38,7 @@ class _SplashPageState extends State<SplashPage> {
   static const String _seenSplashPrefKey = 'has_seen_splash_before';
 
   // Access code. Correct entry → funnel (OnboardIntro). Anything else,
-  // blank, or dismissed → decline paywall. For a $4.99 app this is a
+  // blank, or dismissed → paywall. For a $4.99 app this is a
   // deliberate, low-stakes gate; the string ships in the bundle.
   static const String _accessCode = 'Novern2026!';
 
@@ -124,15 +130,15 @@ class _SplashPageState extends State<SplashPage> {
     if (!mounted) return;
 
     final prefs = await SharedPreferences.getInstance();
-    final runs = prefs.getInt(OnboardReadiness.onboardingRunsKey) ?? 0;
+    final runs = prefs.getInt(kOnboardingRunsKey) ?? 0;
 
     if (!mounted) return;
 
     // ── Free attempts ─────────────────────────────────────────────────
     // First two runs skip the access-code prompt entirely and drop
     // straight into the funnel. From the 3rd run on, the code is
-    // required — wrong/blank/dismissed falls to the decline paywall.
-    if (runs < OnboardReadiness.maxFreeRuns) {
+    // required — wrong/blank/dismissed falls to the paywall.
+    if (runs < kMaxFreeRuns) {
       OnboardingAnswers.instance.reset();
       MixpanelService.instance.track(
         'SpOn_Splash_Route',
@@ -146,12 +152,12 @@ class _SplashPageState extends State<SplashPage> {
     }
 
     // ── Access-code fork ─────────────────────────────────────────────
-    // Correct code → funnel. Anything else → decline paywall.
+    // Correct code → funnel. Anything else → paywall.
     final entered = await _promptAccessCode();
     if (!mounted) return;
 
     if (entered == _accessCode) {
-      // Clear stale diagnostic data so each run starts clean.
+      // Clear stale funnel data so each run starts clean.
       OnboardingAnswers.instance.reset();
       MixpanelService.instance.track(
         'SpOn_Splash_Route',
@@ -172,9 +178,7 @@ class _SplashPageState extends State<SplashPage> {
       );
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(
-          builder: (_) => const OnboardPaywall(startOnDecline: true),
-        ),
+        MaterialPageRoute(builder: (_) => const OnboardPaywall()),
       );
     }
   }
@@ -253,7 +257,7 @@ class _SplashPageState extends State<SplashPage> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Pass the ServSafe\u00AE exam or your money back.\nWe\'ll have you ready in less than 4 hours.',
+                'Pass the ServSafe\u00AE exam or your money back.\nWe will prepare you for the ServSafe exam.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: AppColors.strongText,
@@ -266,9 +270,8 @@ class _SplashPageState extends State<SplashPage> {
               const SizedBox(height: 20),
 
               Text(
-                _isFirstLaunch
-                    ? 'A short diagnostic will show you exactly where you stand \u2014 and how little time it takes to close the gap.'
-                    : 'Welcome back \u2014 your study plan is right where you left it.',
+                'Tell us where you stand \u2014 we\u2019ll build your plan '
+                'around it.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: AppColors.subtleText,

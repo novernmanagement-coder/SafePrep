@@ -7,16 +7,15 @@ import '../app_state_persistence.dart';
 import '../category_study_page.dart';
 import '../assessment_info_page.dart';
 import 'onboard_answers.dart';
-import 'onboard_diagnostic_questions.dart';
 
 /// Post-purchase screen — the terminal build sequence.
 ///
 /// Plays a short typing animation that makes the plan feel computed
-/// rather than canned, then presents the starting point: their weakest
-/// category. Every line in the sequence is literally true of what the
-/// app is doing — unlocking access, reading their diagnostic responses,
-/// sequencing categories by weakness, estimating pace from the exam
-/// window they picked. Nothing invented.
+/// rather than canned, then presents the starting point. No diagnostic
+/// exists anymore to personalize the category — it's a fixed top
+/// weighted category for everyone (matches the Trust page's
+/// breakdown). Pace estimate is keyed to the self-reported knowledge
+/// level instead. Nothing invented, just no longer diagnostic-driven.
 class OnboardPostPurchase extends StatefulWidget {
   const OnboardPostPurchase({super.key});
 
@@ -30,24 +29,35 @@ class _OnboardPostPurchaseState extends State<OnboardPostPurchase> {
   static const Color _softWhite = Color(0xFFF0EDE8);
   static const Color _cardBg = Color(0xFF13130F);
 
-  static const int _minutesPerWeakCategory = 40;
   static const int _maxEstimateMinutes = 240;
 
   final List<_BuildLine> _printed = [];
   bool _revealed = false;
   Timer? _typer;
 
-  DiagnosticResult get _result =>
-      OnboardingAnswers.instance.diagnosticResult ?? const DiagnosticResult([]);
+  /// Top category by real exam weight (matches the Trust page's
+  /// weighted breakdown and the rapid-fire preview's fixed set) — fixed
+  /// for everyone now that there's no diagnostic to personalize
+  /// against.
+  static const String _topCategory = 'Time & Temperature';
 
-  String get _weakestCategory {
-    final cats = _result.weakestCategories;
-    return cats.isNotEmpty ? cats.first : 'Food Safety Foundations';
-  }
-
+  /// Estimate keyed to the self-reported knowledge level rather than
+  /// diagnostic data — a rougher signal, but a real one the user
+  /// actually gave us, and it still ties the "X min" language to
+  /// something they told us about themselves.
   int get _estimateMinutes {
-    final raw = _result.weakestCategories.length * _minutesPerWeakCategory;
-    return raw > _maxEstimateMinutes ? _maxEstimateMinutes : raw;
+    switch (OnboardingAnswers.instance.knowledgeLevel) {
+      case KnowledgeLevel.confident:
+        return 90;
+      case KnowledgeLevel.prepared:
+        return 120;
+      case KnowledgeLevel.almostReady:
+        return 150;
+      case KnowledgeLevel.newToServSafe:
+        return _maxEstimateMinutes;
+      case null:
+        return 150;
+    }
   }
 
   String get _estimateLabel {
@@ -80,7 +90,7 @@ class _OnboardPostPurchaseState extends State<OnboardPostPurchase> {
 
     MixpanelService.instance.track(
       'onboarding_post_purchase_viewed',
-      properties: {'app_name': 'SP', 'weakest_category': _weakestCategory},
+      properties: {'app_name': 'SP', 'top_category': _topCategory},
     );
 
     _startTyping();
@@ -97,12 +107,9 @@ class _OnboardPostPurchaseState extends State<OnboardPostPurchase> {
       _BuildLine('> Unlocking full access'),
       _BuildLine('  confirmed', dim: true),
       _BuildLine('> Loading your responses'),
-      _BuildLine('  ${kDiagnosticQuestions.length} answers mapped', dim: true),
+      _BuildLine('  readiness level recorded', dim: true),
       _BuildLine('> Building your sequence'),
-      _BuildLine(
-        '  starting with ${_weakestCategory.toLowerCase()}',
-        dim: true,
-      ),
+      _BuildLine('  starting with ${_topCategory.toLowerCase()}', dim: true),
       _BuildLine('> Setting your pace'),
       _BuildLine('  $_estimateLabel estimated', dim: true),
       _BuildLine('> Plan ready'),
@@ -158,13 +165,13 @@ class _OnboardPostPurchaseState extends State<OnboardPostPurchase> {
 
     MixpanelService.instance.track(
       'onboarding_post_purchase_start',
-      properties: {'app_name': 'SP', 'category': _weakestCategory},
+      properties: {'app_name': 'SP', 'category': _topCategory},
     );
 
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(
-        builder: (_) => CategoryStudyPage(category: _weakestCategory),
+        builder: (_) => CategoryStudyPage(category: _topCategory),
       ),
       (_) => false,
     );
@@ -294,7 +301,7 @@ class _OnboardPostPurchaseState extends State<OnboardPostPurchase> {
                           ),
                         ),
                         child: Text(
-                          'Start: ${_weakestCategory}  \u2192',
+                          'Start: $_topCategory  \u2192',
                           style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,

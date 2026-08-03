@@ -6,9 +6,33 @@
 /// study plan are built from in-app activity after purchase.
 library;
 
-import 'onboard_diagnostic_questions.dart';
+/// How ready the user says they feel walking in. Self-reported,
+/// captured on the knowledge-level screen. Flat, equal-weight options —
+/// no tier/scope language — since there's only one product to buy, so
+/// there's nothing to price-game toward. Drives paywall subline copy
+/// and FSME's one-line reaction only; does NOT change the underlying
+/// curriculum, pacing, or which category starts first.
+enum KnowledgeLevel {
+  confident,
+  prepared,
+  almostReady,
+  newToServSafe;
 
-/// How far out the user's exam is. Captured on screen 2, used to pace the
+  String get tag {
+    switch (this) {
+      case KnowledgeLevel.confident:
+        return 'confident';
+      case KnowledgeLevel.prepared:
+        return 'prepared';
+      case KnowledgeLevel.almostReady:
+        return 'almost_ready';
+      case KnowledgeLevel.newToServSafe:
+        return 'new_to_servsafe';
+    }
+  }
+}
+
+/// How far out the user's exam is. Captured on screen 4, used to pace the
 /// plan and modulate the results copy.
 ///
 /// [notScheduled] is also a proctoring lead — those users should be
@@ -49,9 +73,7 @@ enum ExamWindow {
   }
 }
 
-/// How the user wants questions presented. Chosen on screen 3, and the
-/// diagnostic on screen 5 MUST honour it — that's what makes the
-/// personalization real rather than decorative.
+/// How the user wants questions presented. Chosen on screen 5.
 ///
 /// Three genuinely distinct render modes:
 ///   [explanations] — correct answer green, wrong pick red, plus a
@@ -84,22 +106,32 @@ enum StudyStyle {
   bool get showsExplanations => this == StudyStyle.explanations;
 }
 
+/// SharedPreferences key holding how many times the user has completed
+/// onboarding (reached the paywall). Formerly incremented inside
+/// OnboardReadiness on the diagnostic verdict screen; that screen is
+/// gone in the self-report redesign, so OnboardPaywall increments this
+/// now instead — reaching the paywall is the new equivalent of "ran the
+/// funnel." Read by SplashPage to gate the free-attempts count. Same
+/// string value preserved so existing installs' saved counts aren't
+/// orphaned.
+const String kOnboardingRunsKey = 'onboarding_runs_completed';
+
+/// Free onboarding run-throughs before the splash requires the access
+/// code.
+const int kMaxFreeRuns = 2;
+
 /// Funnel-scoped answer store. Lives for the duration of onboarding only.
 class OnboardingAnswers {
   OnboardingAnswers._();
   static final OnboardingAnswers instance = OnboardingAnswers._();
 
+  KnowledgeLevel? knowledgeLevel;
   ExamWindow? examWindow;
   StudyStyle? studyStyle;
 
-  /// Scored outcome of the 10-question diagnostic. Drives the category
-  /// score screen, the readiness number, and which three categories are
-  /// offered free on the decline path.
-  DiagnosticResult? diagnosticResult;
-
   void reset() {
+    knowledgeLevel = null;
     examWindow = null;
     studyStyle = null;
-    diagnosticResult = null;
   }
 }

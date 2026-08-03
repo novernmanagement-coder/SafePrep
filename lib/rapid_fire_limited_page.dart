@@ -7,8 +7,6 @@ import 'csv_loader.dart';
 import 'mixpanel_service.dart';
 import 'iap_service.dart';
 import 'category_study_page.dart';
-import 'onboard/onboard_answers.dart';
-import 'onboard/onboard_diagnostic_questions.dart';
 
 /// Limited Rapid Fire — the $4.99 decline path's free taste.
 ///
@@ -240,8 +238,14 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
     _FsmeLine('Here \u2014 use this. It\u2019s free. Congratulations.'),
   ];
 
-  DiagnosticResult get _result =>
-      OnboardingAnswers.instance.diagnosticResult ?? const DiagnosticResult([]);
+  /// Top 3 categories by real exam weight (matches the Trust page's
+  /// weighted breakdown) — fixed for everyone now that there's no
+  /// diagnostic to personalize against.
+  static const List<String> _topCategories = [
+    'Time & Temperature',
+    'Receiving & Storage',
+    'Cross-Contamination',
+  ];
 
   Color get _currentColor {
     final cat = _currentCatIndex < _categories.length
@@ -325,7 +329,9 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
           await Future.delayed(const Duration(milliseconds: 18));
         }
       } else {
-        setState(() => _fsmeLines.add(_TermLine(line.text, line.audience)));
+        setState(
+          () => _fsmeLines.add(_TermLine(line.text, line.audience)),
+        );
       }
 
       await Future.delayed(const Duration(milliseconds: 900));
@@ -416,30 +422,11 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
   }
 
   Future<void> _loadDecks() async {
-    // Get the 3 weakest categories from the diagnostic.
-    final weakest = _result.weakestCategories.take(3).toList();
-    if (weakest.isEmpty) {
-      // Fallback if somehow no weak categories (shouldn't happen on
-      // the decline path, but defensive).
-      weakest.addAll([
-        'Time & Temperature',
-        'Cross-Contamination',
-        'Personal Hygiene',
-      ]);
-    }
-    while (weakest.length < 3) {
-      for (final cat in [
-        'Time & Temperature',
-        'Cross-Contamination',
-        'Cleaning & Sanitizing',
-        'Personal Hygiene',
-      ]) {
-        if (!weakest.contains(cat)) {
-          weakest.add(cat);
-          if (weakest.length >= 3) break;
-        }
-      }
-    }
+    // No diagnostic exists anymore to personalize this — top 3 by real
+    // exam weight (matches the Trust page's breakdown), fixed for
+    // everyone. This screen is a one-time taste, not somewhere users
+    // return to repeatedly, so a fixed set is fine.
+    final weakest = List<String>.from(_topCategories);
 
     final all = await QuestionLoader.loadAll(shuffle: false);
     final decks = <String, List<QuestionModel>>{};
@@ -635,12 +622,11 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
     setState(() => _purchasing = false);
 
     if (result == IAPResult.success) {
-      final weakest = _result.weakestCategories.isNotEmpty
-          ? _result.weakestCategories.first
-          : 'Time & Temperature';
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (_) => CategoryStudyPage(category: weakest)),
+        MaterialPageRoute(
+          builder: (_) => CategoryStudyPage(category: _topCategories.first),
+        ),
         (_) => false,
       );
     } else {

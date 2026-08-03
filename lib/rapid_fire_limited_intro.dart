@@ -3,8 +3,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../constants.dart';
 import '../mixpanel_service.dart';
-import 'onboard/onboard_answers.dart';
-import 'onboard/onboard_diagnostic_questions.dart';
 import 'rapid_fire_limited_page.dart';
 
 /// Intro screen for the limited Rapid Fire — positioned between the
@@ -64,19 +62,15 @@ class _RapidFireLimitedIntroState extends State<RapidFireLimitedIntro>
   static const Color _bossBlue = Color(0xFF4A9BE2);
   static const Color _selfGray = Color(0xFF9E9E9E);
 
-  DiagnosticResult get _result =>
-      OnboardingAnswers.instance.diagnosticResult ?? const DiagnosticResult([]);
-
-  List<String> get _weakCategories {
-    final cats = _result.weakestCategories;
-    if (cats.length >= 3) return cats.take(3).toList();
-    return [
-      ...cats,
-      if (!cats.contains('Time & Temperature')) 'Time & Temperature',
-      if (!cats.contains('Cross-Contamination')) 'Cross-Contamination',
-      if (!cats.contains('Personal Hygiene')) 'Personal Hygiene',
-    ].take(3).toList();
-  }
+  /// Top 3 categories by real exam weight (matches the Trust page's
+  /// weighted breakdown). No diagnostic exists anymore to personalize
+  /// this, and this screen is a one-time taste, not somewhere users
+  /// return to repeatedly — a fixed, meaningfully-chosen set is fine.
+  static const List<String> _weakCategories = [
+    'Time & Temperature',
+    'Receiving & Storage',
+    'Cross-Contamination',
+  ];
 
   // ── FSME popup ───────────────────────────────────────────────────
   static const List<_FsmeLine> _fsmeScript = [
@@ -88,13 +82,6 @@ class _RapidFireLimitedIntroState extends State<RapidFireLimitedIntro>
       'I didn\u2019t have time to give you all the bells and whistles '
       'in this limited version \u2014 you should see the full one\u2026',
     ),
-    _FsmeLine(
-      'The Boss said: "I scanned this student, ran them through all '
-      'the algorithms, and the result was \u2014 Student: hesitant, '
-      'needs one last preview before committing."',
-      audience: _FsmeAudience.boss,
-    ),
-    _FsmeLine('\u2026there she is. Gotta go.', audience: _FsmeAudience.self),
   ];
 
   bool _fsmeVisible = false;
@@ -173,7 +160,8 @@ class _RapidFireLimitedIntroState extends State<RapidFireLimitedIntro>
 
   /// Reveals the popup script one line at a time. User-audience lines
   /// type out character by character; boss/self lines appear
-  /// instantly. Pause between every line either way.
+  /// instantly. Pause between every line either way. Once the script
+  /// finishes, holds for 5 seconds then fades out.
   Future<void> _revealFsme() async {
     for (final line in _fsmeScript) {
       if (!mounted) return;
@@ -192,6 +180,11 @@ class _RapidFireLimitedIntroState extends State<RapidFireLimitedIntro>
 
       await Future.delayed(const Duration(milliseconds: 900));
     }
+
+    if (!mounted) return;
+    await Future.delayed(const Duration(seconds: 5));
+    if (!mounted) return;
+    setState(() => _fsmeVisible = false);
   }
 
   @override
@@ -472,7 +465,7 @@ class _RapidFireLimitedIntroState extends State<RapidFireLimitedIntro>
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const RapidFireLimitedPage(),
+                        builder: (_) => RapidFireLimitedPage(),
                       ),
                     );
                   },

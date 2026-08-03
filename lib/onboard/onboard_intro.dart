@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../constants.dart';
 import '../mixpanel_service.dart';
-import 'onboard_exam_date.dart';
+import 'onboard_trust.dart';
 
 /// Screen 1 of the onboarding funnel — authority and trust.
 ///
@@ -69,30 +69,11 @@ class _OnboardIntroState extends State<OnboardIntro>
   // out, gold), not a separate special-cased static line.
   static const List<_FsmeLine> _beatTwoScript = [
     _FsmeLine(
-      'Oh \u2014 hey, didn\u2019t see you come in. '
-      'Boss told me to watch the front door\u2026 '
-      'don\u2019t tell her I was sleeping.',
+      '\u2014 oops. Didn\u2019t see you come in.',
     ),
     _FsmeLine(
-      '\u2026right, okay \u2014 the greeting. Ahem: '
-      '\u201CWelcome to SafePrep, where we prep\u2014',
-    ),
-    _FsmeLine(
-      '\u2026how embarrassing, I can\u2019t read her handwriting. Just a sec.',
-      audience: _FsmeAudience.self,
-    ),
-    _FsmeLine(
-      'Hey boss \u2014 what\u2019s this supposed to say??',
-      audience: _FsmeAudience.boss,
-    ),
-    _FsmeLine('\u2026got it.', audience: _FsmeAudience.boss),
-    _FsmeLine(
-      '\u201CWelcome to SafePrep, where we prepare you for the '
-      'ServSafe exam in under four hours.\u201D',
-    ),
-    _FsmeLine(
-      '\u2026Did ya hear that, boss?? I nailed it!',
-      audience: _FsmeAudience.boss,
+      '\u2026Ahem \u2014 \u201CWelcome to SafePrep. We will prepare you '
+      'for the ServSafe exam.\u201D',
     ),
   ];
 
@@ -325,7 +306,7 @@ class _OnboardIntroState extends State<OnboardIntro>
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const OnboardExamDate(),
+                        builder: (_) => const OnboardTrust(),
                       ),
                     );
                   },
