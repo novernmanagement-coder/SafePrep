@@ -326,6 +326,22 @@ class AppState {
     curriculumProgress[category] = (curriculumProgress[category] ?? 0) + 1;
   }
 
+  /// One-time reconciliation: a category can be pushed straight to
+  /// "mastered" (score >= masteryThreshold) by the full assessment,
+  /// which only calls saveCategoryQuizScore() — not markCategoryStudied().
+  /// That leaves masteredCategories and studiedCategories out of sync:
+  /// a category shows a MASTERED trophy but never a CURRICULUM trophy,
+  /// getOverallCurriculumPercent() undercounts it relative to intent,
+  /// and ReadinessEngine.coachMessage() permanently nags "go study X"
+  /// for a category the user has already proven they know. Called from
+  /// fromJson() so existing saves self-heal on next load, and safe to
+  /// call anytime since markCategoryStudied() is itself idempotent.
+  void reconcileMasteredStudied() {
+    for (final category in masteredCategories) {
+      markCategoryStudied(category);
+    }
+  }
+
   void clearCurriculumProgress() {
     // Only clear studied/curriculum tracking for categories that DON'T
     // have a real quiz score. If a category was studied AND scored during
@@ -508,5 +524,13 @@ class AppState {
     conceptProgressRecords = (json['conceptProgressRecords'] as Map? ?? {}).map(
       (k, v) => MapEntry(int.parse(k), ConceptProgress.fromJson(v)),
     );
+
+    // Self-heal any category that was mastered via the assessment
+    // before markCategoryStudied() was wired into that path (see
+    // _submitAssessment() in assessment_page_v2.dart). Runs on every
+    // load — cheap, idempotent, and means no separate migration step
+    // is needed for people already stuck with a mastered-but-unstudied
+    // category.
+    reconcileMasteredStudied();
   }
 }

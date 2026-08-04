@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'constants.dart';
@@ -5,6 +6,7 @@ import 'app_state.dart';
 import 'csv_loader.dart';
 import 'app_state_persistence.dart';
 import 'readiness_engine.dart';
+import 'fsme_eye.dart';
 import 'peace_of_mind_page.dart';
 import 'mixpanel_service.dart';
 
@@ -50,6 +52,27 @@ class _RapidFirePageState extends State<RapidFirePage>
   double _timerProgress = 0.0;
   Color _timerColor = AppColors.primaryButton;
 
+  // ── FSME ──────────────────────────────────────────────────────
+  // Small, silent presence in the header: types one intro line on
+  // entry (self-clearing — collapses back to zero height once it's
+  // done, doesn't leave a permanent gap), then settles into `serious`
+  // and just watches. Reacts to answers eye-only — no new text, no
+  // popups, nothing that adds a beat to the question/answer timer
+  // loop. Per the standing rule on file: humor sits before the
+  // questions, never during, so it never distracts a concentrating
+  // user under time pressure.
+  final GlobalKey<FsmeEyePairState> _eyeKey = GlobalKey<FsmeEyePairState>();
+  static const Duration _typeCharDelay = Duration(milliseconds: 18);
+  static const Duration _introHold = Duration(milliseconds: 1800);
+  static const String _introLine =
+      "If I'm a big tool, then this is the tool-iest tool that have "
+      "tooled.";
+
+  EyeMood _eyeMood = EyeMood.fibbing;
+  String _introDisplayedText = '';
+  bool _showIntro = true;
+  Timer? _befuddledRevertTimer;
+
   static const Map<String, Color> _categoryColors = {
     'Time & Temperature': Color(0xFFC0392B),
     'Cross-Contamination': Color(0xFFE67E22),
@@ -66,7 +89,24 @@ class _RapidFirePageState extends State<RapidFirePage>
     super.initState();
     MixpanelService.instance.track('rapid_fire_started');
     _awardExtraCredit();
+    _playIntro();
     _init();
+  }
+
+  Future<void> _playIntro() async {
+    for (var i = 1; i <= _introLine.length; i++) {
+      if (!mounted) return;
+      await Future.delayed(_typeCharDelay);
+      if (!mounted) return;
+      setState(() => _introDisplayedText = _introLine.substring(0, i));
+    }
+    if (!mounted) return;
+    await Future.delayed(_introHold);
+    if (!mounted) return;
+    setState(() {
+      _showIntro = false;
+      _eyeMood = EyeMood.serious;
+    });
   }
 
   void _awardExtraCredit() {
@@ -98,6 +138,7 @@ class _RapidFirePageState extends State<RapidFirePage>
   void dispose() {
     _isStopped = true;
     _slideController?.dispose();
+    _befuddledRevertTimer?.cancel();
     super.dispose();
   }
 
@@ -136,6 +177,10 @@ class _RapidFirePageState extends State<RapidFirePage>
 
       if (!_answerTapped && mounted) {
         setState(() => _skipped++);
+        if (!_showIntro) {
+          _befuddledRevertTimer?.cancel();
+          _eyeKey.currentState?.tired();
+        }
       }
 
       await Future.delayed(const Duration(milliseconds: 200));
@@ -211,6 +256,28 @@ class _RapidFirePageState extends State<RapidFirePage>
         }
       }
     });
+    _reactToAnswer(isCorrect);
+  }
+
+  /// Silent eye-only reaction — never blocks or delays the answer
+  /// loop itself, just rides alongside it. Correct gets a quick
+  /// surprise() bulge (one-shot, auto-reverts). Wrong briefly sets
+  /// the mood to befuddled, then reverts to serious after a beat —
+  /// befuddled isn't one of the triggered one-shots, so this is done
+  /// by hand with a short timer rather than a method call.
+  void _reactToAnswer(bool isCorrect) {
+    if (!_showIntro) {
+      if (isCorrect) {
+        _eyeKey.currentState?.surprise();
+      } else {
+        _befuddledRevertTimer?.cancel();
+        setState(() => _eyeMood = EyeMood.befuddled);
+        _befuddledRevertTimer = Timer(const Duration(milliseconds: 900), () {
+          if (!mounted) return;
+          setState(() => _eyeMood = EyeMood.serious);
+        });
+      }
+    }
   }
 
   Future<void> _pausableDelay(int totalMs, {required int warningMs}) async {
@@ -341,6 +408,7 @@ class _RapidFirePageState extends State<RapidFirePage>
         child: Column(
           children: [
             _buildHeader(),
+            _buildFsmeIntroBanner(),
             Expanded(child: _buildCardArea()),
             _buildScoreCounters(),
             _buildControls(),
@@ -364,6 +432,8 @@ class _RapidFirePageState extends State<RapidFirePage>
               fit: BoxFit.contain,
             ),
           ),
+          const SizedBox(width: 8),
+          FsmeEyePair(key: _eyeKey, mood: _eyeMood, size: 22, spacing: 6),
           const Expanded(
             child: Column(
               children: [
@@ -388,6 +458,30 @@ class _RapidFirePageState extends State<RapidFirePage>
           _ctrlButton('Stop', _stopAndExit),
         ],
       ),
+    );
+  }
+
+  /// Self-clearing — collapses to zero height via AnimatedSize once
+  /// the intro line finishes its hold, so it never permanently steals
+  /// vertical space from the question/answer area below it.
+  Widget _buildFsmeIntroBanner() {
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      child: _showIntro
+          ? Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Text(
+                _introDisplayedText,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
+                  color: Color(0xFF555555),
+                ),
+              ),
+            )
+          : const SizedBox(width: double.infinity, height: 0),
     );
   }
 

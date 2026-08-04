@@ -170,8 +170,18 @@ class _AssessmentPageV2State extends State<AssessmentPageV2> {
       },
     );
 
+    // Saving a category score here can push it straight to "mastered"
+    // (>= masteryThreshold) without the user ever visiting that
+    // category's CategoryStudyPage, which is the only other place
+    // markCategoryStudied() gets called. Without this, a category can
+    // show up in masteredCategories but never in studiedCategories —
+    // visible as a MASTERED trophy with no matching CURRICULUM trophy,
+    // and a permanent "go study this" nag from ReadinessEngine.coachMessage.
     for (final kvp in result.categoryScores.entries) {
       state.saveCategoryQuizScore(kvp.key, kvp.value);
+      if (kvp.value >= AppState.masteryThreshold) {
+        state.markCategoryStudied(kvp.key);
+      }
     }
 
     state.testHistory.add(result);

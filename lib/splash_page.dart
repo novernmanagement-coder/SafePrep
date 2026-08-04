@@ -6,6 +6,7 @@ import 'app_state.dart';
 import 'app_state_persistence.dart';
 import 'mixpanel_service.dart';
 import 'dashboard_page.dart';
+import 'splash_navigating_page.dart';
 import 'onboard/onboard_intro.dart';
 import 'onboard/onboard_paywall.dart';
 import 'onboard/onboard_answers.dart';
@@ -15,7 +16,8 @@ import 'onboard/onboard_answers.dart';
 // Three paths:
 //   purchased            → DashboardPage
 //   wrong / no code       → OnboardPaywall
-//   correct access code   → OnboardIntro (the funnel)
+//   correct access code   → SplashNavigatingPage (DEBUG ONLY — see note
+//                           below; was OnboardIntro before this change)
 //
 // The old preview/trial/cinematic flow is dead. The onboarding funnel
 // IS the trial — no free-roam dashboard, no 30-minute timer, no
@@ -37,9 +39,18 @@ class SplashPage extends StatefulWidget {
 class _SplashPageState extends State<SplashPage> {
   static const String _seenSplashPrefKey = 'has_seen_splash_before';
 
-  // Access code. Correct entry → funnel (OnboardIntro). Anything else,
-  // blank, or dismissed → paywall. For a $4.99 app this is a
-  // deliberate, low-stakes gate; the string ships in the bundle.
+  // Access code. Correct entry → SplashNavigatingPage (debug menu).
+  // Anything else, blank, or dismissed → paywall.
+  //
+  // DEBUG ONLY — REMOVE BEFORE RELEASE. This access-code branch
+  // normally routed to OnboardIntro (the real funnel). It's been
+  // temporarily repointed at SplashNavigatingPage so the correct code
+  // reaches the debug destination menu instead — StoreKit/IAP isn't
+  // resolvable in this test environment, so the real purchase flow
+  // can't always be reached normally. Revert the branch below (swap
+  // SplashNavigatingPage back to OnboardIntro, drop the
+  // splash_navigating_page.dart import) once the landing page is
+  // locked and the real purchase → landing handoff has been verified.
   static const String _accessCode = 'Novern2026!';
 
   static const int _firstLaunchHoldSeconds = 8;
@@ -152,7 +163,8 @@ class _SplashPageState extends State<SplashPage> {
     }
 
     // ── Access-code fork ─────────────────────────────────────────────
-    // Correct code → funnel. Anything else → paywall.
+    // Correct code → SplashNavigatingPage (DEBUG — see class-level
+    // note). Anything else → paywall.
     final entered = await _promptAccessCode();
     if (!mounted) return;
 
@@ -161,15 +173,11 @@ class _SplashPageState extends State<SplashPage> {
       OnboardingAnswers.instance.reset();
       MixpanelService.instance.track(
         'SpOn_Splash_Route',
-        properties: {
-          'app_name': 'SP',
-          'path': 'fresh_onboarding',
-          'runs': runs,
-        },
+        properties: {'app_name': 'SP', 'path': 'debug_nav', 'runs': runs},
       );
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const OnboardIntro()),
+        MaterialPageRoute(builder: (_) => const SplashNavigatingPage()),
       );
     } else {
       MixpanelService.instance.track(

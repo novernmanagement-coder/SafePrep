@@ -5,9 +5,9 @@ import '../constants.dart';
 import '../mixpanel_service.dart';
 import '../iap_service.dart';
 import '../fsme_popup.dart';
+import '../fsme_post_purchase_landing.dart';
 import 'onboard_answers.dart';
 import 'onboard_knowledge_level.dart';
-import 'onboard_post_purchase.dart';
 import '../rapid_fire_limited_intro.dart';
 
 /// Onboarding paywall — redesigned for the self-report funnel.
@@ -25,6 +25,11 @@ import '../rapid_fire_limited_intro.dart';
 ///
 /// FSME's role here is deliberately minimal — one reactive line via
 /// the shared [FsmePopup] widget, no authored multi-beat script.
+///
+/// On purchase success, routes to [FsmePostPurchaseLanding] — the
+/// one-time FSME cluster tour — rather than the old terminal-style
+/// build-sequence screen, since the self-report funnel has no
+/// diagnostic data to build a "your plan is ready" sequence from.
 class OnboardPaywall extends StatefulWidget {
   const OnboardPaywall({super.key});
 
@@ -112,7 +117,7 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
     if (result == IAPResult.success) {
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (_) => const OnboardPostPurchase()),
+        MaterialPageRoute(builder: (_) => const FsmePostPurchaseLanding()),
         (_) => false,
       );
     } else if (result != IAPResult.canceled) {
@@ -199,9 +204,7 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
 
               const SizedBox(height: 22),
 
-              FsmePopup(
-                lines: [FsmeLine(_fsmeLineFor(level))],
-              ),
+              FsmePopup(lines: [FsmeLine(_fsmeLineFor(level))]),
 
               const SizedBox(height: 20),
 

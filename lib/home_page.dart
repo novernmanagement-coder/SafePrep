@@ -13,9 +13,7 @@ import 'sixty_second_refresh_page.dart';
 import 'about_proctors_page.dart';
 import 'final_exam_intro_page.dart';
 import 'peace_of_mind_page.dart';
-import 'trial_timer_service.dart';
 import 'mixpanel_service.dart';
-import 'preview/preview_reveal_page.dart';
 import 'safe_prep_nav_bar.dart';
 
 class HomePage extends StatefulWidget {
@@ -29,8 +27,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   final AppState _state = AppState();
   String _currentFact = '';
   List<MilestoneModel> _milestones = [];
-
-  Timer? _displayTicker;
 
   @override
   void initState() {
@@ -47,37 +43,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       'home_viewed',
       properties: {'is_unlocked': _state.hasUnlockedApp, 'app_name': 'SP'},
     );
-
-    if (!_state.hasUnlockedApp) {
-      if (!_state.trialStarted) {
-        MixpanelService.instance.track(
-          'trial_started',
-          properties: {'app_name': 'SP'},
-        );
-        _state.trialStarted = true;
-        AppStatePersistence.save();
-      }
-      if (!TrialTimerService.instance.isExpired) {
-        TrialTimerService.instance.onTrialExpired = _onTrialExpired;
-        TrialTimerService.instance.start();
-        _startDisplayTicker();
-      } else {
-        _onTrialExpired();
-      }
-    }
-  }
-
-  void _startDisplayTicker() {
-    _displayTicker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) return;
-      setState(() {});
-    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _displayTicker?.cancel();
     super.dispose();
   }
 
@@ -89,20 +59,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         properties: {'app_name': 'SP'},
       );
     }
-  }
-
-  void _onTrialExpired() {
-    MixpanelService.instance.track(
-      'trial_expired',
-      properties: {'app_name': 'SP'},
-    );
-    _displayTicker?.cancel();
-    if (!mounted) return;
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => PreviewRevealPage()),
-      (route) => false,
-    );
   }
 
   void _checkUnlockTrophy() {
@@ -691,99 +647,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildTrialUnlockBanner() {
-    if (_state.hasUnlockedApp) return const SizedBox();
-    return GestureDetector(
-      onTap: () {
-        MixpanelService.instance.track(
-          'paywall_viewed',
-          properties: {'source': 'home_page_banner', 'app_name': 'SP'},
-        );
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => PreviewRevealPage()),
-          (route) => false,
-        );
-      },
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: const Color(0xFF0A0A0F),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFFD4AF37), width: 1.5),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            Text('⭐', style: TextStyle(fontSize: 14)),
-            SizedBox(width: 8),
-            Text(
-              'Unlock Full Access — starting at \$4.99',
-              style: TextStyle(
-                color: Color(0xFFD4AF37),
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTrialCountdown() {
-    final remaining = TrialTimerService.instance.remainingSeconds;
-    final minutes = (remaining ~/ 60).toString().padLeft(2, '0');
-    final seconds = (remaining % 60).toString().padLeft(2, '0');
-
-    return GestureDetector(
-      onTap: () {
-        MixpanelService.instance.track(
-          'paywall_viewed',
-          properties: {'source': 'trial_countdown', 'app_name': 'SP'},
-        );
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => PreviewRevealPage()),
-          (route) => false,
-        );
-      },
-      child: Column(
-        spacing: 2,
-        children: [
-          Container(
-            width: double.infinity,
-            height: AppSizes.primaryButtonHeight,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: const Color(0xFF0A0A0F),
-              borderRadius: BorderRadius.circular(AppSizes.buttonCornerRadius),
-              border: Border.all(color: const Color(0xFFD4AF37), width: 1.5),
-            ),
-            child: Text(
-              'Trial — $minutes:$seconds',
-              style: const TextStyle(
-                color: Color(0xFFD4AF37),
-                fontSize: AppFonts.button,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ),
-          Text(
-            'Tap to see full access options',
-            style: TextStyle(
-              fontSize: 11,
-              color: AppColors.subtleText,
-              fontStyle: FontStyle.italic,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildTrophySection() {
     if (_milestones.isEmpty) return const SizedBox();
     final topTwo = _milestones.take(2).toList();
@@ -1068,56 +931,53 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   child: Column(
                     spacing: AppSizes.cardSpacing,
                     children: [
-                      _state.hasUnlockedApp
-                          ? Column(
-                              spacing: 2,
-                              children: [
-                                SizedBox(
-                                  width: double.infinity,
-                                  height: AppSizes.primaryButtonHeight,
-                                  child: ElevatedButton(
-                                    onPressed: () {
-                                      MixpanelService.instance.track(
-                                        'curriculum_tapped',
-                                        properties: {'app_name': 'SP'},
-                                      );
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) =>
-                                              const AssessmentInfoPage(),
-                                        ),
-                                      );
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.primaryButton,
-                                      foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(
-                                          AppSizes.buttonCornerRadius,
-                                        ),
-                                      ),
-                                    ),
-                                    child: const Text(
-                                      'Create my personalized curriculum',
-                                      style: TextStyle(
-                                        fontSize: AppFonts.button,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
+                      Column(
+                        spacing: 2,
+                        children: [
+                          SizedBox(
+                            width: double.infinity,
+                            height: AppSizes.primaryButtonHeight,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                MixpanelService.instance.track(
+                                  'curriculum_tapped',
+                                  properties: {'app_name': 'SP'},
+                                );
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const AssessmentInfoPage(),
+                                  ),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primaryButton,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    AppSizes.buttonCornerRadius,
                                   ),
                                 ),
-                                Text(
-                                  'Study less — take the assessment first',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: AppColors.subtleText,
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                              ),
+                              child: const Text(
+                                'Create my personalized curriculum',
+                                style: TextStyle(
+                                  fontSize: AppFonts.button,
+                                  fontWeight: FontWeight.w700,
                                 ),
-                              ],
-                            )
-                          : _buildTrialCountdown(),
+                              ),
+                            ),
+                          ),
+                          Text(
+                            'Study less — take the assessment first',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.subtleText,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
 
                       Column(
                         spacing: 2,
@@ -1142,52 +1002,52 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         ],
                       ),
 
-                      Builder(
-                        builder: (context) {
-                          final isLocked =
-                              !_state.hasUnlockedApp &&
-                              _state.readinessScore < 100;
-                          if (isLocked) return const SizedBox();
-                          return Column(
-                            spacing: 2,
-                            children: [
-                              SizedBox(
-                                width: double.infinity,
-                                height: AppSizes.primaryButtonHeight,
-                                child: ElevatedButton(
-                                  onPressed: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          const FinalExamIntroPage(),
-                                    ),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.primaryButton,
-                                    foregroundColor: Colors.white,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(
-                                        AppSizes.buttonCornerRadius,
-                                      ),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'When ready — take the SafePrep exam',
-                                    style: TextStyle(fontSize: AppFonts.button),
+                      // Final Exam button is always shown to purchased
+                      // users — no readiness-score gate. The old
+                      // 100%-readiness lock existed only to stop the
+                      // now-removed 30-minute trial from letting users
+                      // skip straight to the exam without studying;
+                      // that population no longer exists, so the gate
+                      // (and its "Access enabled when 100%..." footer
+                      // line) has been removed entirely rather than
+                      // left as unreachable dead code.
+                      Column(
+                        spacing: 2,
+                        children: [
+                          SizedBox(
+                            width: double.infinity,
+                            height: AppSizes.primaryButtonHeight,
+                            child: ElevatedButton(
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const FinalExamIntroPage(),
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primaryButton,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    AppSizes.buttonCornerRadius,
                                   ),
                                 ),
                               ),
-                              Text(
-                                'Access enabled when 100% ServSafe readiness is achieved',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.success,
-                                  fontStyle: FontStyle.italic,
-                                ),
+                              child: const Text(
+                                'When ready — take the SafePrep exam',
+                                style: TextStyle(fontSize: AppFonts.button),
                               ),
-                            ],
-                          );
-                        },
+                            ),
+                          ),
+                          Text(
+                            'Take it whenever you\'re ready — no gate.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.success,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ],
                       ),
 
                       _buildButton(
@@ -1309,7 +1169,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         ],
                       ),
 
-                      _buildTrialUnlockBanner(),
                       _buildTrophySection(),
                       _buildFooterSection(),
                     ],
@@ -1363,7 +1222,9 @@ class _ReadinessMarqueeScrollerState extends State<ReadinessMarqueeScroller> {
       }
       await _scrollController.animateTo(
         max,
-        duration: Duration(milliseconds: (max * 25).toInt().clamp(3000, 20000)),
+        duration: Duration(
+          milliseconds: (max * 25).toInt().clamp(3000, 1 << 30),
+        ),
         curve: Curves.linear,
       );
       if (!mounted) break;
@@ -1428,7 +1289,9 @@ class _MarqueeState extends State<Marquee> {
       }
       await _scrollController.animateTo(
         maxExtent,
-        duration: const Duration(seconds: 800),
+        duration: Duration(
+          milliseconds: (maxExtent * 25).toInt().clamp(3000, 1 << 30),
+        ),
         curve: Curves.linear,
       );
       if (!mounted) break;
