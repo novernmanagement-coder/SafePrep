@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'constants.dart';
+import 'cluster_info_page.dart';
 import 'csv_loader.dart';
 import 'app_state.dart';
 import 'app_state_persistence.dart';
+import 'fsme_help_box.dart';
 import 'home_page.dart';
 import 'final_exam_grade_page.dart';
 import 'final_exam_review_page.dart';
@@ -21,6 +23,26 @@ class _FinalStepExamPageState extends State<FinalStepExamPage> {
   List<int> _selectedAnswers = [];
   int _currentIndex = 0;
   bool _loaded = false;
+
+  // This page IS the finalExam cluster, so its FsmeHelpBox opens that
+  // cluster's explanation directly.
+  static const List<String> _fsmeHelpMessages = [
+    "90 questions, scored exactly like the real ServSafe exam.",
+    "Whatever you get, results feed back into your curriculum.",
+    "Tap me — I'll 'splain what this whole thing is for.",
+  ];
+
+  void _openFinalExamExplanation() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ClusterInfoPage(
+          cluster: AppCluster.finalExam,
+          launchContext: ClusterLaunchContext.landing,
+        ),
+      ),
+    );
+  }
 
   static const Map<String, double> categoryWeights = {
     'Time & Temperature': 0.23,
@@ -295,6 +317,12 @@ class _FinalStepExamPageState extends State<FinalStepExamPage> {
                           ),
                         ],
                       ),
+                    ),
+
+                    FsmeHelpBox(
+                      messages: _fsmeHelpMessages,
+                      onTap: _openFinalExamExplanation,
+                      enabled: _state.fsmeEnabled,
                     ),
 
                     Text(

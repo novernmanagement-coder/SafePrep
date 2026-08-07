@@ -3,6 +3,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'constants.dart';
 import 'app_state.dart';
 import 'app_state_persistence.dart';
+import 'cluster_info_page.dart';
+import 'fsme_eye.dart';
 import 'home_page.dart';
 import 'splash_page.dart';
 import 'tips_page.dart';
@@ -15,10 +17,41 @@ class SettingsPage extends StatefulWidget {
   State<SettingsPage> createState() => _SettingsPageState();
 }
 
+class _ClusterEntry {
+  final AppCluster cluster;
+  final String label;
+  final IconData icon;
+  const _ClusterEntry(this.cluster, this.label, this.icon);
+}
+
 class _SettingsPageState extends State<SettingsPage> {
   final AppState _state = AppState();
   final TextEditingController _nameController = TextEditingController();
   bool _nameSaved = false;
+
+  // Mirrors the five stops from FsmePostPurchaseLanding — same
+  // clusters, same labels/icons, so "come back to these explanations
+  // later from Settings" (the promise made on that page) points to
+  // the same five things.
+  static const List<_ClusterEntry> _clusters = [
+    _ClusterEntry(
+      AppCluster.assessment,
+      'The Assessment',
+      Icons.fact_check_outlined,
+    ),
+    _ClusterEntry(
+      AppCluster.dashboardStudy,
+      'Dashboard and Study',
+      Icons.dashboard_customize_outlined,
+    ),
+    _ClusterEntry(AppCluster.trainers, 'The Trainers', Icons.bolt_outlined),
+    _ClusterEntry(AppCluster.settings, 'Settings', Icons.settings_outlined),
+    _ClusterEntry(
+      AppCluster.finalExam,
+      'The Final Exam',
+      Icons.workspace_premium_outlined,
+    ),
+  ];
 
   @override
   void initState() {
@@ -83,6 +116,114 @@ class _SettingsPageState extends State<SettingsPage> {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
+  void _toggleFsme(bool value) {
+    setState(() => _state.fsmeEnabled = value);
+    AppStatePersistence.save();
+  }
+
+  void _openCluster(AppCluster cluster) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ClusterInfoPage(
+          cluster: cluster,
+          launchContext: ClusterLaunchContext.landing,
+        ),
+      ),
+    );
+  }
+
+  void _showClusterList() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0A0A0F),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'What do you want to revisit?',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFFD4AF37).withValues(alpha: 0.9),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                ..._clusters.map(
+                  (entry) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          _openCluster(entry.cluster);
+                        },
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 13,
+                            horizontal: 14,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF13130F),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: const Color(
+                                0xFFD4AF37,
+                              ).withValues(alpha: 0.35),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                entry.icon,
+                                size: 16,
+                                color: const Color(0xFFD4AF37),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  entry.label,
+                                  style: const TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFFF0EDE8),
+                                  ),
+                                ),
+                              ),
+                              Icon(
+                                Icons.chevron_right,
+                                size: 16,
+                                color: const Color(
+                                  0xFFD4AF37,
+                                ).withValues(alpha: 0.7),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildSectionCard({
     required String title,
     required List<Widget> children,
@@ -107,6 +248,82 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           Divider(color: AppColors.cardBorder),
           ...children,
+        ],
+      ),
+    );
+  }
+
+  /// Dark/gold card matching FsmePostPurchaseLanding's aesthetic
+  /// rather than the light section-card style used elsewhere on this
+  /// page — this is FSME's own settings, so it gets his palette.
+  /// Mini eyes visually mirror the toggle state: straight-ahead
+  /// (Serious mood, not asleep) when on, closed lids when off.
+  Widget _buildFsmeCard() {
+    final bool enabled = _state.fsmeEnabled;
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A0A0F),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFFD4AF37).withValues(alpha: 0.3),
+        ),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              FsmeEyePair(
+                mood: EyeMood.serious,
+                asleep: !enabled,
+                size: 26,
+                spacing: 6,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'FSME',
+                  style: TextStyle(
+                    fontSize: AppFonts.subheader,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFFD4AF37),
+                  ),
+                ),
+              ),
+              Switch(
+                value: enabled,
+                onChanged: _toggleFsme,
+                activeColor: const Color(0xFFD4AF37),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            enabled
+                ? 'He shows up around the app (not in the trainers — those are his and stay on either way).'
+                : 'He\'s asleep. The trainers stay unaffected — that\'s where he lives.',
+            style: TextStyle(
+              fontSize: AppFonts.caption,
+              color: const Color(0xFFF0EDE8).withValues(alpha: 0.6),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: OutlinedButton(
+              onPressed: _showClusterList,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFFD4AF37),
+                side: const BorderSide(color: Color(0xFFD4AF37)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text("Let me 'splain that again"),
+            ),
+          ),
         ],
       ),
     );
@@ -217,6 +434,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 child: Column(
                   spacing: 10,
                   children: [
+                    _buildFsmeCard(),
+
                     _buildSectionCard(
                       title: 'About SafePrep™',
                       children: [

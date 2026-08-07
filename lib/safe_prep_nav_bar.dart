@@ -6,7 +6,8 @@ import 'iap_service.dart';
 import 'home_page.dart';
 import 'dashboard_page.dart';
 import 'rapid_fire_page.dart';
-import 'preview/preview_reveal_page.dart';
+import 'onboard/onboard_paywall.dart';
+import 'renew_page.dart';
 
 class SafePrepNavBar extends StatefulWidget {
   final bool isDashboardPage;
@@ -29,20 +30,17 @@ class _SafePrepNavBarState extends State<SafePrepNavBar> {
 
   // Gated on real purchase state — either never purchased, or a
   // sevenDay/fourteenDay purchase whose calendar expiry has passed
-  // (AppState.isExpired, purchaseDate + duration vs. now). This
-  // replaces the old TrialTimerService-based check, which stopped
-  // meaning anything once the trial system was removed. This is the
-  // same gate that was added after the paywall-bypass bug found here
-  // previously (Dashboard nav had zero purchase check) — kept
-  // deliberately strict rather than just deleted, so that bug can't
-  // quietly reopen for an expired purchaser.
+  // (AppState.isExpired, purchaseDate + duration vs. now). Locked
+  // users route to OnboardPaywall — confirmed the sole active
+  // in-app paywall; the old preview/PreviewRevealPage screen is no
+  // longer used anywhere and should not be re-added.
   void _goDashboard(BuildContext context) {
     final state = AppState();
     final bool locked = !state.hasUnlockedApp || state.isExpired;
     if (locked) {
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (_) => PreviewRevealPage()),
+        MaterialPageRoute(builder: (_) => const OnboardPaywall()),
         (route) => false,
       );
       return;
@@ -53,22 +51,31 @@ class _SafePrepNavBarState extends State<SafePrepNavBar> {
     );
   }
 
+  // Same gate as _goDashboard() — previously Rapid Fire had NO lock
+  // check at all here, relying only on the old paywall page hiding
+  // its own nav footer to indirectly block access. That's a real gap
+  // if a locked user reaches this nav bar from anywhere else it
+  // appears, so this button now checks directly like Dashboard does.
   void _goRapidFire(BuildContext context) {
+    final state = AppState();
+    final bool locked = !state.hasUnlockedApp || state.isExpired;
+    if (locked) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const OnboardPaywall()),
+        (route) => false,
+      );
+      return;
+    }
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (_) => const RapidFirePage()),
     );
   }
 
-  // NOTE: still calls buySevenDay() — the ORIGINAL first-purchase
-  // product. This is a placeholder, not a real renewal. Apple
-  // non-consumables (which kProductSevenDay is) can only be bought
-  // ONCE per Apple ID ever — tapping this a second time doesn't
-  // charge again or extend anything, StoreKit just silently treats
-  // it as "already owned." A real renewal needs the $2.99 repeatable
-  // CONSUMABLE product (kProductRenewalWeek / buyRenewal()) already
-  // drafted in iap_service.dart but not yet created in App Store
-  // Connect or shipped — see the flag at the bottom of this file.
+  // Unlock button only — the original first-purchase product
+  // (kProductSevenDay, a non-consumable). Renew has its own separate
+  // flow now (see _goRenew() below) and no longer calls this.
   Future<void> _buyNow(BuildContext context) async {
     if (_purchaseInFlight) return;
     setState(() => _purchaseInFlight = true);
@@ -98,22 +105,37 @@ class _SafePrepNavBarState extends State<SafePrepNavBar> {
     if (message != null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text("You're unlocked! 🎉")));
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
+  // Renew opens its own dedicated page (RenewPage) rather than
+  // purchasing directly from the nav bar — that page handles the
+  // real $2.99 buyRenewal() flow, shows FSME's readiness/date copy,
+  // and gives the user a clean back-out. Just navigation here, no
+  // purchase logic duplicated in this file.
+  Future<void> _goRenew(BuildContext context) async {
+    final renewed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const RenewPage()),
+    );
+    if (renewed == true && mounted) {
+      setState(() {}); // refresh nav bar state (daysRemaining, showRenew)
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final state = AppState();
+    final bool isUnlocked = state.hasUnlockedApp;
 
-    // Temporarily disabled for this submission via an impossible
-    // threshold — plans max out at 14 days remaining, so requiring
-    // 50+ can never be true. Renew's tap action isn't wired to a real
-    // purchase yet (still calls buySevenDay(), a non-consumable),
-    // so this keeps the button hidden until that's built. Lower the
-    // 50 back down (e.g. to 2) once the real renewal IAP is ready.
+    // Real threshold restored — shows for existing sevenDay/
+    // fourteenDay purchasers once daysRemaining <= 2 (or already
+    // expired), matching the home_page.dart FSME explainer's gate.
     final bool showRenew =
-        state.isTimeLimited && (state.daysRemaining ?? 0) >= 50;
+        isUnlocked &&
+        state.isTimeLimited &&
+        ((state.daysRemaining ?? 0) <= 2 || state.isExpired);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
@@ -141,14 +163,81 @@ class _SafePrepNavBarState extends State<SafePrepNavBar> {
               onTap: () => _goRapidFire(context),
             ),
           ),
-          if (showRenew)
+          // Unlock (never purchased) and Renew (existing purchase
+          // expiring soon) are mutually exclusive states — a
+          // time-limited purchaser is by definition already unlocked
+          // — so these are two independent slots, not one shared
+          // condition.
+          if (!isUnlocked)
             Expanded(
-              child: _RenewNavButton(
+              child: _UnlockNavButton(
                 loading: _purchaseInFlight,
                 onTap: () => _buyNow(context),
               ),
             ),
+          if (showRenew)
+            Expanded(
+              child: _RenewNavButton(
+                loading: false,
+                onTap: () => _goRenew(context),
+              ),
+            ),
         ],
+      ),
+    );
+  }
+}
+
+class _UnlockNavButton extends StatelessWidget {
+  final bool loading;
+  final VoidCallback onTap;
+
+  const _UnlockNavButton({required this.onTap, this.loading = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: loading ? null : onTap,
+      child: SizedBox(
+        height: AppSizes.footerButtonHeight,
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF0A0A0F),
+            border: Border.all(
+              color: const Color(0xFFD4AF37),
+              width: AppSizes.buttonBorderThickness,
+            ),
+            borderRadius: BorderRadius.circular(
+              AppSizes.footerButtonCornerRadius,
+            ),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            spacing: 2,
+            children: [
+              loading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Color(0xFFD4AF37),
+                      ),
+                    )
+                  : const Icon(Icons.star, size: 18, color: Color(0xFFD4AF37)),
+              Text(
+                'Unlock',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: AppFonts.label,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFFD4AF37),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -259,21 +348,3 @@ class _NavButton extends StatelessWidget {
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────
-// STILL OPEN — the Renew button's TAP ACTION is a placeholder.
-// Gating/label are correct now (shows for existing sevenDay/
-// fourteenDay purchasers within 2 days of expiry or already
-// expired), but _buyNow() still calls buySevenDay() — the original
-// non-consumable product, which Apple only allows ONE purchase of
-// per Apple ID ever. Tapping "Renew" right now would NOT charge
-// again or add days; it would just resolve as "already owned."
-// Making Renew actually work requires the $2.99 repeatable
-// CONSUMABLE IAP (kProductRenewalWeek / buyRenewal()) already
-// drafted in iap_service.dart — that product still needs to be
-// created in App Store Connect and _buyNow() switched to call
-// buyRenewal() instead of buySevenDay(). This was paused earlier
-// because tying a new IAP to a build had been a headache before —
-// worth confirming whether that's still the case before wiring it
-// in for real.
-// ─────────────────────────────────────────────────────────────────

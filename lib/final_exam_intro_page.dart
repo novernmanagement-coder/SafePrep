@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'constants.dart';
+import 'cluster_info_page.dart';
 import 'csv_loader.dart';
+import 'app_state.dart';
+import 'fsme_help_box.dart';
 import 'home_page.dart';
 import 'final_step_exam_page.dart';
 import 'safe_prep_nav_bar.dart';
@@ -14,6 +17,26 @@ class FinalExamIntroPage extends StatefulWidget {
 
 class _FinalExamIntroPageState extends State<FinalExamIntroPage> {
   String _tickerFacts = '';
+
+  // Same finalExam cluster as FinalStepExamPage — this intro page and
+  // the actual exam share one explanation.
+  static const List<String> _fsmeHelpMessages = [
+    "90 questions, scored exactly like the real ServSafe exam.",
+    "Whatever you get, results feed back into your curriculum.",
+    "Tap me — I'll 'splain what this whole thing is for.",
+  ];
+
+  void _openFinalExamExplanation() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ClusterInfoPage(
+          cluster: AppCluster.finalExam,
+          launchContext: ClusterLaunchContext.landing,
+        ),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -91,6 +114,12 @@ class _FinalExamIntroPageState extends State<FinalExamIntroPage> {
                     ),
                   ],
                 ),
+              ),
+
+              FsmeHelpBox(
+                messages: _fsmeHelpMessages,
+                onTap: _openFinalExamExplanation,
+                enabled: AppState().fsmeEnabled,
               ),
 
               if (_tickerFacts.isNotEmpty)

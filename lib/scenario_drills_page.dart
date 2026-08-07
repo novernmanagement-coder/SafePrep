@@ -5,6 +5,7 @@ import 'app_state.dart';
 import 'app_state_persistence.dart';
 import 'readiness_engine.dart';
 import 'csv_loader.dart';
+import 'fsme_eye.dart';
 import 'peace_of_mind_page.dart';
 import 'safe_prep_nav_bar.dart';
 import 'mixpanel_service.dart';
@@ -38,6 +39,24 @@ class _ScenarioDrillsPageState extends State<ScenarioDrillsPage> {
 
   final ScrollController _scrollController = ScrollController();
 
+  // ── FSME ──────────────────────────────────────────────────────
+  // Same self-clearing header pattern as RapidFirePage/FlashCardsPage:
+  // types on entry, holds briefly, collapses to zero height. This
+  // line references the instructor/student character art on the page
+  // itself, rather than being a freestanding tall tale.
+  final GlobalKey<FsmeEyePairState> _eyeKey = GlobalKey<FsmeEyePairState>();
+  static const Duration _typeCharDelay = Duration(milliseconds: 18);
+  static const Duration _introHold = Duration(milliseconds: 1800);
+  static const String _introLine =
+      "Ok, this tool took a lot \u2014 I had to hire an instructor and "
+      "have a student who didn't mind being held here forever... "
+      "(She's one of the extra-smart do-gooders, who only wants to "
+      "make sure you pass the exam.)";
+
+  EyeMood _eyeMood = EyeMood.fibbing;
+  String _introDisplayedText = '';
+  bool _showIntro = true;
+
   String get _instructorImage {
     if (_wasCorrect == null)
       return _phase == _Phase.scenario
@@ -64,6 +83,23 @@ class _ScenarioDrillsPageState extends State<ScenarioDrillsPage> {
     super.initState();
     _awardExtraCredit();
     _init();
+    _playIntro();
+  }
+
+  Future<void> _playIntro() async {
+    for (var i = 1; i <= _introLine.length; i++) {
+      if (!mounted) return;
+      await Future.delayed(_typeCharDelay);
+      if (!mounted) return;
+      setState(() => _introDisplayedText = _introLine.substring(0, i));
+    }
+    if (!mounted) return;
+    await Future.delayed(_introHold);
+    if (!mounted) return;
+    setState(() {
+      _showIntro = false;
+      _eyeMood = EyeMood.serious;
+    });
   }
 
   void _awardExtraCredit() {
@@ -268,6 +304,7 @@ class _ScenarioDrillsPageState extends State<ScenarioDrillsPage> {
         child: Column(
           children: [
             _buildHeader(),
+            _buildFsmeIntroBanner(),
             Expanded(child: _buildBody()),
             const SafePrepNavBar(),
           ],
@@ -305,7 +342,9 @@ class _ScenarioDrillsPageState extends State<ScenarioDrillsPage> {
                   fit: BoxFit.contain,
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
+              FsmeEyePair(key: _eyeKey, mood: _eyeMood, size: 22, spacing: 6),
+              const SizedBox(width: 8),
               const Text(
                 'Prep\u2122',
                 style: TextStyle(
@@ -335,6 +374,30 @@ class _ScenarioDrillsPageState extends State<ScenarioDrillsPage> {
           ),
         ],
       ),
+    );
+  }
+
+  /// Self-clearing — collapses to zero height via AnimatedSize once
+  /// the intro line finishes its hold, so it never permanently steals
+  /// vertical space from the character panel / scenario area below.
+  Widget _buildFsmeIntroBanner() {
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      child: _showIntro
+          ? Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+              child: Text(
+                _introDisplayedText,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
+                  color: Color(0xFF555555),
+                ),
+              ),
+            )
+          : const SizedBox(width: double.infinity, height: 0),
     );
   }
 

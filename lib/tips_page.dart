@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'constants.dart';
+import 'fsme_eye.dart';
 import 'home_page.dart';
 import 'safe_prep_nav_bar.dart';
 import 'mixpanel_service.dart';
@@ -12,10 +13,44 @@ class TipsPage extends StatefulWidget {
 }
 
 class _TipsPageState extends State<TipsPage> {
+  // ── FSME ──────────────────────────────────────────────────────
+  // Same self-clearing header pattern as the other trainers. Uses
+  // Idle rather than Fibbing/Befuddled — this line is a confession,
+  // not an active lie or a fumble, so neither mood quite fits; Idle
+  // keeps it simple rather than forcing a stretch.
+  final GlobalKey<FsmeEyePairState> _eyeKey = GlobalKey<FsmeEyePairState>();
+  static const Duration _typeCharDelay = Duration(milliseconds: 18);
+  static const Duration _introHold = Duration(milliseconds: 1800);
+  static const String _introLine =
+      "Ok, I admit it \u2014 I didn't come up with these tips. The old "
+      "people in the nerd room who teach this stuff did. However, I "
+      "did take the credit for it.";
+
+  EyeMood _eyeMood = EyeMood.typing;
+  String _introDisplayedText = '';
+  bool _showIntro = true;
+
   @override
   void initState() {
     super.initState();
     MixpanelService.instance.track('proctor_tips_viewed');
+    _playIntro();
+  }
+
+  Future<void> _playIntro() async {
+    for (var i = 1; i <= _introLine.length; i++) {
+      if (!mounted) return;
+      await Future.delayed(_typeCharDelay);
+      if (!mounted) return;
+      setState(() => _introDisplayedText = _introLine.substring(0, i));
+    }
+    if (!mounted) return;
+    await Future.delayed(_introHold);
+    if (!mounted) return;
+    setState(() {
+      _showIntro = false;
+      _eyeMood = EyeMood.idle;
+    });
   }
 
   Widget _buildCard(String title, List<String> paragraphs) {
@@ -49,6 +84,30 @@ class _TipsPageState extends State<TipsPage> {
           ),
         ],
       ),
+    );
+  }
+
+  /// Self-clearing — collapses to zero height via AnimatedSize once
+  /// the intro line finishes its hold, so it never permanently steals
+  /// vertical space from the tips list below.
+  Widget _buildFsmeIntroBanner() {
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      child: _showIntro
+          ? Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+              child: Text(
+                _introDisplayedText,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
+                  color: Color(0xFF555555),
+                ),
+              ),
+            )
+          : const SizedBox(width: double.infinity, height: 0),
     );
   }
 
@@ -93,9 +152,18 @@ class _TipsPageState extends State<TipsPage> {
                       ],
                     ),
                   ),
+                  const SizedBox(width: 8),
+                  FsmeEyePair(
+                    key: _eyeKey,
+                    mood: _eyeMood,
+                    size: 22,
+                    spacing: 6,
+                  ),
                 ],
               ),
             ),
+
+            _buildFsmeIntroBanner(),
 
             Expanded(
               child: SingleChildScrollView(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'constants.dart';
+import 'cluster_info_page.dart';
 import 'home_page.dart';
 import 'dashboard_page.dart';
 import 'csv_loader.dart';
@@ -7,6 +8,7 @@ import 'app_state.dart';
 import 'app_state_persistence.dart';
 import 'expert_club_dialog.dart';
 import 'final_exam_intro_page.dart';
+import 'fsme_help_box.dart';
 import 'readiness_engine.dart';
 import 'mixpanel_service.dart';
 
@@ -22,6 +24,27 @@ class _AssessmentPageV2State extends State<AssessmentPageV2> {
   List<int> _selectedAnswers = [];
   int _currentIndex = 0;
   bool _loaded = false;
+
+  // Assessment IS one of the five clusters, so its FsmeHelpBox opens
+  // that single cluster's explanation directly — unlike Home/Settings,
+  // which aren't any one cluster themselves and open a list instead.
+  static const List<String> _fsmeHelpMessages = [
+    "This builds your custom study plan — there's no pass or fail here.",
+    "Order and answer positions shuffle every time, so don't bother memorizing a pattern.",
+    "Tap me — I'll 'splain what this whole thing is for.",
+  ];
+
+  void _openAssessmentExplanation() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ClusterInfoPage(
+          cluster: AppCluster.assessment,
+          launchContext: ClusterLaunchContext.landing,
+        ),
+      ),
+    );
+  }
 
   static const Map<String, double> categoryWeights = {
     'Time & Temperature': 0.23,
@@ -333,6 +356,12 @@ class _AssessmentPageV2State extends State<AssessmentPageV2> {
                       ),
                     ],
                   ),
+                ),
+
+                FsmeHelpBox(
+                  messages: _fsmeHelpMessages,
+                  onTap: _openAssessmentExplanation,
+                  enabled: AppState().fsmeEnabled,
                 ),
 
                 Text(

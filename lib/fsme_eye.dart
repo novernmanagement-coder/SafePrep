@@ -43,12 +43,19 @@ class FsmeEyePair extends StatefulWidget {
   final EyeMood mood;
   final double size;
   final double spacing;
+  // When true, renders both eyes as flat closed lids regardless of
+  // mood — no dart, no blink, no bulge. Used for a static "FSME is
+  // off/sleeping" indicator (e.g. the Settings toggle), not a mood
+  // in the ambient sense — sleep never auto-resolves back to a mood
+  // the way the momentary one-shots do.
+  final bool asleep;
 
   const FsmeEyePair({
     super.key,
     this.mood = EyeMood.idle,
     this.size = 34,
     this.spacing = 10,
+    this.asleep = false,
   });
 
   @override
@@ -334,6 +341,21 @@ class FsmeEyePairState extends State<FsmeEyePair>
     }
   }
 
+  // Static closed-lid shape for the asleep/off state — no gradient
+  // eyeball, no pupil, no animation at all. A flat rounded bar reads
+  // clearly as "closed" at small sizes without needing a full
+  // eyelid-over-eyeball composite.
+  Widget _sleepingEyeVisual() {
+    return Container(
+      width: widget.size,
+      height: widget.size * 0.22,
+      decoration: BoxDecoration(
+        color: const Color(0xFF5A2020),
+        borderRadius: BorderRadius.circular(widget.size),
+      ),
+    );
+  }
+
   // Both rendered eyes read from the exact same _gazeX/_gazeY/lid/
   // bulge values below — that's what keeps them in lockstep instead
   // of each picking their own target independently.
@@ -382,6 +404,19 @@ class FsmeEyePairState extends State<FsmeEyePair>
 
   @override
   Widget build(BuildContext context) {
+    if (widget.asleep) {
+      // No animation at all while asleep — static, no controllers
+      // driving it, cheapest possible render for a settings toggle.
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _sleepingEyeVisual(),
+          SizedBox(width: widget.spacing),
+          _sleepingEyeVisual(),
+        ],
+      );
+    }
+
     return AnimatedBuilder(
       animation: Listenable.merge([
         _gazeAnim,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'constants.dart';
+import 'fsme_eye.dart';
 import 'peace_of_mind_page.dart';
 import 'safe_prep_nav_bar.dart';
 import 'mixpanel_service.dart';
@@ -110,10 +111,43 @@ class _MnemonicsPageState extends State<MnemonicsPage> {
     ]),
   ];
 
+  // ── FSME ──────────────────────────────────────────────────────
+  // Same self-clearing header pattern as the other trainers. This
+  // one uses Befuddled rather than Fibbing — he's genuinely tripping
+  // over the word itself, not making an exaggerated boast.
+  final GlobalKey<FsmeEyePairState> _eyeKey = GlobalKey<FsmeEyePairState>();
+  static const Duration _typeCharDelay = Duration(milliseconds: 18);
+  static const Duration _introHold = Duration(milliseconds: 1800);
+  static const String _introLine =
+      "Me-ne-nomics... in-menomics... menomonica... I can never "
+      "pronounce that word. It took forever to come up with "
+      "these \u2014 you better appreciate it!";
+
+  EyeMood _eyeMood = EyeMood.befuddled;
+  String _introDisplayedText = '';
+  bool _showIntro = true;
+
   @override
   void initState() {
     super.initState();
     MixpanelService.instance.track('mnemonics_viewed');
+    _playIntro();
+  }
+
+  Future<void> _playIntro() async {
+    for (var i = 1; i <= _introLine.length; i++) {
+      if (!mounted) return;
+      await Future.delayed(_typeCharDelay);
+      if (!mounted) return;
+      setState(() => _introDisplayedText = _introLine.substring(0, i));
+    }
+    if (!mounted) return;
+    await Future.delayed(_introHold);
+    if (!mounted) return;
+    setState(() {
+      _showIntro = false;
+      _eyeMood = EyeMood.serious;
+    });
   }
 
   @override
@@ -124,6 +158,7 @@ class _MnemonicsPageState extends State<MnemonicsPage> {
         child: Column(
           children: [
             _buildHeader(context),
+            _buildFsmeIntroBanner(),
             Expanded(child: _buildCardsList()),
             const SafePrepNavBar(),
           ],
@@ -161,7 +196,9 @@ class _MnemonicsPageState extends State<MnemonicsPage> {
                   fit: BoxFit.contain,
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
+              FsmeEyePair(key: _eyeKey, mood: _eyeMood, size: 22, spacing: 6),
+              const SizedBox(width: 8),
               const Text(
                 'Prep™',
                 style: TextStyle(
@@ -191,6 +228,30 @@ class _MnemonicsPageState extends State<MnemonicsPage> {
           ),
         ],
       ),
+    );
+  }
+
+  /// Self-clearing — collapses to zero height via AnimatedSize once
+  /// the intro line finishes its hold, so it never permanently steals
+  /// vertical space from the card list below.
+  Widget _buildFsmeIntroBanner() {
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      child: _showIntro
+          ? Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+              child: Text(
+                _introDisplayedText,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
+                  color: Color(0xFF555555),
+                ),
+              ),
+            )
+          : const SizedBox(width: double.infinity, height: 0),
     );
   }
 

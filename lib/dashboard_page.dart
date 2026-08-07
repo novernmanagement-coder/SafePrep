@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'constants.dart';
+import 'cluster_info_page.dart';
 import 'csv_loader.dart';
 import 'app_state.dart';
+import 'fsme_help_box.dart';
 import 'home_page.dart';
 import 'category_study_page.dart';
 import 'sixty_second_refresh_page.dart';
 import 'safe_prep_nav_bar.dart';
 import 'mixpanel_service.dart';
-import 'trial_timer_service.dart';
-import 'preview/preview_reveal_page.dart';
+import 'onboard/onboard_paywall.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -24,6 +25,26 @@ class _DashboardPageState extends State<DashboardPage> {
   List<FactModel> _facts = [];
   int _lastFactIndex = -1;
   String _currentFact = '';
+
+  // Dashboard IS the dashboardStudy cluster, so its FsmeHelpBox opens
+  // that cluster's explanation directly.
+  static const List<String> _fsmeHelpMessages = [
+    "Every category, your scores, what's mastered — it's all here.",
+    "Pulsing cards mean study this next. Not broken, just insistent.",
+    "Tap me — I'll 'splain what this whole thing is for.",
+  ];
+
+  void _openDashboardExplanation() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ClusterInfoPage(
+          cluster: AppCluster.dashboardStudy,
+          launchContext: ClusterLaunchContext.landing,
+        ),
+      ),
+    );
+  }
 
   static const List<String> categoryOrder = [
     'Time & Temperature',
@@ -61,14 +82,21 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void initState() {
     super.initState();
-    final bool locked =
-        !_state.hasUnlockedApp && TrialTimerService.instance.isExpired;
+    // Gated on real purchase state — either never purchased, or a
+    // sevenDay/fourteenDay purchase whose calendar expiry has passed
+    // (AppState.isExpired). This replaces the old TrialTimerService-
+    // based check, which stopped meaning anything once the trial
+    // system was removed and is the exact same dead-check pattern
+    // already found and fixed in safe_prep_nav_bar.dart's
+    // _goDashboard() — kept deliberately strict here too rather than
+    // just deleted, so an expired purchaser can't slip past the gate.
+    final bool locked = !_state.hasUnlockedApp || _state.isExpired;
     if (locked) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => PreviewRevealPage()),
+          MaterialPageRoute(builder: (_) => const OnboardPaywall()),
           (route) => false,
         );
       });
@@ -660,6 +688,11 @@ class _DashboardPageState extends State<DashboardPage> {
                 child: Column(
                   children: [
                     _buildHeader(),
+                    FsmeHelpBox(
+                      messages: _fsmeHelpMessages,
+                      onTap: _openDashboardExplanation,
+                      enabled: _state.fsmeEnabled,
+                    ),
                     Container(
                       decoration: BoxDecoration(
                         color: const Color(0xFF1A1A1A),

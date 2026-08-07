@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'constants.dart';
 import 'app_state.dart';
 import 'app_state_persistence.dart';
 import 'csv_loader.dart';
+import 'fsme_eye.dart';
 import 'peace_of_mind_page.dart';
 import 'readiness_engine.dart';
 import 'mixpanel_service.dart';
@@ -26,6 +28,25 @@ class _FlashCardsPageState extends State<FlashCardsPage>
   late AnimationController _flipController;
   late Animation<double> _scaleX;
 
+  // ── FSME ──────────────────────────────────────────────────────
+  // Small, self-clearing intro banner under the header — same
+  // pattern as RapidFirePage: types on entry, holds briefly, then
+  // collapses to zero height so it never permanently steals space
+  // from the card area. No ongoing reactions on this page (flash
+  // cards are self-graded, no correct/wrong signal to react to).
+  final GlobalKey<FsmeEyePairState> _eyeKey = GlobalKey<FsmeEyePairState>();
+  static const Duration _typeCharDelay = Duration(milliseconds: 18);
+  static const Duration _introHold = Duration(milliseconds: 1800);
+  static const String _introLine =
+      "Did I tell you I got kicked out of Vegas for counting cards? "
+      "I counted 1.3 million cards in the city \u2014 that's what "
+      "inspired Flash Cards. Time-tested, and a great way for "
+      "humans to lock in the information.";
+
+  EyeMood _eyeMood = EyeMood.fibbing;
+  String _introDisplayedText = '';
+  bool _showIntro = true;
+
   static const Map<String, _Suit> _categorySuits = {
     'Time & Temperature': _Suit('🌡', Color(0xFFC0392B), 'T&T'),
     'Cross-Contamination': _Suit('⚠', Color(0xFFE67E22), 'CC'),
@@ -48,6 +69,23 @@ class _FlashCardsPageState extends State<FlashCardsPage>
       CurvedAnimation(parent: _flipController, curve: Curves.easeInOut),
     );
     _loadCards();
+    _playIntro();
+  }
+
+  Future<void> _playIntro() async {
+    for (var i = 1; i <= _introLine.length; i++) {
+      if (!mounted) return;
+      await Future.delayed(_typeCharDelay);
+      if (!mounted) return;
+      setState(() => _introDisplayedText = _introLine.substring(0, i));
+    }
+    if (!mounted) return;
+    await Future.delayed(_introHold);
+    if (!mounted) return;
+    setState(() {
+      _showIntro = false;
+      _eyeMood = EyeMood.serious;
+    });
   }
 
   @override
@@ -212,6 +250,7 @@ class _FlashCardsPageState extends State<FlashCardsPage>
         child: Column(
           children: [
             _buildHeader(),
+            _buildFsmeIntroBanner(),
             Expanded(child: _buildCardArea()),
             _buildNavButtons(),
           ],
@@ -249,7 +288,9 @@ class _FlashCardsPageState extends State<FlashCardsPage>
                   fit: BoxFit.contain,
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
+              FsmeEyePair(key: _eyeKey, mood: _eyeMood, size: 22, spacing: 6),
+              const SizedBox(width: 8),
               const Text(
                 'Prep™',
                 style: TextStyle(
@@ -279,6 +320,30 @@ class _FlashCardsPageState extends State<FlashCardsPage>
           ),
         ],
       ),
+    );
+  }
+
+  /// Self-clearing — collapses to zero height via AnimatedSize once
+  /// the intro line finishes its hold, so it never permanently steals
+  /// vertical space from the card area below it.
+  Widget _buildFsmeIntroBanner() {
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      child: _showIntro
+          ? Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+              child: Text(
+                _introDisplayedText,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
+                  color: Color(0xFF555555),
+                ),
+              ),
+            )
+          : const SizedBox(width: double.infinity, height: 0),
     );
   }
 

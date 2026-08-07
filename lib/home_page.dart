@@ -7,12 +7,15 @@ import 'app_state_persistence.dart';
 import 'iap_service.dart';
 import 'readiness_engine.dart';
 import 'assessment_info_page.dart';
+import 'cluster_info_page.dart';
 import 'dashboard_page.dart';
 import 'settings_page.dart';
 import 'sixty_second_refresh_page.dart';
 import 'about_proctors_page.dart';
 import 'final_exam_intro_page.dart';
 import 'peace_of_mind_page.dart';
+import 'fsme_help_box.dart';
+import 'fsme_eye.dart'; // FsmeEyePair, EyeMood
 import 'mixpanel_service.dart';
 import 'safe_prep_nav_bar.dart';
 
@@ -23,10 +26,54 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
+class _HomeClusterEntry {
+  final AppCluster cluster;
+  final String label;
+  final IconData icon;
+  const _HomeClusterEntry(this.cluster, this.label, this.icon);
+}
+
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   final AppState _state = AppState();
   String _currentFact = '';
   List<MilestoneModel> _milestones = [];
+
+  // --- FSME renewal explainer (daysRemaining <= 2, one-time) ---
+  final GlobalKey<FsmeEyePairState> _explainerEyeKey =
+      GlobalKey<FsmeEyePairState>();
+  bool _showFsmeBeat1 = false;
+  bool _showFsmeBeat2 = false;
+  final List<Timer> _explainerTimers = [];
+
+  // Mirrors the five stops from FsmePostPurchaseLanding / the list in
+  // settings_page.dart — same clusters, same labels/icons. Home isn't
+  // any one of the five itself, so its FsmeHelpBox opens this list
+  // rather than a single ClusterInfoPage the way other pages will.
+  static const List<_HomeClusterEntry> _clusters = [
+    _HomeClusterEntry(
+      AppCluster.assessment,
+      'The Assessment',
+      Icons.fact_check_outlined,
+    ),
+    _HomeClusterEntry(
+      AppCluster.dashboardStudy,
+      'Dashboard and Study',
+      Icons.dashboard_customize_outlined,
+    ),
+    _HomeClusterEntry(AppCluster.trainers, 'The Trainers', Icons.bolt_outlined),
+    _HomeClusterEntry(AppCluster.settings, 'Settings', Icons.settings_outlined),
+    _HomeClusterEntry(
+      AppCluster.finalExam,
+      'The Final Exam',
+      Icons.workspace_premium_outlined,
+    ),
+  ];
+
+  static const List<String> _fsmeHelpMessages = [
+    "Home base. Everything spins out from here.",
+    "Not sure what does what? Story of my life too.",
+    "Tap me — I'll 'splain whatever you're stuck on.",
+  ];
 
   @override
   void initState() {
@@ -48,6 +95,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    for (final t in _explainerTimers) {
+      t.cancel();
+    }
     super.dispose();
   }
 
@@ -92,7 +142,265 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         _state.readinessScore,
       );
       setState(() => _milestones = all);
+      _maybeStartRenewalExplainer();
     }
+  }
+
+  // Fires once, only when the Renew button is actually showing
+  // (daysRemaining <= 2 through expiry) and the user hasn't seen this
+  // explainer before. Two-beat sequence, not a modal:
+  //   Beat 1: under the header, "follow me" line, eyes point down.
+  //   Beat 2: above the footer/nav bar, full days-left/readiness/
+  //   discount script, holds 10s, then self-clears.
+  //
+  // TODO: AppState needs a `hasSeenRenewalExplainer` bool (default
+  // false) persisted via AppStatePersistence — added here as a
+  // field reference; wire the real field/persistence in app_state.dart.
+  // TODO: reset hasSeenRenewalExplainer to false on the purchase-
+  // success path for buyRenewal(), so this can fire again on a
+  // future renewal cycle rather than only ever once, lifetime.
+  void _maybeStartRenewalExplainer() {
+    final eligible =
+        _state.isTimeLimited &&
+        !_state.isExpired &&
+        (_state.daysRemaining ?? 99) <= 2 &&
+        !_state.hasSeenRenewalExplainer; // TODO: add this field to AppState
+    if (!eligible) return;
+
+    _explainerTimers.add(
+      Timer(const Duration(milliseconds: 300), () {
+        if (!mounted) return;
+        setState(() => _showFsmeBeat1 = true);
+        // TODO: fsme_eye.dart doesn't yet have a Point(direction)
+        // one-shot — this was scoped as a general widget addition
+        // (up/down/left/right), first use case being this screen.
+        // Once built: _explainerEyeKey.currentState?.point(EyeDirection.down);
+      }),
+    );
+    _explainerTimers.add(
+      Timer(const Duration(milliseconds: 3300), () {
+        if (!mounted) return;
+        setState(() => _showFsmeBeat1 = false);
+      }),
+    );
+    _explainerTimers.add(
+      Timer(const Duration(milliseconds: 3700), () {
+        if (!mounted) return;
+        setState(() => _showFsmeBeat2 = true);
+      }),
+    );
+    _explainerTimers.add(
+      Timer(const Duration(milliseconds: 13700), () {
+        if (!mounted) return;
+        setState(() => _showFsmeBeat2 = false);
+        _state.hasSeenRenewalExplainer = true; // TODO: see field note above
+        AppStatePersistence.save();
+      }),
+    );
+  }
+
+  Widget _buildFsmeBeat1() {
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 300),
+      child: !_showFsmeBeat1
+          ? const SizedBox(width: double.infinity)
+          : Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBF0),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: _goldDark),
+              ),
+              child: Row(
+                children: [
+                  FsmeEyePair(
+                    key: _explainerEyeKey,
+                    mood: EyeMood.idle,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Hey, follow me — I have something to show ya?',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: _goldText,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+
+  Widget _buildFsmeBeat2() {
+    final daysLeft = _state.daysRemaining ?? 0;
+    final readiness = _state.readinessScore;
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 300),
+      child: !_showFsmeBeat2
+          ? const SizedBox(width: double.infinity)
+          : Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBF0),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: _goldDark, width: 1.5),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const FsmeEyePair(mood: EyeMood.idle, size: 20),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'F S M E',
+                        style: TextStyle(
+                          fontSize: 10,
+                          letterSpacing: 2,
+                          color: _goldText,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "I see the Boss added the Renew button, so you've got "
+                    "$daysLeft day${daysLeft == 1 ? '' : 's'} left. You're "
+                    "at $readiness% readiness — want to add another week? "
+                    "If so, hit Renew.",
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      color: Color(0xFF4A3728),
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    "(I talked her into the friends and family discount — "
+                    "just \$2.99.)",
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: _goldText,
+                      fontStyle: FontStyle.italic,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+
+  void _openCluster(AppCluster cluster) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ClusterInfoPage(
+          cluster: cluster,
+          launchContext: ClusterLaunchContext.landing,
+        ),
+      ),
+    );
+  }
+
+  void _showClusterList() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0A0A0F),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'What do you want me to \'splain?',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFFD4AF37).withValues(alpha: 0.9),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                ..._clusters.map(
+                  (entry) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          _openCluster(entry.cluster);
+                        },
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 13,
+                            horizontal: 14,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF13130F),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: const Color(
+                                0xFFD4AF37,
+                              ).withValues(alpha: 0.35),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                entry.icon,
+                                size: 16,
+                                color: const Color(0xFFD4AF37),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  entry.label,
+                                  style: const TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFFF0EDE8),
+                                  ),
+                                ),
+                              ),
+                              Icon(
+                                Icons.chevron_right,
+                                size: 16,
+                                color: const Color(
+                                  0xFFD4AF37,
+                                ).withValues(alpha: 0.7),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildButton(String label, VoidCallback onPressed) {
@@ -755,76 +1063,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       child: Column(
         spacing: 2,
         children: [
-          if (state.canUpgradeToLifetime) ...[
-            GestureDetector(
-              onTap: () async {
-                final result = await IAPService.instance.buyUpgrade();
-                if (!mounted) return;
-
-                if (result == IAPResult.success) {
-                  setState(() {});
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text("You're upgraded to Lifetime! 🎉"),
-                    ),
-                  );
-                  return;
-                }
-
-                if (result == IAPResult.canceled) {
-                  return;
-                }
-
-                final message = result.userMessage;
-                if (message != null) {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text(message)));
-                }
-              },
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                margin: const EdgeInsets.only(bottom: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2A1F00),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFF0C575)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text('⭐', style: TextStyle(fontSize: 14)),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Upgrade to Lifetime — ${IAPService.instance.upgradePrice}',
-                      style: const TextStyle(
-                        color: Color(0xFFF0C575),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-          if (state.isLifetime)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Text(
-                '⭐ SafePrep™ Lifetime Member',
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: Color(0xFFF0C575),
-                  fontWeight: FontWeight.w600,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
           if (state.isTimeLimited && state.daysRemaining != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 4),
@@ -904,6 +1142,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   ],
                 ),
               ),
+              // FSME renewal-explainer beat 1 (under header)
+              _buildFsmeBeat1(),
               Container(
                 height: 32,
                 margin: const EdgeInsets.only(bottom: 8),
@@ -925,6 +1165,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       ? const SizedBox()
                       : Marquee(text: _currentFact),
                 ),
+              ),
+              FsmeHelpBox(
+                messages: _fsmeHelpMessages,
+                onTap: _showClusterList,
+                enabled: _state.fsmeEnabled,
               ),
               Expanded(
                 child: SingleChildScrollView(
@@ -1175,6 +1420,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   ),
                 ),
               ),
+              // FSME renewal-explainer beat 2 (above the nav bar/footer)
+              _buildFsmeBeat2(),
               const SafePrepNavBar(),
             ],
           ),

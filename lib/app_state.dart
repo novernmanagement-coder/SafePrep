@@ -86,17 +86,25 @@ class AppState {
       purchaseType == PurchaseType.fourteenDay;
   bool get canUpgradeToLifetime => isTimeLimited && hasUnlockedApp;
 
-  bool get isExpired {
-    if (!isTimeLimited || purchaseDate == null) return false;
+  // The actual expiry DateTime, exposed as its own getter so callers
+  // that need the real date (e.g. renew_page.dart's "yours until X"
+  // copy) don't have to duplicate the purchaseDate + duration math
+  // that isExpired/daysRemaining already do below.
+  DateTime? get expiryDate {
+    if (!isTimeLimited || purchaseDate == null) return null;
     final days = purchaseType == PurchaseType.sevenDay ? 7 : 14;
-    final expiry = purchaseDate!.add(Duration(days: days));
+    return purchaseDate!.add(Duration(days: days));
+  }
+
+  bool get isExpired {
+    final expiry = expiryDate;
+    if (expiry == null) return false;
     return DateTime.now().isAfter(expiry);
   }
 
   int? get daysRemaining {
-    if (!isTimeLimited || purchaseDate == null) return null;
-    final days = purchaseType == PurchaseType.sevenDay ? 7 : 14;
-    final expiry = purchaseDate!.add(Duration(days: days));
+    final expiry = expiryDate;
+    if (expiry == null) return null;
     final remaining = expiry.difference(DateTime.now()).inDays;
     return remaining < 0 ? 0 : remaining;
   }
@@ -109,6 +117,25 @@ class AppState {
   // purchase fields do, so a data reset never re-triggers a duplicate
   // trial_started event either.
   bool trialStarted = false;
+  // ──────────────────────────────────────────────────────────
+
+  // ── FSME toggle ──────────────────────────────────────────────
+  // Global on/off switch for FSME's presence outside the trainers
+  // (Peace of Mind + the 5 trainer pages ignore this entirely per
+  // product decision — "trainers are his baby"). Defaults on.
+  // Persists across reset() the same way the other preference-style
+  // fields above do — it's a preference, not progress.
+  bool fsmeEnabled = true;
+  // ──────────────────────────────────────────────────────────
+
+  // ── Renewal explainer ─────────────────────────────────────────
+  // One-time HomePage FSME explainer for the Renew button, fires once
+  // when daysRemaining <= 2 (see home_page.dart _maybeStartRenewalExplainer).
+  // Persists across reset() same as trialStarted/fsmeEnabled. Reset back
+  // to false on a successful renewal purchase (see iap_service.dart
+  // buyRenewal() success path) so the explainer can legitimately fire
+  // again on a future renewal cycle.
+  bool hasSeenRenewalExplainer = false;
   // ──────────────────────────────────────────────────────────
 
   // ── Readiness Index ───────────────────────────────────────
@@ -399,6 +426,8 @@ class AppState {
     final savedPurchaseType = purchaseType;
     final savedPurchaseDate = purchaseDate;
     final savedTrialStarted = trialStarted;
+    final savedFsmeEnabled = fsmeEnabled;
+    final savedHasSeenRenewalExplainer = hasSeenRenewalExplainer;
 
     userName = '';
     hasSeenIntro = false;
@@ -432,6 +461,8 @@ class AppState {
     purchaseType = savedPurchaseType;
     purchaseDate = savedPurchaseDate;
     trialStarted = savedTrialStarted;
+    fsmeEnabled = savedFsmeEnabled;
+    hasSeenRenewalExplainer = savedHasSeenRenewalExplainer;
   }
 
   Map<String, dynamic> toJson() => {
@@ -442,6 +473,8 @@ class AppState {
     'purchaseType': purchaseType.name,
     'purchaseDate': purchaseDate?.toIso8601String(),
     'trialStarted': trialStarted,
+    'fsmeEnabled': fsmeEnabled,
+    'hasSeenRenewalExplainer': hasSeenRenewalExplainer,
     'readinessScore': readinessScore,
     'readinessCoachMessage': readinessCoachMessage,
     'readinessCheerMessage': readinessCheerMessage,
@@ -484,6 +517,8 @@ class AppState {
         ? DateTime.parse(json['purchaseDate'])
         : null;
     trialStarted = json['trialStarted'] ?? false;
+    fsmeEnabled = json['fsmeEnabled'] ?? true;
+    hasSeenRenewalExplainer = json['hasSeenRenewalExplainer'] ?? false;
     readinessScore = json['readinessScore'] ?? 0;
     readinessCoachMessage =
         json['readinessCoachMessage'] ??
