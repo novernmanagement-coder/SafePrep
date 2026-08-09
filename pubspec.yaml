@@ -15,6 +15,7 @@ dependencies:
   shared_preferences: ^2.3.2
   url_launcher: ^6.3.0
   in_app_purchase: ^3.2.0
+  in_app_review: ^2.0.12
   http: ^1.6.0
   path_provider: ^2.1.5
   mixpanel_flutter: ^2.3.3

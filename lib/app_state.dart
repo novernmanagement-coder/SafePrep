@@ -141,6 +141,14 @@ class AppState {
   bool hasSeenStudyLanding = false;
   // ──────────────────────────────────────────────────────────
 
+  // ── Final Exam review prompt (FSME) ──────────────────────────
+  // One-time, ever — fires once on a Final Exam pass at 85%+ (see
+  // FinalExamGradePage / ReviewPromptDialog). Preserved across
+  // reset() same as hasSeenRenewalExplainer/hasSeenStudyLanding, so
+  // a data reset doesn't let the ask fire a second time.
+  bool hasSeenReviewPrompt = false;
+  // ──────────────────────────────────────────────────────────
+
   // ── Fail-streak safety net (Retro→Proper→Full Study) ─────────────
   // Per-category, resets on any pass (>=75%) or when the counter is
   // consumed by a triggered switch — does NOT carry across different
@@ -539,6 +547,7 @@ class AppState {
     final savedFsmeEnabled = fsmeEnabled;
     final savedHasSeenRenewalExplainer = hasSeenRenewalExplainer;
     final savedHasSeenStudyLanding = hasSeenStudyLanding;
+    final savedHasSeenReviewPrompt = hasSeenReviewPrompt;
 
     userName = '';
     hasSeenIntro = false;
@@ -583,6 +592,7 @@ class AppState {
     fsmeEnabled = savedFsmeEnabled;
     hasSeenRenewalExplainer = savedHasSeenRenewalExplainer;
     hasSeenStudyLanding = savedHasSeenStudyLanding;
+    hasSeenReviewPrompt = savedHasSeenReviewPrompt;
   }
 
   Map<String, dynamic> toJson() => {
@@ -596,6 +606,7 @@ class AppState {
     'fsmeEnabled': fsmeEnabled,
     'hasSeenRenewalExplainer': hasSeenRenewalExplainer,
     'hasSeenStudyLanding': hasSeenStudyLanding,
+    'hasSeenReviewPrompt': hasSeenReviewPrompt,
     'categoryQuizFailStreak': categoryQuizFailStreak,
     'categoryModeOverride': categoryModeOverride,
     'readinessScore': readinessScore,
@@ -654,6 +665,7 @@ class AppState {
     fsmeEnabled = json['fsmeEnabled'] ?? true;
     hasSeenRenewalExplainer = json['hasSeenRenewalExplainer'] ?? false;
     hasSeenStudyLanding = json['hasSeenStudyLanding'] ?? false;
+    hasSeenReviewPrompt = json['hasSeenReviewPrompt'] ?? false;
     categoryQuizFailStreak = Map<String, int>.from(
       json['categoryQuizFailStreak'] ?? {},
     );

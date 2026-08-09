@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:in_app_review/in_app_review.dart';
 import 'app_state.dart';
+import 'app_state_persistence.dart';
 import 'constants.dart';
 
 /// FSME's post-Final-Exam-pass review ask.
@@ -90,7 +91,7 @@ class _ReviewPromptDialogState extends State<ReviewPromptDialog>
   }) async {
     final state = AppState();
     state.hasSeenReviewPrompt = true;
-    state.save();
+    AppStatePersistence.save();
 
     if (requestReview) {
       final inAppReview = InAppReview.instance;
