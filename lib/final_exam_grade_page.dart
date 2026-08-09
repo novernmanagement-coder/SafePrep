@@ -4,6 +4,7 @@ import 'app_state.dart';
 import 'dashboard_page.dart';
 import 'exam_ready_page.dart';
 import 'safe_prep_nav_bar.dart';
+import 'review_prompt_dialog.dart';
 
 class FinalExamGradePage extends StatelessWidget {
   final TestResult result;
@@ -75,6 +76,12 @@ class FinalExamGradePage extends StatelessWidget {
     final score = result.overallScore;
     final scoreColor = _scoreColor(score);
     final state = AppState();
+
+    if (score >= 85 && !state.hasSeenReviewPrompt) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) ReviewPromptDialog.show(context);
+      });
+    }
 
     final categories = [
       'Time & Temperature',
