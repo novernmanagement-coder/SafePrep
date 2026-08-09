@@ -11,24 +11,32 @@ import 'onboard/onboard_intro.dart';
 import 'onboard/onboard_paywall.dart';
 import 'onboard/onboard_answers.dart';
 
-// BUILD 28 — Simplified routing, updated for the self-report redesign.
+// BUILD 29 — Splash routing, revised so casual/free-info visitors
+// never hit the access-code wall.
 //
 // Three paths:
-//   purchased            → DashboardPage
-//   wrong / no code       → OnboardPaywall
-//   correct access code   → SplashNavigatingPage (DEBUG ONLY — see note
-//                           below; was OnboardIntro before this change)
+//   purchased              → DashboardPage
+//   everyone else          → OnboardIntro (the funnel), every launch,
+//                             no run cap
+//   long-press splash logo → access-code prompt (DEBUG ONLY — see
+//                             note below), independent of run count
 //
-// The old preview/trial/cinematic flow is dead. The onboarding funnel
-// IS the trial — no free-roam dashboard, no 30-minute timer, no
-// PreviewCinematicSplash.
+// PREVIOUSLY: after kMaxFreeRuns onboarding runs, this page would
+// interrupt with an access-code prompt before falling through to
+// OnboardPaywall on a wrong/blank/dismissed entry. That wall was
+// catching casual visitors who just wanted free information and had
+// no intent to buy yet — SpOn_Splash_Route funnel data showed people
+// bailing right around there. DECIDED (per earlier discussion): drop
+// the run-count trigger entirely — unlimited free re-runs of the
+// funnel, since the paywall itself is the real gate, not repeat
+// exposure to the pitch. Free attempts counter (kOnboardingRunsKey)
+// is still incremented in OnboardPaywall.initState and still useful
+// as an analytics signal — just no longer drives routing here.
 //
-// The free-attempts counter (onboarding_runs_completed) used to be
-// incremented inside OnboardReadiness, on the diagnostic verdict
-// screen. That screen is gone in the self-report redesign, so the
-// increment now happens when the user REACHES THE PAYWALL instead —
-// that's the new equivalent of "completed a full run through the
-// funnel." See OnboardPaywall.initState.
+// This removed Gerry's only way to reach the access-code prompt (it
+// was previously the run-count trigger itself), so a long-press on
+// the splash logo now opens the same prompt directly, independent of
+// run count — this is the new/only way in.
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
 
@@ -40,7 +48,9 @@ class _SplashPageState extends State<SplashPage> {
   static const String _seenSplashPrefKey = 'has_seen_splash_before';
 
   // Access code. Correct entry → SplashNavigatingPage (debug menu).
-  // Anything else, blank, or dismissed → paywall.
+  // Anything else, blank, or dismissed → dialog just closes, normal
+  // splash countdown/navigation continues underneath if it hasn't
+  // already fired.
   //
   // DEBUG ONLY — REMOVE BEFORE RELEASE. This access-code branch
   // normally routed to OnboardIntro (the real funnel). It's been
@@ -61,6 +71,10 @@ class _SplashPageState extends State<SplashPage> {
   int _secondsElapsed = 0;
   int? _totalHoldSeconds;
   bool _isFirstLaunch = true;
+
+  // Guards against the auto-navigate firing after a long-press has
+  // already taken the user down the debug path.
+  bool _navigated = false;
 
   @override
   void initState() {
@@ -111,7 +125,7 @@ class _SplashPageState extends State<SplashPage> {
     final state = AppState();
 
     await Future.delayed(Duration(seconds: holdSeconds));
-    if (!mounted) return;
+    if (!mounted || _navigated) return;
 
     // Clear stale debug state.
     //
@@ -132,11 +146,12 @@ class _SplashPageState extends State<SplashPage> {
       state.purchaseType = PurchaseType.none;
       await AppStatePersistence.save();
     }
-    if (!mounted) return;
+    if (!mounted || _navigated) return;
 
     // ── Path 1: purchased and active → Dashboard ─────────────────────
-    // Checked FIRST so a paying customer never sees the access prompt.
+    // Checked FIRST so a paying customer never sees the funnel again.
     if (state.hasUnlockedApp && !state.isExpired) {
+      _navigated = true;
       MixpanelService.instance.track(
         'SpOn_Splash_Route',
         properties: {'app_name': 'SP', 'path': 'purchased'},
@@ -152,62 +167,53 @@ class _SplashPageState extends State<SplashPage> {
       state.hasUnlockedApp = false;
       AppStatePersistence.save();
     }
-    if (!mounted) return;
+    if (!mounted || _navigated) return;
 
+    // ── Path 2: everyone else → funnel, every time ────────────────────
+    // No run cap. The run counter (kOnboardingRunsKey) still increments
+    // in OnboardPaywall.initState purely as an analytics signal — it no
+    // longer gates anything here.
+    _navigated = true;
+    OnboardingAnswers.instance.reset();
     final prefs = await SharedPreferences.getInstance();
     final runs = prefs.getInt(kOnboardingRunsKey) ?? 0;
-
+    MixpanelService.instance.track(
+      'SpOn_Splash_Route',
+      properties: {'app_name': 'SP', 'path': 'free_attempt', 'runs': runs},
+    );
     if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const OnboardIntro()),
+    );
+  }
 
-    // ── Free attempts ─────────────────────────────────────────────────
-    // First two runs skip the access-code prompt entirely and drop
-    // straight into the funnel. From the 3rd run on, the code is
-    // required — wrong/blank/dismissed falls to the paywall.
-    if (runs < kMaxFreeRuns) {
-      OnboardingAnswers.instance.reset();
-      MixpanelService.instance.track(
-        'SpOn_Splash_Route',
-        properties: {'app_name': 'SP', 'path': 'free_attempt', 'runs': runs},
-      );
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const OnboardIntro()),
-      );
-      return;
-    }
-
-    // ── Access-code fork ─────────────────────────────────────────────
-    // Correct code → SplashNavigatingPage (DEBUG — see class-level
-    // note). Anything else → paywall.
+  /// Long-press on the splash logo — the only remaining way to reach
+  /// the debug access-code prompt, independent of run count. Wrong,
+  /// blank, or dismissed entry just closes the dialog; the normal
+  /// timed navigation continues underneath if it hasn't already fired.
+  Future<void> _debugEntry() async {
     final entered = await _promptAccessCode();
-    if (!mounted) return;
+    if (!mounted || _navigated) return;
 
     if (entered == _accessCode) {
-      // Clear stale funnel data so each run starts clean.
+      _navigated = true;
+      _displayTicker?.cancel();
       OnboardingAnswers.instance.reset();
       MixpanelService.instance.track(
         'SpOn_Splash_Route',
-        properties: {'app_name': 'SP', 'path': 'debug_nav', 'runs': runs},
+        properties: {'app_name': 'SP', 'path': 'debug_nav_longpress'},
       );
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const SplashNavigatingPage()),
       );
-    } else {
-      MixpanelService.instance.track(
-        'SpOn_Splash_Route',
-        properties: {'app_name': 'SP', 'path': 'runs_exhausted', 'runs': runs},
-      );
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const OnboardPaywall()),
-      );
     }
+    // Wrong/blank/dismissed: do nothing, let normal routing proceed.
   }
 
   /// Shows a modal asking for the access code. Returns the entered
-  /// string, or null if dismissed. A null / wrong return routes to the
-  /// paywall.
+  /// string, or null if dismissed.
   Future<String?> _promptAccessCode() {
     final controller = TextEditingController();
     return showDialog<String>(
@@ -264,7 +270,10 @@ class _SplashPageState extends State<SplashPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Image.asset('Assets/splash.png', width: 80, height: 80),
+              GestureDetector(
+                onLongPress: _debugEntry,
+                child: Image.asset('Assets/splash.png', width: 80, height: 80),
+              ),
               const SizedBox(height: 24),
 
               const Text(

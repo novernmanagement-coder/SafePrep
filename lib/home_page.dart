@@ -84,11 +84,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
     MixpanelService.instance.track(
       'session_start',
-      properties: {'is_unlocked': _state.hasUnlockedApp, 'app_name': 'SP'},
+      properties: {
+        'is_unlocked': _state.hasUnlockedApp,
+        'app_name': 'SP',
+        'days_remaining': _state.daysRemaining,
+      },
     );
     MixpanelService.instance.track(
       'home_viewed',
-      properties: {'is_unlocked': _state.hasUnlockedApp, 'app_name': 'SP'},
+      properties: {
+        'is_unlocked': _state.hasUnlockedApp,
+        'app_name': 'SP',
+        'readiness_score': _state.readinessScore,
+        'days_remaining': _state.daysRemaining,
+      },
     );
   }
 
