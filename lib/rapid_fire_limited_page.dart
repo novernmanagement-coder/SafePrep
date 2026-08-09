@@ -329,9 +329,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
           await Future.delayed(const Duration(milliseconds: 18));
         }
       } else {
-        setState(
-          () => _fsmeLines.add(_TermLine(line.text, line.audience)),
-        );
+        setState(() => _fsmeLines.add(_TermLine(line.text, line.audience)));
       }
 
       await Future.delayed(const Duration(milliseconds: 900));
@@ -921,7 +919,8 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
           const SizedBox(height: 10),
 
           Text(
-            'There are $remaining more \u2014 and it\u2019s your weakest area.',
+            'There are $remaining more \u2014 and ServSafe will hammer '
+            'home this category on the test.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,

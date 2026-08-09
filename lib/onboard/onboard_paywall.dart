@@ -180,7 +180,7 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
               const SizedBox(height: 10),
 
               Text(
-                'Built from your readiness level.',
+                'Built from what you told us.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 12,

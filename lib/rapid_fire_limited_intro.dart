@@ -15,7 +15,7 @@ import 'rapid_fire_limited_page.dart';
 /// the "not just random questions" promise — they pick what to study,
 /// which is the personalization hook in miniature.
 ///
-/// FSME pops up once, above the Start button: a "psst" aside revealing
+/// FSME pops up once, below the Start button: a "psst" aside revealing
 /// this is his favorite of the six trainers, a quote of the Boss's
 /// read on the user (hesitant, needs one more preview), then he bolts
 /// as she approaches. Standard pop-in timing (2s delay, 2300ms fade).
@@ -407,7 +407,7 @@ class _RapidFireLimitedIntroState extends State<RapidFireLimitedIntro>
 
               // Pre-selected categories
               Text(
-                'We\u2019ve pre-selected your 3 weakest areas:',
+                'We\u2019ve selected 3 of the heaviest weighted categories from the test:',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 12,
@@ -449,10 +449,7 @@ class _RapidFireLimitedIntroState extends State<RapidFireLimitedIntro>
 
               const SizedBox(height: 32),
 
-              // FSME's "psst" aside — pops in above the Start button.
-              _fsmePopup(),
-
-              // Start button
+              // Start button — sits directly below the category chips now.
               SizedBox(
                 height: 52,
                 child: ElevatedButton(
@@ -464,9 +461,7 @@ class _RapidFireLimitedIntroState extends State<RapidFireLimitedIntro>
 
                     Navigator.pushReplacement(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) => RapidFireLimitedPage(),
-                      ),
+                      MaterialPageRoute(builder: (_) => RapidFireLimitedPage()),
                     );
                   },
                   style: ElevatedButton.styleFrom(
@@ -485,6 +480,11 @@ class _RapidFireLimitedIntroState extends State<RapidFireLimitedIntro>
                   ),
                 ),
               ),
+
+              const SizedBox(height: 16),
+
+              // FSME's "psst" aside — now appears below the Start button.
+              _fsmePopup(),
             ],
           ),
         ),

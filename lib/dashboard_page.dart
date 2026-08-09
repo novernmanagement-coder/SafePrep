@@ -5,7 +5,7 @@ import 'csv_loader.dart';
 import 'app_state.dart';
 import 'fsme_help_box.dart';
 import 'home_page.dart';
-import 'category_study_page.dart';
+import 'study_landing_page.dart';
 import 'sixty_second_refresh_page.dart';
 import 'safe_prep_nav_bar.dart';
 import 'mixpanel_service.dart';
@@ -150,11 +150,13 @@ class _DashboardPageState extends State<DashboardPage> {
     return 'No change vs baseline';
   }
 
+  // Routes through the shared navigateToStudy() helper (see
+  // study_landing_page.dart) instead of pushing CategoryStudyPage
+  // directly, so a user's very first-ever "Study →" tap — whether it
+  // happens here or anywhere else in the app — still shows the
+  // one-time FSME study-landing modal before landing in the module.
   void _goToStudy(String category) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => CategoryStudyPage(category: category)),
-    );
+    navigateToStudy(context, category);
   }
 
   Widget _buildHeader() {

@@ -1,5 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'constants.dart';
+import 'app_state.dart';
+import 'dashboard_page.dart';
 import 'fsme_post_purchase_landing.dart';
 import 'home_page.dart';
 import 'onboard/onboard_intro.dart';
@@ -17,6 +20,22 @@ class SplashNavigatingPage extends StatelessWidget {
 
   void _go(BuildContext context, Widget page) {
     Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => page));
+  }
+
+  // Windows/desktop dev builds have no working IAP store, so
+  // AppState().hasUnlockedApp is never set to true by a real purchase
+  // — SafePrepNavBar's gate then bounces straight to OnboardPaywall
+  // on any attempt to reach Dashboard or Rapid Fire. This forces the
+  // unlocked state directly so local testing doesn't require a real
+  // purchase or a TestFlight round-trip.
+  //
+  // kDebugMode-gated: compiles to nothing in release builds, so it
+  // can never be used as a free-unlock path in a shipped app even if
+  // this file is accidentally left wired in.
+  void _forceUnlockForDebug() {
+    if (!kDebugMode) return;
+    AppState().hasUnlockedApp = true;
+    AppState().purchaseType = PurchaseType.lifetime;
   }
 
   Widget _destButton(BuildContext context, String label, Widget page) {
@@ -73,6 +92,29 @@ class SplashNavigatingPage extends StatelessWidget {
                   const OnboardIntro(),
                 ),
                 _destButton(context, 'Home Page', const HomePage()),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: SizedBox(
+                    height: AppSizes.primaryButtonHeight,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        _forceUnlockForDebug();
+                        _go(context, const DashboardPage());
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF13130F),
+                        foregroundColor: const Color(0xFFF0EDE8),
+                        side: const BorderSide(color: Color(0xFFD4AF37)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppSizes.buttonCornerRadius,
+                          ),
+                        ),
+                      ),
+                      child: const Text('Dashboard (force-unlocked)'),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),

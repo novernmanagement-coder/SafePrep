@@ -113,10 +113,24 @@ class _SplashPageState extends State<SplashPage> {
     await Future.delayed(Duration(seconds: holdSeconds));
     if (!mounted) return;
 
-    // Clear stale debug state
+    // Clear stale debug state.
+    //
+    // FIXED: this used to call state.reset(), which looks like it
+    // should clear hasUnlockedApp — but AppState.reset() deliberately
+    // SAVES hasUnlockedApp/purchaseType/purchaseDate before wiping
+    // anything and RESTORES them at the end (so a normal progress
+    // reset never accidentally un-purchases a real paying user). That
+    // makes reset() a no-op for exactly the fields this guard is
+    // trying to clear — a debug-forced hasUnlockedApp (set via
+    // SplashNavigatingPage's force-unlock button, which never sets a
+    // purchaseDate) would survive reset() untouched, and Path 1 below
+    // would then route straight to Dashboard on every future launch,
+    // permanently skipping this page's own routing entirely. Clear
+    // the fields directly instead.
     if (state.hasUnlockedApp && state.purchaseDate == null) {
-      state.reset();
-      await AppStatePersistence.delete();
+      state.hasUnlockedApp = false;
+      state.purchaseType = PurchaseType.none;
+      await AppStatePersistence.save();
     }
     if (!mounted) return;
 

@@ -60,6 +60,12 @@ class _FinalStepExamPageState extends State<FinalStepExamPage> {
   static const double hardWeight = 0.40;
   static const double mediumWeight = 0.40;
 
+  // The Final Exam is the true readiness checkpoint — matches the
+  // real ServSafe exam pass mark, same 75% used by the category-quiz
+  // fail-streak safety net elsewhere (see category_quiz_results_page
+  // .dart's _failThreshold). Not an arbitrary number.
+  static const int _passThreshold = 75;
+
   @override
   void initState() {
     super.initState();
@@ -180,10 +186,49 @@ class _FinalStepExamPageState extends State<FinalStepExamPage> {
       TestType.finalExam,
     );
 
-    for (final entry in result.categoryScores.entries) {
-      _state.saveCategoryQuizScore(entry.key, entry.value);
-      if (entry.value >= AppState.masteryThreshold)
-        _state.markCategoryStudied(entry.key);
+    final passed = result.overallScore >= _passThreshold;
+
+    if (passed) {
+      // Unchanged from before — real exam performance, saved and
+      // credited exactly as it's earned.
+      for (final entry in result.categoryScores.entries) {
+        _state.saveCategoryQuizScore(entry.key, entry.value);
+        if (entry.value >= AppState.masteryThreshold) {
+          _state.markCategoryStudied(entry.key);
+        }
+      }
+    } else {
+      // FAIL — full reset. The Final Exam is the one true readiness
+      // checkpoint: failing it means whatever state got the user here
+      // (assessment shortcuts, stale mastery, guessed answers) can't
+      // be trusted. Treated the same as the assessment's own scoring
+      // loop, category by category — a category that STILL hits
+      // mastery on the exam itself earns real credit (score + marked
+      // studied); every other category drops to a genuine 0%, not
+      // just "needs review," and loses its studied flag so it reads
+      // as un-started, not partially done.
+      //
+      // categoryBaselineScores is deliberately left untouched — see
+      // AppState — so the user keeps a record of where they started,
+      // a standing reminder that shortcuts don't work.
+      for (final entry in result.categoryScores.entries) {
+        if (entry.value >= AppState.masteryThreshold) {
+          _state.saveCategoryQuizScore(entry.key, entry.value);
+          _state.markCategoryStudied(entry.key);
+        } else {
+          _state.saveCategoryQuizScore(entry.key, 0);
+          _state.studiedCategories.remove(entry.key);
+        }
+      }
+
+      // Whole-app wipe, not scoped to only the categories that scored
+      // low on THIS exam — a failed Final Exam invalidates the
+      // mode-override/fail-streak/question-mastery signal everywhere,
+      // not only where the exam happened to catch it.
+      _state.categoryModeOverride.clear();
+      _state.categoryQuizFailStreak.clear();
+      _state.categoryQuizAttempts.clear();
+      _state.clearAllQuestionMastery();
     }
 
     final missedIds = <String>[];

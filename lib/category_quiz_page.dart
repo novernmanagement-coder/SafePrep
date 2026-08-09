@@ -5,7 +5,17 @@ import 'app_state.dart';
 import 'app_state_persistence.dart';
 import 'dashboard_page.dart';
 import 'category_quiz_results_page.dart';
+import 'category_study_page.dart';
 import 'safe_prep_nav_bar.dart';
+import 'onboard/onboard_answers.dart'; // OnboardingAnswers, StudyStyle
+
+/// In-quiz feedback behavior. Distinct from StudyStyle (the onboarding
+/// answer) — this is the resolved TWO-behavior mapping: StudyStyle
+/// .quizFormat -> retro by default; both StudyStyle.explanations and
+/// StudyStyle.answersOnly -> proper by default. AppState
+/// .categoryModeOverride (set by the fail-streak safety net) beats
+/// this default per category once it's been triggered — see initState.
+enum _QuizFeedbackMode { proper, retro }
 
 class CategoryQuizPage extends StatefulWidget {
   final String category;
@@ -25,10 +35,72 @@ class _CategoryQuizPageState extends State<CategoryQuizPage> {
   bool _loaded = false;
   final ScrollController _scrollController = ScrollController();
 
+  // ── Toggle state ────────────────────────────────────────────────
+  // Freely switchable anytime via the toggle row — never locked to
+  // the initial choice. Switching never discards _correctCount/
+  // answered questions; it only changes how the NEXT unanswered
+  // question behaves.
+  late _QuizFeedbackMode _feedbackMode;
+  late bool _showExplanationText;
+
+  // True if this category has been auto-escalated all the way to
+  // Full Study by the fail-streak safety net — checked in initState,
+  // redirects away before this page ever actually renders a quiz.
+  bool _redirectingToFullStudy = false;
+
   @override
   void initState() {
     super.initState();
-    _loadQuestions();
+
+    final override = _state.categoryModeOverride[widget.category];
+
+    if (override == 'fullStudy') {
+      _redirectingToFullStudy = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => CategoryStudyPage(category: widget.category),
+          ),
+        );
+      });
+      // Still set sane defaults below in case build() runs once
+      // before the redirect completes.
+    }
+
+    final style = OnboardingAnswers.instance.studyStyle;
+
+    if (override == 'proper') {
+      // Fail-streak safety net already moved this category off Retro
+      // — honor that regardless of the onboarding default.
+      _feedbackMode = _QuizFeedbackMode.proper;
+    } else {
+      _feedbackMode = style == StudyStyle.quizFormat
+          ? _QuizFeedbackMode.retro
+          : _QuizFeedbackMode.proper;
+    }
+    _showExplanationText = style == StudyStyle.explanations;
+
+    if (_redirectingToFullStudy) {
+      _loaded = true; // avoid an indefinite spinner during the redirect
+      return;
+    }
+
+    // Toggle-session cache: if the user just came from Full Study
+    // Mode (or from this same quiz, toggling back), resume the exact
+    // in-progress question set instead of drawing a brand new random
+    // 15 — see AppState.quizSessionQuestions for why this matters.
+    final cached = _state.quizSessionQuestions[widget.category];
+    if (cached != null && cached.isNotEmpty) {
+      _questions = cached;
+      _currentIndex = _state.quizSessionIndex[widget.category] ?? 0;
+      _correctCount = _state.quizSessionCorrectCount[widget.category] ?? 0;
+      if (_currentIndex >= _questions.length) _currentIndex = 0;
+      _loaded = true;
+    } else {
+      _loadQuestions();
+    }
   }
 
   @override
@@ -45,16 +117,34 @@ class _CategoryQuizPageState extends State<CategoryQuizPage> {
     return 'Standard';
   }
 
+  // Keeps AppState's toggle-session cache in step with the live index/
+  // score so a mode-switch mid-quiz resumes at exactly this spot.
+  void _syncSession() {
+    _state.quizSessionIndex[widget.category] = _currentIndex;
+    _state.quizSessionCorrectCount[widget.category] = _correctCount;
+  }
+
   Future<void> _loadQuestions() async {
     final mode = _determineMode();
-    final all = await QuestionLoader.loadByCategory(
+    final allInCategory = await QuestionLoader.loadByCategory(
       widget.category,
       shuffle: false,
     );
-    if (all.isEmpty) {
+    if (allInCategory.isEmpty) {
       setState(() => _loaded = true);
       return;
     }
+
+    // Question-level mastery: retire anything already mastered (3
+    // consecutive correct) from the live draw pool, so a user stops
+    // getting re-asked what they've already proven they know. If the
+    // live pool alone can't fill a quiz (small category bank, most of
+    // it mastered), top off with mastered questions as a safety valve
+    // rather than serving a short/empty quiz.
+    final live = allInCategory
+        .where((q) => !_state.isQuestionMastered(widget.category, q.id))
+        .toList();
+    final all = live.length >= 15 ? live : allInCategory;
 
     const target = 15;
     final selected = <QuestionModel>[];
@@ -112,13 +202,18 @@ class _CategoryQuizPageState extends State<CategoryQuizPage> {
 
     selected.shuffle();
 
-    // Randomize answer positions for each question (anti-muscle-memory)
     final shuffled = selected.take(target).map((q) => q.shuffled()).toList();
 
     setState(() {
       _questions = shuffled;
       _loaded = true;
     });
+
+    // Freshly drawn — this is the one true draw for this quiz
+    // session; cache it immediately so any subsequent mode toggle
+    // resumes THIS set rather than drawing again.
+    _state.quizSessionQuestions[widget.category] = shuffled;
+    _syncSession();
   }
 
   void _answerSelected(int index) {
@@ -128,6 +223,21 @@ class _CategoryQuizPageState extends State<CategoryQuizPage> {
     final correct = index == q.correctAnswer;
 
     if (correct) _correctCount++;
+    _syncSession();
+
+    // Question-level mastery is category-quiz-only — the Final Exam
+    // never touches this (see AppState.recordQuestionAnswer).
+    _state.recordQuestionAnswer(
+      category: widget.category,
+      questionId: q.id,
+      difficulty: q.difficulty,
+      correct: correct,
+    );
+
+    if (_feedbackMode == _QuizFeedbackMode.retro) {
+      _nextQuestion();
+      return;
+    }
 
     setState(() {
       _selectedIndex = index;
@@ -153,6 +263,7 @@ class _CategoryQuizPageState extends State<CategoryQuizPage> {
       _selectedIndex = -1;
       _answered = false;
     });
+    _syncSession();
     _scrollController.animateTo(
       0,
       duration: const Duration(milliseconds: 300),
@@ -161,13 +272,10 @@ class _CategoryQuizPageState extends State<CategoryQuizPage> {
   }
 
   void _showResults() {
-    final score = _questions.isEmpty
-        ? 0
-        : (_correctCount * 100) ~/ _questions.length;
-    _state.saveCategoryQuizScore(widget.category, score);
-    _state.markCategoryStudied(widget.category);
-    AppStatePersistence.save();
-
+    // Quiz is genuinely finished — clear the toggle-session cache so
+    // the next fresh entry into this category draws a brand new set
+    // rather than resuming a completed one.
+    _state.clearQuizSession(widget.category);
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -175,20 +283,104 @@ class _CategoryQuizPageState extends State<CategoryQuizPage> {
           category: widget.category,
           correctCount: _correctCount,
           totalCount: _questions.length,
+          wasRetroMode: _feedbackMode == _QuizFeedbackMode.retro,
         ),
       ),
     );
   }
 
+  void _goFullStudy() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CategoryStudyPage(category: widget.category),
+      ),
+    );
+  }
+
+  void _toggleFeedbackMode() {
+    setState(() {
+      _feedbackMode = _feedbackMode == _QuizFeedbackMode.proper
+          ? _QuizFeedbackMode.retro
+          : _QuizFeedbackMode.proper;
+    });
+  }
+
   Color _answerColor(int index, int correctAnswer) {
+    if (_feedbackMode == _QuizFeedbackMode.retro) {
+      return AppColors.primaryButton;
+    }
     if (!_answered) return AppColors.primaryButton;
     if (index == correctAnswer) return AppColors.scoreBand4;
     if (index == _selectedIndex) return AppColors.scoreBand1;
     return AppColors.primaryButton;
   }
 
+  Widget _buildToggleRow() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        spacing: 8,
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: _goFullStudy,
+              icon: const Icon(Icons.menu_book_outlined, size: 15),
+              label: const Text(
+                'Full Study Mode',
+                style: TextStyle(fontSize: 11.5),
+                overflow: TextOverflow.ellipsis,
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.bodyText,
+                side: BorderSide(color: AppColors.cardBorder),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: _toggleFeedbackMode,
+              icon: Icon(
+                _feedbackMode == _QuizFeedbackMode.proper
+                    ? Icons.fact_check_outlined
+                    : Icons.visibility_off_outlined,
+                size: 15,
+              ),
+              label: Text(
+                _feedbackMode == _QuizFeedbackMode.proper
+                    ? 'Quiz Proper'
+                    : 'Quiz Retro',
+                style: const TextStyle(fontSize: 11.5),
+                overflow: TextOverflow.ellipsis,
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.bodyText,
+                side: BorderSide(color: AppColors.cardBorder),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_redirectingToFullStudy) {
+      // Brief, invisible-in-practice frame while the postFrameCallback
+      // redirect above fires — same background as everywhere else so
+      // there's no visible flash.
+      return const Scaffold(backgroundColor: AppColors.servSafeBlue);
+    }
+
     if (!_loaded) {
       return const Scaffold(
         backgroundColor: Color(0xFFE3F0F9),
@@ -202,6 +394,8 @@ class _CategoryQuizPageState extends State<CategoryQuizPage> {
         : null;
     final isLast = _currentIndex == _questions.length - 1;
     final correct = _answered && q != null && _selectedIndex == q.correctAnswer;
+    final showFeedbackCard =
+        _answered && _feedbackMode == _QuizFeedbackMode.proper;
 
     return Scaffold(
       backgroundColor: AppColors.servSafeBlue,
@@ -283,6 +477,8 @@ class _CategoryQuizPageState extends State<CategoryQuizPage> {
                           ],
                         ),
                       ),
+
+                      _buildToggleRow(),
 
                       if (!hasQuestions)
                         Container(
@@ -377,8 +573,10 @@ class _CategoryQuizPageState extends State<CategoryQuizPage> {
                           );
                         }),
 
-                        // Feedback card
-                        if (_answered)
+                        // Feedback card — Proper only; Retro skips
+                        // straight to the next question with no card
+                        // at all (see _answerSelected).
+                        if (showFeedbackCard)
                           Container(
                             padding: const EdgeInsets.all(14),
                             margin: const EdgeInsets.only(top: 4),
@@ -402,14 +600,15 @@ class _CategoryQuizPageState extends State<CategoryQuizPage> {
                                     color: Colors.white,
                                   ),
                                 ),
-                                Text(
-                                  q.explanation,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.white,
-                                    height: 1.5,
+                                if (_showExplanationText)
+                                  Text(
+                                    q.explanation,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.white,
+                                      height: 1.5,
+                                    ),
                                   ),
-                                ),
                                 SizedBox(
                                   width: double.infinity,
                                   height: AppSizes.primaryButtonHeight,
