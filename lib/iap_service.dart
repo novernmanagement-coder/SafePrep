@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'app_state.dart';
 import 'app_state_persistence.dart';
@@ -53,6 +54,35 @@ class IAPService {
   // — this app only ever has one purchase in flight per product at a
   // time, since buy buttons disable themselves while loading.
   final Map<String, Completer<IAPResult>> _pendingPurchases = {};
+
+  // ── Sandbox / TestFlight detection ─────────────────────────
+  // Distinguishes real App Store purchases from TestFlight/sandbox
+  // ones so analytics (Mixpanel) can be filtered clean of test data.
+  // TestFlight purchases use a real Apple ID but resolve through
+  // Apple's sandbox backend, and StoreKit/in_app_purchase gives no
+  // Dart-level signal for this — the only reliable check is whether
+  // the on-device App Store receipt file is named "sandboxReceipt"
+  // instead of the production receipt name, which requires a native
+  // platform channel call (see ios/Runner/AppDelegate.swift).
+  static const _receiptChannel = MethodChannel(
+    'com.geraldmiller.safeprep/receipt',
+  );
+  bool? _isSandboxCached;
+
+  Future<bool> _isSandboxEnvironment() async {
+    if (_isSandboxCached != null) return _isSandboxCached!;
+    try {
+      _isSandboxCached =
+          await _receiptChannel.invokeMethod<bool>('isSandboxReceipt') ?? false;
+    } catch (e) {
+      debugPrint('Sandbox receipt check failed: $e');
+      // Fail safe — if the check errors for any reason, assume
+      // production rather than silently mislabeling real sales as
+      // test data.
+      _isSandboxCached = false;
+    }
+    return _isSandboxCached!;
+  }
 
   // ── Initialization ──────────────────────────────────────────
   Future<void> initialize() async {
@@ -118,8 +148,12 @@ class IAPService {
   // error in the App Store sheet. Every outcome here both resolves
   // the Completer the calling buy* method is waiting on AND logs a
   // Mixpanel event, so purchase outcomes are visible in analytics,
-  // not just taps.
+  // not just taps. Every logged event also carries `is_test_purchase`
+  // so TestFlight/sandbox activity can be filtered out of real
+  // conversion data.
   void _onPurchaseUpdate(List<PurchaseDetails> purchases) async {
+    final isSandbox = await _isSandboxEnvironment();
+
     for (final purchase in purchases) {
       final completer = _pendingPurchases[purchase.productID];
 
@@ -132,6 +166,7 @@ class IAPService {
             properties: {
               'product_id': purchase.productID,
               'restored': purchase.status == PurchaseStatus.restored,
+              'is_test_purchase': isSandbox,
             },
           );
           completer?.complete(IAPResult.success);
@@ -145,6 +180,7 @@ class IAPService {
             properties: {
               'product_id': purchase.productID,
               'error': purchase.error?.message ?? 'unknown',
+              'is_test_purchase': isSandbox,
             },
           );
           completer?.complete(IAPResult.error);
@@ -155,7 +191,10 @@ class IAPService {
           debugPrint('IAP canceled: ${purchase.productID}');
           MixpanelService.instance.track(
             'purchase_canceled',
-            properties: {'product_id': purchase.productID},
+            properties: {
+              'product_id': purchase.productID,
+              'is_test_purchase': isSandbox,
+            },
           );
           completer?.complete(IAPResult.canceled);
           _pendingPurchases.remove(purchase.productID);
