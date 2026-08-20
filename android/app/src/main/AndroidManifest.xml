@@ -1,6 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required for HTTP calls, in-app purchase, and Mixpanel — the
+         debug/profile manifests get this for free from the Flutter
+         tooling, but a release build only gets it if it's declared
+         here. Without it, release builds would silently fail every
+         network call (purchases, analytics, http requests). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="safeprep"
+        android:label="SafePrep"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -34,7 +40,6 @@
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
          https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
-
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <queries>
         <intent>
