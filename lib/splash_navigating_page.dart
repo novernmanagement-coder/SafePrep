@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'constants.dart';
 import 'app_state.dart';
+import 'app_state_persistence.dart';
 import 'dashboard_page.dart';
 import 'fsme_post_purchase_landing.dart';
 import 'home_page.dart';
@@ -36,6 +37,75 @@ class SplashNavigatingPage extends StatelessWidget {
     if (!kDebugMode) return;
     AppState().hasUnlockedApp = true;
     AppState().purchaseType = PurchaseType.lifetime;
+  }
+
+  // TEMP DEBUG (Aug 2026) — the Renew/Lifetime nav button only shows
+  // once daysRemaining <= 2 on a real 7-day purchase (see
+  // safe_prep_nav_bar.dart's showRenew), which normally means waiting
+  // 5 real days after a real purchase before that flow is reachable
+  // at all. Backdating purchaseDate here lets the REAL purchase code
+  // path (Play Billing, kProductLifetimeOfferAndroid, etc. — not the
+  // force-unlock stub below, which is fake and kDebugMode-only) be
+  // tested on a release build without the wait. Requires an existing
+  // real purchase already in progress (hasUnlockedApp + a time-limited
+  // purchaseType) — does nothing to a never-purchased or lifetime
+  // account. NOT kDebugMode-gated, same reasoning as the rest of this
+  // page: it's only reachable via the access-code prompt already.
+  // Remove this button once the $2.99 lifetime offer has been
+  // confirmed working.
+  Future<void> _fastForwardPurchaseForDebug(BuildContext context) async {
+    final state = AppState();
+    if (!state.hasUnlockedApp ||
+        !state.isTimeLimited ||
+        state.purchaseDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No active 7-day/14-day purchase to fast-forward — buy the '
+            '\$4.99 seven-day first.',
+          ),
+        ),
+      );
+      return;
+    }
+    state.purchaseDate = state.purchaseDate!.subtract(
+      const Duration(days: 5),
+    );
+    await AppStatePersistence.save();
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Purchase backdated 5 days — daysRemaining is now '
+          '${state.daysRemaining}. Renew/Lifetime button should show on '
+          'Home.',
+        ),
+      ),
+    );
+    _go(context, const HomePage());
+  }
+
+  // TEMP DEBUG (Aug 2026) — AppState.reset() deliberately preserves
+  // limitedRapidFireRoundsUsed (see app_state.dart) so a normal
+  // "reset progress" action can't be used to farm free show-me-more
+  // rounds. That's correct for real users, but it means local testing
+  // permanently uses up both rounds unless something resets the
+  // counter directly. This button does that. Same reasoning as the
+  // rest of this page: only reachable via the access-code prompt
+  // already, so it's not a real-user-facing free-unlock path. Remove
+  // once the Rapid Fire "show me more" upgrade is done being tested.
+  Future<void> _resetShowMeMoreRoundsForDebug(BuildContext context) async {
+    AppState().limitedRapidFireRoundsUsed = 0;
+    await AppStatePersistence.save();
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Show-me-more rounds reset to 0/2 — the paywall’s '
+          '"Try this first" link should be back.',
+        ),
+      ),
+    );
   }
 
   Widget _destButton(BuildContext context, String label, Widget page) {
@@ -112,6 +182,50 @@ class SplashNavigatingPage extends StatelessWidget {
                         ),
                       ),
                       child: const Text('Dashboard (force-unlocked)'),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: SizedBox(
+                    height: AppSizes.primaryButtonHeight,
+                    child: ElevatedButton(
+                      onPressed: () => _fastForwardPurchaseForDebug(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF13130F),
+                        foregroundColor: const Color(0xFFF0EDE8),
+                        side: const BorderSide(color: Color(0xFFD4AF37)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppSizes.buttonCornerRadius,
+                          ),
+                        ),
+                      ),
+                      child: const Text(
+                        'Fast-forward purchase 5 days (test Renew/Lifetime)',
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: SizedBox(
+                    height: AppSizes.primaryButtonHeight,
+                    child: ElevatedButton(
+                      onPressed: () => _resetShowMeMoreRoundsForDebug(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF13130F),
+                        foregroundColor: const Color(0xFFF0EDE8),
+                        side: const BorderSide(color: Color(0xFFD4AF37)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppSizes.buttonCornerRadius,
+                          ),
+                        ),
+                      ),
+                      child: const Text(
+                        'Reset show-me-more rounds (0/2)',
+                      ),
                     ),
                   ),
                 ),

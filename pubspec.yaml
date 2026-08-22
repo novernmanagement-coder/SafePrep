@@ -1,7 +1,7 @@
 name: safeprep
 description: "SafePrep - Food Safety Exam Prep"
 publish_to: 'none'
-version: 1.15.3+5
+version: 1.15.4+6
 
 
 environment:

@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../constants.dart';
+import '../app_state.dart';
+import '../app_state_persistence.dart';
 import '../mixpanel_service.dart';
 import 'rapid_fire_limited_page.dart';
 
@@ -87,6 +89,13 @@ class _RapidFireLimitedIntroState extends State<RapidFireLimitedIntro>
   bool _fsmeVisible = false;
   final List<_TermLine> _fsmeLines = [];
   Timer? _fsmeInTimer;
+
+  /// Rounds left BEFORE this one is used — computed once at build time
+  /// off AppState (rounds are only ever incremented on Start, not just
+  /// by viewing this screen), so the copy always reflects what's
+  /// actually available right now.
+  int get _roundsLeft =>
+      AppState.maxLimitedRapidFireRounds - AppState().limitedRapidFireRoundsUsed;
 
   int _gazeTarget = 0;
   double _gazeCurrent = 0.0;
@@ -308,8 +317,83 @@ class _RapidFireLimitedIntroState extends State<RapidFireLimitedIntro>
     );
   }
 
+  /// Shown instead of the normal offer if this screen is somehow
+  /// reached with 0 rounds left (the entry point in onboard_paywall.dart
+  /// hides the "Try this first" link once rounds run out, so this is a
+  /// defensive fallback, not the normal path).
+  Widget _exhaustedView(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _darkBg,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.bolt_rounded,
+                  size: 40,
+                  color: _gold.withValues(alpha: 0.5),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'You\u2019ve used both free Rapid Fire rounds.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: _softWhite,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'The full version has unlimited rounds across every '
+                  'category.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: _softWhite.withValues(alpha: 0.5),
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  height: 50,
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _gold,
+                      foregroundColor: _darkBg,
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(
+                          AppSizes.buttonCornerRadius,
+                        ),
+                      ),
+                    ),
+                    child: const Text(
+                      'Back',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_roundsLeft <= 0) return _exhaustedView(context);
+
     return Scaffold(
       backgroundColor: _darkBg,
       body: SafeArea(
@@ -339,9 +423,11 @@ class _RapidFireLimitedIntroState extends State<RapidFireLimitedIntro>
 
               const SizedBox(height: 14),
 
-              // Headline
+              // Headline \u2014 reflects however many of the 2 total rounds
+              // are actually left, not a hardcoded "2".
               Text(
-                '2 free rounds of our most\npowerful retention tool.',
+                '$_roundsLeft free round${_roundsLeft == 1 ? '' : 's'} of '
+                'our most\npowerful retention tool.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 20,
@@ -359,7 +445,8 @@ class _RapidFireLimitedIntroState extends State<RapidFireLimitedIntro>
                 child: Text(
                   'This is a limited version of Rapid Fire \u2014 designed '
                   'to keep the material top of mind in 60 seconds or less. '
-                  'You get 2 rounds \u2014 use them whenever you\u2019re ready.',
+                  'You get 2 rounds total, ever \u2014 use them whenever '
+                  'you\u2019re ready.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 13,
@@ -454,9 +541,19 @@ class _RapidFireLimitedIntroState extends State<RapidFireLimitedIntro>
                 height: 52,
                 child: ElevatedButton(
                   onPressed: () {
+                    // Consume a round HERE, on Start, not on completion —
+                    // so backing out mid-round still counts against the
+                    // 2-round cap rather than letting someone quit and
+                    // retry indefinitely for a fresh random draw.
+                    AppState().limitedRapidFireRoundsUsed++;
+                    AppStatePersistence.save();
+
                     MixpanelService.instance.track(
                       'rapid_fire_limited_intro_start',
-                      properties: {'app_name': 'SP'},
+                      properties: {
+                        'app_name': 'SP',
+                        'rounds_used': AppState().limitedRapidFireRoundsUsed,
+                      },
                     );
 
                     Navigator.pushReplacement(

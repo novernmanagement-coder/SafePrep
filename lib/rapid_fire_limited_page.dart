@@ -7,6 +7,7 @@ import 'csv_loader.dart';
 import 'mixpanel_service.dart';
 import 'iap_service.dart';
 import 'category_study_page.dart';
+import 'fsme_eye.dart';
 
 /// Limited Rapid Fire — the $4.99 decline path's free taste.
 ///
@@ -74,7 +75,15 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
   static const Color _selfGray = Color(0xFF9E9E9E);
   static const Color _processingTeal = Color(0xFF6FA8A6);
 
-  static const int _questionsPerCategory = 5;
+  static const int _questionsPerCategory = 3;
+
+  /// Short labels for the category-clear pill row — the real category
+  /// names are too long to fit three across.
+  static const Map<String, String> _shortLabels = {
+    'Time & Temperature': 'Time & Temp',
+    'Receiving & Storage': 'Receiving',
+    'Cross-Contamination': 'Cross-Contam',
+  };
   static const int _slideInMs = 320;
   static const int _slideOutMs = 260;
 
@@ -118,6 +127,37 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
   List<String> _categories = [];
   Map<String, List<QuestionModel>> _categoryDecks = {};
   Map<String, int> _categoryProgress = {};
+
+  // ── Engagement upgrade: per-category correct tally, streak, trophy ──
+  // _categoryCorrect tracks correct (not just answered) per category —
+  // that's what "cleared perfectly" means, distinct from _categoryProgress
+  // which just tracks how many of that category have been answered.
+  Map<String, int> _categoryCorrect = {};
+  int _currentStreak = 0;
+  int _bestStreak = 0;
+
+  // Set once _loadQuestion() decides a category has hit its limit — read
+  // by _categoryLimitView()/the trophy burst to know if THIS category run
+  // was a perfect _questionsPerCategory-for-_questionsPerCategory.
+  bool _currentCategoryPerfect = false;
+  // Guards the trophy-burst animation to fire once per category, even
+  // though _categoryLimitView() can rebuild multiple times while showing.
+  final Set<String> _trophyShownFor = {};
+  AnimationController? _trophyController;
+  // True for the duration of the trophy-burst animation only — gates
+  // the full-screen overlay in build() so it's only in the widget tree
+  // while trophies are actually flying (see _trophyOverlay()).
+  bool _showTrophyOverlay = false;
+
+  // Live reaction eyes, shown under the question/answer panels during
+  // play (separate from the popup-box _davEye() used in the limit/
+  // completion screens) — reuses the shared FsmeEyePair widget so the
+  // reactions (bulge on correct, eyes-rolled-up on wrong) match the
+  // real RapidFirePage's behavior exactly.
+  final GlobalKey<FsmeEyePairState> _liveEyeKey =
+      GlobalKey<FsmeEyePairState>();
+  EyeMood _liveEyeMood = EyeMood.idle;
+  Timer? _liveEyeRevertTimer;
 
   int _currentCatIndex = 0;
   bool _loaded = false;
@@ -178,6 +218,36 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
     _FsmeLine(
       'Yup, I am genius. This bad boy won first place \u2014 suck on it, '
       'Goggles.',
+      audience: _FsmeAudience.self,
+    ),
+  ];
+
+  // \u2500\u2500 FSME (final category-limit screen, once all 3 are done) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  /// True once the closing tease has ever fired \u2014 mirrors _limitFsmeShown
+  /// so it only plays on the very first time the LAST category's limit
+  /// screen is reached (there's only one "last category" screen per
+  /// session anyway, but this also guards rebuilds of that screen).
+  bool _finalTeaseShown = false;
+  bool _finalTeaseVisible = false;
+  final List<_TermLine> _finalTeaseLines = [];
+  Timer? _finalTeaseInTimer;
+
+  /// FSME's closing pitch, once the user has cleared all 3 free
+  /// categories (9 of 9): the trophy tease from the shelf above, then
+  /// \u2014 after a beat, like he just remembered \u2014 the actual sales
+  /// pitch. Last line undercuts the 98% stat for a laugh, so it reads as
+  /// him being honest rather than a hard close.
+  static const List<_FsmeLine> _finalTeaseScript = [
+    _FsmeLine(
+      'Bet you\u2019re wondering why I won first place for \u201cBest Use '
+      'Of The Word \u2018Mnemonic\u2019\u201d\u2026 get the app and I\u2019ll '
+      'show ya.',
+    ),
+    _FsmeLine('Oh yeah \u2014 this app comes with a money-back guarantee.'),
+    _FsmeLine('They built this thing just for you.'),
+    _FsmeLine('98% pass rate.'),
+    _FsmeLine(
+      'Heck, I\u2019m only right 97.896526652% of the time.',
       audience: _FsmeAudience.self,
     ),
   ];
@@ -269,9 +339,12 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
     _slideController?.dispose();
     _gazeAnim?.dispose();
     _blinkController?.dispose();
+    _trophyController?.dispose();
     _gazeTimer?.cancel();
     _blinkTimer?.cancel();
     _limitFsmeInTimer?.cancel();
+    _finalTeaseInTimer?.cancel();
+    _liveEyeRevertTimer?.cancel();
     super.dispose();
   }
 
@@ -374,6 +447,383 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
     }
   }
 
+  /// Schedules the closing tease, but only the very first time it's
+  /// called — mirrors _maybeStartLimitFsme().
+  void _maybeStartFinalTease() {
+    if (_finalTeaseShown) return;
+    _finalTeaseShown = true;
+    _finalTeaseInTimer = Timer(const Duration(seconds: 2), () {
+      if (!mounted) return;
+      _ensureEyeAnimation();
+      setState(() => _finalTeaseVisible = true);
+      _revealFinalTease();
+    });
+  }
+
+  /// Reveals the closing-tease script one line at a time — same typing
+  /// rule as the other scripts, but with an extra-long pause after the
+  /// trophy tease (line 0) before the sales pitch lands, so it reads as
+  /// him catching himself remembering something rather than one flat
+  /// list.
+  Future<void> _revealFinalTease() async {
+    for (var idx = 0; idx < _finalTeaseScript.length; idx++) {
+      final line = _finalTeaseScript[idx];
+      if (!mounted) return;
+
+      if (line.audience == _FsmeAudience.user) {
+        final entry = _TermLine('', line.audience);
+        setState(() => _finalTeaseLines.add(entry));
+        for (var i = 1; i <= line.text.length; i++) {
+          if (!mounted) return;
+          setState(() => entry.text = line.text.substring(0, i));
+          await Future.delayed(const Duration(milliseconds: 18));
+        }
+      } else {
+        setState(
+          () => _finalTeaseLines.add(_TermLine(line.text, line.audience)),
+        );
+      }
+
+      final pause = idx == 0
+          ? const Duration(milliseconds: 2200)
+          : const Duration(milliseconds: 900);
+      await Future.delayed(pause);
+    }
+  }
+
+  // ── FSME (trophy burst) ─────────────────────────────────────────────
+  /// Fires once, the first time a category is cleared PERFECTLY
+  /// ($_questionsPerCategory-for-$_questionsPerCategory) — 5 trophies
+  /// rise up the FULL SCREEN (see _trophyOverlay/_floatingTrophy), then
+  /// the bragging line lands in the celebration box. Guarded by
+  /// _trophyShownFor so re-rendering the limit screen (setState, e.g.
+  /// from the score row updating) never re-triggers it for a category
+  /// already celebrated.
+  ///
+  /// 2800ms (was 1400ms) and a near-full-screen rise (was a 46px fan
+  /// confined to a 60px box) — the original was over almost before it
+  /// registered. See _floatingTrophy for the travel math.
+  static const int _trophyCount = 5;
+  static const List<double> _trophyAngles = [-56, -28, 0, 28, 56];
+
+  void _maybeStartTrophyBurst(String cat) {
+    if (!_currentCategoryPerfect || _trophyShownFor.contains(cat)) return;
+    _trophyShownFor.add(cat);
+    _ensureEyeAnimation();
+    if (_trophyController == null) {
+      _trophyController = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 2800),
+      );
+      // Take the full-screen overlay back out of the tree once the
+      // animation finishes — it's IgnorePointer'd, but no reason to
+      // keep it (and its AnimatedBuilder rebuilds) mounted forever.
+      _trophyController!.addStatusListener((status) {
+        if (status == AnimationStatus.completed && mounted) {
+          setState(() => _showTrophyOverlay = false);
+        }
+      });
+    }
+    setState(() => _showTrophyOverlay = true);
+    _trophyController!.forward(from: 0.0);
+  }
+
+  /// Full-screen trophy overlay — laid over the whole Scaffold body by
+  /// build() (see the Stack there), not confined to the small
+  /// _celebrationBox card. IgnorePointer so it never blocks taps on the
+  /// real UI underneath while it plays.
+  Widget _trophyOverlay(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    return IgnorePointer(
+      child: SizedBox(
+        width: size.width,
+        height: size.height,
+        child: Stack(
+          alignment: Alignment.bottomCenter,
+          children: [
+            for (int i = 0; i < _trophyCount; i++)
+              _floatingTrophy(_trophyAngles[i], i * 0.12, size),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// One trophy rising from roughly where the celebration card sits
+  /// toward the top of the screen — scales in with an overshoot, rises
+  /// most of the screen height with a gentle horizontal fan along
+  /// [angleDeg] so the $_trophyCount trophies don't overlap, then fades
+  /// in the last 40% of the animation. Driven entirely by
+  /// _trophyController's single value so all trophies stay in sync,
+  /// just staggered by [startFraction].
+  Widget _floatingTrophy(
+    double angleDeg,
+    double startFraction,
+    Size screenSize,
+  ) {
+    return AnimatedBuilder(
+      animation: _trophyController ?? const AlwaysStoppedAnimation(0.0),
+      builder: (context, _) {
+        final raw = _trophyController?.value ?? 0.0;
+        final progress = ((raw - startFraction) / (1 - startFraction)).clamp(
+          0.0,
+          1.0,
+        );
+        final scale = Curves.easeOutBack.transform(progress);
+        final rise = Curves.easeOutCubic.transform(progress);
+        final fadeStart = (progress - 0.6) / 0.4;
+        final opacity = 1.0 - fadeStart.clamp(0.0, 1.0);
+        final rad = angleDeg * (pi / 180);
+        // Mostly straight up the screen, with a light horizontal fan so
+        // the 5 trophies read as a burst rather than a single column.
+        final dx = sin(rad) * 80 * rise;
+        final dy = -screenSize.height * 0.6 * rise;
+        return Opacity(
+          opacity: opacity,
+          child: Transform.translate(
+            offset: Offset(dx, dy),
+            child: Transform.scale(
+              scale: scale,
+              child: const Text('🏆', style: TextStyle(fontSize: 30)),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// FSME's trophy case — three of his (entirely self-proclaimed)
+  /// Byte-Me Conference awards, shown above his eyes in _celebrationBox
+  /// on a perfect category. Static and purely cosmetic — no animation,
+  /// no game logic, just his ego on full display.
+  Widget _trophyShelf() {
+    const awards = [
+      'Best Tool Created By A Tool',
+      'Best Use Of The Word “Mnemonic”',
+      'Best Learning Tool Ever Created Since The Dawn Of Time — Or '
+          'Last Thursday',
+    ];
+    return Column(
+      children: [
+        Text(
+          'BYTE-ME CONFERENCE  •  1ST PLACE (x3)',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 9,
+            letterSpacing: 1.1,
+            fontWeight: FontWeight.w700,
+            color: _gold.withValues(alpha: 0.5),
+          ),
+        ),
+        const SizedBox(height: 10),
+        for (final award in awards)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Text('🏆', style: TextStyle(fontSize: 22)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    award,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: _softWhite.withValues(alpha: 0.8),
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// Shared eye header — one eye pair + "F S M E" wordmark, centered.
+  /// Used by _celebrationBox() so there is ever only ONE eye pair on
+  /// screen at a time, whether the box is showing the trophy burst,
+  /// the scripted first-category popup, or both merged together.
+  Widget _eyeHeaderRow() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _davEye(),
+        const SizedBox(width: 10),
+        Text(
+          'F S M E',
+          style: TextStyle(
+            fontSize: 10,
+            letterSpacing: 3,
+            color: _eyeRed.withValues(alpha: 0.3),
+            fontWeight: FontWeight.w300,
+          ),
+        ),
+        const SizedBox(width: 10),
+        _davEye(),
+      ],
+    );
+  }
+
+  /// The ONE celebration box shown on _categoryLimitView() — merges
+  /// what used to be two separate boxes (trophy burst + the scripted
+  /// first-category popup), which could both fire on the same screen
+  /// (category 0 cleared perfectly) and stack two redundant eye pairs.
+  /// Now there's a single eye header; the trophies themselves fly
+  /// full-screen via _trophyOverlay (see build()), not inside this box.
+  /// The scripted lines (category 0's first limit screen only) type in
+  /// below a divider if that's also happening. Either half can appear
+  /// alone.
+  Widget _celebrationBox(String cat) {
+    final bool perfect = _currentCategoryPerfect;
+    final bool showScript = _currentCatIndex == 0 && _limitFsmeVisible;
+    // Last category's limit screen only — the closing tease (trophy
+    // callback + sales pitch) plays here regardless of whether this
+    // category itself was perfect or first. See _maybeStartFinalTease().
+    final bool showFinalTease =
+        _currentCatIndex == _categories.length - 1 && _finalTeaseVisible;
+
+    return AnimatedOpacity(
+      // Perfect shows immediately (no delay); the scripted halves fade
+      // in on their own 2s-delayed schedules via _limitFsmeVisible /
+      // _finalTeaseVisible — see _maybeStartLimitFsme() /
+      // _maybeStartFinalTease(). showScript/showFinalTease already
+      // encode those flags, so the divider/lines below only ever
+      // appear once true.
+      opacity: (perfect || _limitFsmeVisible || _finalTeaseVisible)
+          ? 1.0
+          : 0.0,
+      duration: const Duration(milliseconds: 2300),
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.fromLTRB(14, perfect ? 20 : 12, 14, 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0A0E14),
+          borderRadius: BorderRadius.circular(perfect ? 10 : 8),
+          border: Border.all(
+            color: _gold.withValues(alpha: perfect ? 0.4 : 0.25),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // FSME's trophy case — his three (self-proclaimed) awards,
+            // sitting above his eyes. Static/cosmetic only, separate
+            // from the flying _trophyOverlay burst.
+            if (perfect) ...[_trophyShelf(), const SizedBox(height: 14)],
+
+            // Trophies themselves also fly across the full screen (see
+            // _trophyOverlay, laid over the Scaffold body in build()) —
+            // this box just keeps the single eye header + bragging line
+            // (and, on a perfect category, the trophy shelf above it).
+            _eyeHeaderRow(),
+
+            const SizedBox(height: 10),
+
+            if (perfect) ...[
+              Text(
+                'PERFECT  •  ${_shortLabels[cat] ?? cat}  '
+                '$_questionsPerCategory/$_questionsPerCategory',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                  color: _gold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '"This is why I won first place. Every single one of '
+                'these."',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 11.5,
+                  fontStyle: FontStyle.italic,
+                  height: 1.5,
+                  color: _selfGray,
+                ),
+              ),
+            ],
+
+            if (showScript) ...[
+              if (perfect) ...[
+                const SizedBox(height: 14),
+                Divider(color: _gold.withValues(alpha: 0.15), height: 1),
+                const SizedBox(height: 12),
+              ],
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final line in _limitFsmeLines)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Text(
+                        '> ${line.text}',
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 11,
+                          height: 1.5,
+                          color: switch (line.audience) {
+                            _FsmeAudience.boss => _bossBlue,
+                            _FsmeAudience.self => _selfGray,
+                            _FsmeAudience.processing => _processingTeal,
+                            _FsmeAudience.user => _gold.withValues(
+                              alpha: 0.85,
+                            ),
+                          },
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+
+            if (showFinalTease) ...[
+              if (perfect || showScript) ...[
+                const SizedBox(height: 14),
+                Divider(color: _gold.withValues(alpha: 0.15), height: 1),
+                const SizedBox(height: 12),
+              ],
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final line in _finalTeaseLines)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Text(
+                        '> ${line.text}',
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 11,
+                          height: 1.5,
+                          color: switch (line.audience) {
+                            _FsmeAudience.boss => _bossBlue,
+                            _FsmeAudience.self => _selfGray,
+                            _FsmeAudience.processing => _processingTeal,
+                            _FsmeAudience.user => _gold.withValues(
+                              alpha: 0.85,
+                            ),
+                          },
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   void _advanceGaze() {
     final target = _gazeTarget.toDouble();
     final next = _gazeCurrent + (target - _gazeCurrent) * 0.18;
@@ -429,6 +879,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
     final all = await QuestionLoader.loadAll(shuffle: false);
     final decks = <String, List<QuestionModel>>{};
     final progress = <String, int>{};
+    final correct = <String, int>{};
 
     for (final cat in weakest) {
       final questions =
@@ -438,6 +889,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
             ..shuffle();
       decks[cat] = questions.take(_questionsPerCategory).toList();
       progress[cat] = 0;
+      correct[cat] = 0;
     }
 
     if (!mounted) return;
@@ -445,6 +897,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
       _categories = weakest;
       _categoryDecks = decks;
       _categoryProgress = progress;
+      _categoryCorrect = correct;
       _loaded = true;
     });
 
@@ -462,7 +915,11 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
     final progress = _categoryProgress[cat] ?? 0;
 
     if (progress >= deck.length || progress >= _questionsPerCategory) {
-      setState(() => _showingLimit = true);
+      setState(() {
+        _showingLimit = true;
+        _currentCategoryPerfect =
+            (_categoryCorrect[cat] ?? 0) >= _questionsPerCategory;
+      });
       return;
     }
 
@@ -537,8 +994,12 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
       _totalAnswered++;
       if (isCorrect) {
         _totalCorrect++;
+        _categoryCorrect[cat] = (_categoryCorrect[cat] ?? 0) + 1;
+        _currentStreak++;
+        if (_currentStreak > _bestStreak) _bestStreak = _currentStreak;
       } else {
         _totalIncorrect++;
+        _currentStreak = 0;
       }
       _categoryProgress[cat] = (_categoryProgress[cat] ?? 0) + 1;
 
@@ -563,6 +1024,8 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
       }
     });
 
+    _reactLiveEyes(isCorrect);
+
     MixpanelService.instance.track(
       'SpOn_RefLtd_Answered',
       properties: {
@@ -581,6 +1044,28 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
       if (!mounted) return;
       _loadQuestion();
     });
+  }
+
+  /// Reacts to each answer, live, under the panels — bulge (surprise)
+  /// on correct, eyes rolled up (befuddled mood, gaze locked straight
+  /// up) on wrong. Wrong reverts to idle after a beat instead of
+  /// staying stuck looking confused; correct's bulge is a one-shot
+  /// that hands control back to whatever mood was active on its own.
+  /// Matches the reaction pattern already used in the real
+  /// RapidFirePage — same widget, same moods.
+  void _reactLiveEyes(bool isCorrect) {
+    if (isCorrect) {
+      _liveEyeRevertTimer?.cancel();
+      if (_liveEyeMood != EyeMood.idle) setState(() => _liveEyeMood = EyeMood.idle);
+      _liveEyeKey.currentState?.surprise();
+    } else {
+      _liveEyeRevertTimer?.cancel();
+      setState(() => _liveEyeMood = EyeMood.befuddled);
+      _liveEyeRevertTimer = Timer(const Duration(milliseconds: 900), () {
+        if (!mounted) return;
+        setState(() => _liveEyeMood = EyeMood.idle);
+      });
+    }
   }
 
   void _continueToNextCategory() {
@@ -646,17 +1131,110 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 8),
       color: _gold.withValues(alpha: 0.12),
-      child: Text(
-        'LIMITED VERSION  \u2022  $_totalAnswered of '
-        '${_categories.length * _questionsPerCategory} free questions',
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.5,
-          color: _gold,
-        ),
+      child: Column(
+        children: [
+          Text(
+            'LIMITED VERSION  \u2022  $_totalAnswered of '
+            '${_categories.length * _questionsPerCategory} free questions',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+              color: _gold,
+            ),
+          ),
+          if (_categories.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _categoryPillsRow(),
+          ],
+          // Streak only shows once it's actually worth bragging about \u2014
+          // a "0" or "1" streak chip is just noise.
+          if (_currentStreak >= 2) ...[
+            const SizedBox(height: 6),
+            _streakChip(),
+          ],
+        ],
       ),
+    );
+  }
+
+  /// One pill per category: outline while not yet reached, filled gold
+  /// with a checkmark once cleared, filled with a trophy if cleared
+  /// perfectly ($_questionsPerCategory-for-$_questionsPerCategory). The
+  /// visible "finish line" for the whole round \u2014 glance at this row to
+  /// see exactly how close to done you are.
+  Widget _categoryPillsRow() {
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 8,
+      runSpacing: 6,
+      children: _categories.asMap().entries.map((entry) {
+        final index = entry.key;
+        final cat = entry.value;
+        final progress = _categoryProgress[cat] ?? 0;
+        final correct = _categoryCorrect[cat] ?? 0;
+        final cleared = progress >= _questionsPerCategory;
+        final perfect = cleared && correct >= _questionsPerCategory;
+        final isCurrent = index == _currentCatIndex && !cleared;
+        final color = _categoryColors[cat] ?? _gold;
+
+        final String label = _shortLabels[cat] ?? cat;
+        final Widget? icon = perfect
+            ? const Text('\ud83c\udfc6', style: TextStyle(fontSize: 12))
+            : cleared
+            ? Icon(Icons.check_rounded, size: 13, color: _darkBg)
+            : null;
+
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: cleared
+                ? (perfect ? _gold : color.withValues(alpha: 0.85))
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: cleared
+                  ? Colors.transparent
+                  : color.withValues(alpha: isCurrent ? 0.9 : 0.35),
+              width: isCurrent ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[icon, const SizedBox(width: 4)],
+              Text(
+                cleared ? '$label $progress/$_questionsPerCategory' : label,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w600,
+                  color: cleared ? _darkBg : color.withValues(alpha: 0.85),
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _streakChip() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Text('\ud83d\udd25', style: TextStyle(fontSize: 12)),
+        const SizedBox(width: 4),
+        Text(
+          '$_currentStreak in a row',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: _gold.withValues(alpha: 0.9),
+          ),
+        ),
+      ],
     );
   }
 
@@ -711,7 +1289,13 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
           ),
         ),
 
-        const SizedBox(height: 24),
+        const SizedBox(height: 14),
+
+        // FSME, under the panels — reacts live to each answer (bulge
+        // on correct, eyes rolled up on wrong). See _reactLiveEyes().
+        FsmeEyePair(key: _liveEyeKey, mood: _liveEyeMood, size: 24, spacing: 8),
+
+        const SizedBox(height: 14),
 
         _scoreCounters(),
       ],
@@ -893,6 +1477,19 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
     // guarantees this only ever fires once, on the very first category-
     // limit screen the user sees.
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeStartLimitFsme());
+    // Separate guard, separate trigger — this one can fire on ANY
+    // category (not just the first), whenever that category happened
+    // to be cleared perfectly.
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _maybeStartTrophyBurst(cat),
+    );
+    // Closing tease — the LAST category's limit screen only, whether
+    // or not that category itself was perfect.
+    if (!hasMoreCategories) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _maybeStartFinalTease(),
+      );
+    }
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(22, 40, 22, 22),
@@ -929,9 +1526,11 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
             ),
           ),
 
-          if (_currentCatIndex == 0 && _limitFsmeVisible) ...[
+          if (_currentCategoryPerfect ||
+              (_currentCatIndex == 0 && _limitFsmeVisible) ||
+              (!hasMoreCategories && _finalTeaseVisible)) ...[
             const SizedBox(height: 18),
-            _limitFsmePopup(),
+            _celebrationBox(cat),
           ],
 
           const SizedBox(height: 24),
@@ -1034,68 +1633,6 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
           ),
         );
       },
-    );
-  }
-
-  /// One-time category-limit popup — eyes + typed/instant readout,
-  /// same visual chrome as the completion box but only ever shown once,
-  /// on the first category the user hits the limit on.
-  Widget _limitFsmePopup() {
-    return AnimatedOpacity(
-      opacity: _limitFsmeVisible ? 1.0 : 0.0,
-      duration: const Duration(milliseconds: 2300),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF0A0E14),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: _gold.withValues(alpha: 0.25), width: 1),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _davEye(),
-                const SizedBox(width: 10),
-                Text(
-                  'F S M E',
-                  style: TextStyle(
-                    fontSize: 10,
-                    letterSpacing: 3,
-                    color: _eyeRed.withValues(alpha: 0.3),
-                    fontWeight: FontWeight.w300,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                _davEye(),
-              ],
-            ),
-            const SizedBox(height: 10),
-            for (final line in _limitFsmeLines)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Text(
-                  '> ${line.text}',
-                  style: TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 11,
-                    height: 1.5,
-                    color: switch (line.audience) {
-                      _FsmeAudience.boss => _bossBlue,
-                      _FsmeAudience.self => _selfGray,
-                      _FsmeAudience.processing => _processingTeal,
-                      _FsmeAudience.user => _gold.withValues(alpha: 0.85),
-                    },
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -1243,10 +1780,24 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
             ),
           ),
 
+          if (_bestStreak >= 2) ...[
+            const SizedBox(height: 8),
+            Text(
+              '🔥 Best streak: $_bestStreak in a row',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: _gold.withValues(alpha: 0.8),
+              ),
+            ),
+          ],
+
           const SizedBox(height: 8),
 
           Text(
-            'That was 15 questions out of 500+.',
+            'That was ${_categories.length * _questionsPerCategory} '
+            'questions out of 500+.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,
@@ -1300,21 +1851,30 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
 
     return Scaffold(
       backgroundColor: _darkBg,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _limitedBanner(),
-            Expanded(
-              child: SingleChildScrollView(
-                child: _allDone
-                    ? _completionView()
-                    : _showingLimit
-                    ? _categoryLimitView()
-                    : _questionView(),
-              ),
+      // Stack, not just SafeArea/Column directly — the trophy-burst
+      // overlay (_trophyOverlay) needs to sit ABOVE the whole screen,
+      // not confined inside _celebrationBox, so it's layered on top
+      // here rather than nested in the normal content tree.
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Column(
+              children: [
+                _limitedBanner(),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: _allDone
+                        ? _completionView()
+                        : _showingLimit
+                        ? _categoryLimitView()
+                        : _questionView(),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          if (_showTrophyOverlay) _trophyOverlay(context),
+        ],
       ),
     );
   }

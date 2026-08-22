@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants.dart';
+import '../app_state.dart';
 import '../mixpanel_service.dart';
 import '../iap_service.dart';
 import '../fsme_popup.dart';
@@ -268,21 +269,26 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
 
               const SizedBox(height: 10),
 
-              GestureDetector(
-                onTap: _showMeMore,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  child: Text(
-                    'Not ready to commit yet? Try this first  \u2192',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: _gold,
+              // Hidden once both free "show me more" rounds are spent \u2014
+              // no dead-end tap on an offer that's already used up. See
+              // AppState.hasLimitedRapidFireRoundsLeft; rounds are
+              // consumed in rapid_fire_limited_intro.dart on Start.
+              if (AppState().hasLimitedRapidFireRoundsLeft)
+                GestureDetector(
+                  onTap: _showMeMore,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Text(
+                      'Not ready to commit yet? Try this first  \u2192',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: _gold,
+                      ),
                     ),
                   ),
                 ),
-              ),
             ],
           ),
         ),

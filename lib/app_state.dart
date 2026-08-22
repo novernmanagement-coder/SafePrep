@@ -101,6 +101,17 @@ class AppState {
       purchaseType == PurchaseType.fourteenDay;
   bool get canUpgradeToLifetime => isTimeLimited && hasUnlockedApp;
 
+  // ── "Show me more" free taste (limited Rapid Fire) ─────────────
+  // Capped at 2 total rounds, ever, to keep this a taste rather than
+  // a way to grind the question bank for free — see
+  // rapid_fire_limited_intro.dart. Survives AppState.reset() the same
+  // way purchase fields do (see reset() below): it's an anti-abuse
+  // counter, not study progress that should clear on a fresh start.
+  static const int maxLimitedRapidFireRounds = 2;
+  int limitedRapidFireRoundsUsed = 0;
+  bool get hasLimitedRapidFireRoundsLeft =>
+      limitedRapidFireRoundsUsed < maxLimitedRapidFireRounds;
+
   DateTime? get expiryDate {
     if (!isTimeLimited || purchaseDate == null) return null;
     final days = purchaseType == PurchaseType.sevenDay ? 7 : 14;
@@ -548,6 +559,7 @@ class AppState {
     final savedHasSeenRenewalExplainer = hasSeenRenewalExplainer;
     final savedHasSeenStudyLanding = hasSeenStudyLanding;
     final savedHasSeenReviewPrompt = hasSeenReviewPrompt;
+    final savedLimitedRapidFireRoundsUsed = limitedRapidFireRoundsUsed;
 
     userName = '';
     hasSeenIntro = false;
@@ -593,6 +605,7 @@ class AppState {
     hasSeenRenewalExplainer = savedHasSeenRenewalExplainer;
     hasSeenStudyLanding = savedHasSeenStudyLanding;
     hasSeenReviewPrompt = savedHasSeenReviewPrompt;
+    limitedRapidFireRoundsUsed = savedLimitedRapidFireRoundsUsed;
   }
 
   Map<String, dynamic> toJson() => {
@@ -607,6 +620,7 @@ class AppState {
     'hasSeenRenewalExplainer': hasSeenRenewalExplainer,
     'hasSeenStudyLanding': hasSeenStudyLanding,
     'hasSeenReviewPrompt': hasSeenReviewPrompt,
+    'limitedRapidFireRoundsUsed': limitedRapidFireRoundsUsed,
     'categoryQuizFailStreak': categoryQuizFailStreak,
     'categoryModeOverride': categoryModeOverride,
     'readinessScore': readinessScore,
@@ -666,6 +680,7 @@ class AppState {
     hasSeenRenewalExplainer = json['hasSeenRenewalExplainer'] ?? false;
     hasSeenStudyLanding = json['hasSeenStudyLanding'] ?? false;
     hasSeenReviewPrompt = json['hasSeenReviewPrompt'] ?? false;
+    limitedRapidFireRoundsUsed = json['limitedRapidFireRoundsUsed'] ?? 0;
     categoryQuizFailStreak = Map<String, int>.from(
       json['categoryQuizFailStreak'] ?? {},
     );
