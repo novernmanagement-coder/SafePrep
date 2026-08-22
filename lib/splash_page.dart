@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'constants.dart';
 import 'app_state.dart';
 import 'app_state_persistence.dart';
+import 'main.dart';
 import 'mixpanel_service.dart';
 import 'dashboard_page.dart';
 import 'splash_navigating_page.dart';
@@ -359,6 +360,25 @@ class _SplashPageState extends State<SplashPage> {
                     fontStyle: FontStyle.italic,
                     letterSpacing: 0.3,
                   ),
+                ),
+              ),
+
+              // TEMP DEBUG (Aug 2026) \u2014 shows how long each pre-runApp
+              // startup step took (or if it timed out), so a hang before
+              // this page renders is visible without a USB debug session.
+              // Only appears if this page actually gets to build, which
+              // it now always should since every step ahead of it is
+              // timeout-capped. Remove alongside startupDiagnostics/
+              // _timed in main.dart once Android startup is confirmed
+              // reliably fast.
+              const SizedBox(height: 18),
+              Text(
+                '[DEBUG]\n${startupDiagnostics.join('\n')}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0x99F0EDE8),
+                  fontSize: 9,
+                  fontFamily: 'monospace',
                 ),
               ),
             ],
