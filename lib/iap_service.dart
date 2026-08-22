@@ -126,7 +126,23 @@ class IAPService {
 
   // ── Initialization ──────────────────────────────────────────
   Future<void> initialize() async {
-    _available = await _iap.isAvailable();
+    // TIMEOUT GUARD (Aug 2026) — isAvailable() and queryProductDetails()
+    // below are platform-channel calls into Play Billing/StoreKit with
+    // no built-in timeout. A hung billing connection (seen right after
+    // a fresh Play Store install) would previously await forever.
+    // main() no longer blocks runApp() on this call, but without a cap
+    // here IAP would just silently never become available for the rest
+    // of the session if the platform call never resolves — so fail
+    // safe after a reasonable wait instead.
+    try {
+      _available = await _iap.isAvailable().timeout(
+        const Duration(seconds: 15),
+      );
+    } catch (e) {
+      debugPrint('IAP isAvailable() timed out or failed: $e');
+      lastLoadDiagnostic = 'IAP isAvailable() timed out or failed: $e';
+      _available = false;
+    }
     if (!_available) return;
 
     _subscription = _iap.purchaseStream.listen(
@@ -139,14 +155,23 @@ class IAPService {
   }
 
   Future<void> _loadProducts() async {
-    final response = await _iap.queryProductDetails({
-      kProductSevenDay,
-      kProductFourteenDay,
-      kProductUnlockApp,
-      kProductUpgrade,
-      kProductRenewal,
-      if (Platform.isAndroid) kProductLifetimeOfferAndroid,
-    });
+    final ProductDetailsResponse response;
+    try {
+      response = await _iap
+          .queryProductDetails({
+            kProductSevenDay,
+            kProductFourteenDay,
+            kProductUnlockApp,
+            kProductUpgrade,
+            kProductRenewal,
+            if (Platform.isAndroid) kProductLifetimeOfferAndroid,
+          })
+          .timeout(const Duration(seconds: 15));
+    } catch (e) {
+      lastLoadDiagnostic = 'queryProductDetails timed out or failed: $e';
+      debugPrint('IAP product load timeout/error: $e');
+      return;
+    }
 
     if (response.error != null) {
       lastLoadDiagnostic =

@@ -30,9 +30,22 @@ void main() async {
   // Won't block launch — if offline, bundled/cached files are used.
   CsvUpdater.syncIfNeeded();
 
-  // Initialize IAP service — iOS and Android only
+  // Initialize IAP service — iOS and Android only.
+  //
+  // FIXED (Aug 2026): this used to be awaited here, which meant the
+  // whole app — including SplashPage — could not paint its first
+  // Flutter frame until Play Billing/StoreKit finished connecting.
+  // The native Android launch icon shows automatically while waiting
+  // for that first frame, so a slow or hung billing connection (seen
+  // right after a fresh Play Store install) left the app stuck on
+  // that icon forever: no error, no Flutter UI, nothing. Fire this
+  // off in the background instead, same as CsvUpdater.syncIfNeeded()
+  // just above — the paywall already handles products not being
+  // loaded yet (IAPResult.productNotFound / lastLoadDiagnostic) and
+  // retries _loadProducts() itself if a product is missing when a
+  // purchase is attempted.
   if (Platform.isIOS || Platform.isAndroid) {
-    await IAPService.instance.initialize();
+    IAPService.instance.initialize();
   }
 
   runApp(const SafePrepApp());
