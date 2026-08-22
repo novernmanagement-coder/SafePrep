@@ -80,15 +80,6 @@ class IAPService {
   bool _available = false;
   bool get isAvailable => _available;
 
-  // TEMP DEBUG (Aug 2026) — Android purchases are failing with
-  // productNotFound and we have no way to see the real Play Billing
-  // error without a USB-connected debug session, which has been a
-  // dead end on this machine. Surfaces the raw response.error / the
-  // actual list of IDs Play couldn't find, so it can be shown on
-  // screen instead of just debugPrint'd into the void. Remove once
-  // Android purchases are confirmed working.
-  String? lastLoadDiagnostic;
-
   // Tracks in-flight purchases so _onPurchaseUpdate can resolve the
   // Future that the calling buy* method is awaiting. Keyed by product ID
   // — this app only ever has one purchase in flight per product at a
@@ -140,7 +131,6 @@ class IAPService {
       );
     } catch (e) {
       debugPrint('IAP isAvailable() timed out or failed: $e');
-      lastLoadDiagnostic = 'IAP isAvailable() timed out or failed: $e';
       _available = false;
     }
     if (!_available) return;
@@ -168,26 +158,22 @@ class IAPService {
           })
           .timeout(const Duration(seconds: 15));
     } catch (e) {
-      lastLoadDiagnostic = 'queryProductDetails timed out or failed: $e';
       debugPrint('IAP product load timeout/error: $e');
       return;
     }
 
     if (response.error != null) {
-      lastLoadDiagnostic =
-          'queryProductDetails error — source: ${response.error!.source}, '
-          'code: ${response.error!.code}, message: ${response.error!.message}';
       debugPrint('IAP product load error: ${response.error}');
       return;
     }
 
     if (response.notFoundIDs.isNotEmpty) {
-      lastLoadDiagnostic =
-          'Play could not find these product IDs: ${response.notFoundIDs.join(', ')} '
-          '(requested ${response.productDetails.length + response.notFoundIDs.length} total, '
-          'found ${response.productDetails.length})';
-    } else {
-      lastLoadDiagnostic = null;
+      debugPrint(
+        'Play could not find these product IDs: '
+        '${response.notFoundIDs.join(', ')} '
+        '(requested ${response.productDetails.length + response.notFoundIDs.length} total, '
+        'found ${response.productDetails.length})',
+      );
     }
 
     // NOTE: was a switch on p.id — switch case labels must be

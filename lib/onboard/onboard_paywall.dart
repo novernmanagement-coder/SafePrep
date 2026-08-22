@@ -122,15 +122,7 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
         (_) => false,
       );
     } else if (result != IAPResult.canceled) {
-      var message = result.userMessage;
-      // TEMP DEBUG (Aug 2026) — append the real Play Billing diagnostic
-      // so it's visible on-screen without a USB debug session. Remove
-      // this block (and IAPService.lastLoadDiagnostic) once Android
-      // purchases are confirmed working.
-      if (result == IAPResult.productNotFound &&
-          IAPService.instance.lastLoadDiagnostic != null) {
-        message = '${message ?? ''}\n\n[DEBUG] ${IAPService.instance.lastLoadDiagnostic}';
-      }
+      final message = result.userMessage;
       if (message != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
