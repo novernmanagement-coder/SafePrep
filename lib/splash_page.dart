@@ -70,7 +70,6 @@ class _SplashPageState extends State<SplashPage> {
   Timer? _displayTicker;
   int _secondsElapsed = 0;
   int? _totalHoldSeconds;
-  bool _isFirstLaunch = true;
 
   // Guards against the auto-navigate firing after a long-press has
   // already taken the user down the debug path.
@@ -94,17 +93,37 @@ class _SplashPageState extends State<SplashPage> {
     }
 
     if (!mounted) return;
-    setState(() {
-      _totalHoldSeconds = holdSeconds;
-      _isFirstLaunch = !hasSeenBefore;
-    });
+    setState(() => _totalHoldSeconds = holdSeconds);
     _startDisplayTicker();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _navigate(holdSeconds));
   }
 
+  // FIXED — the ticker is now the SINGLE source of truth for both the
+  // visible countdown and the auto-navigate trigger (previously a
+  // separate Future.delayed(holdSeconds) fired from initState via
+  // addPostFrameCallback, completely independent of this ticker and
+  // of whether the debug access-code dialog was open). That meant a
+  // long-press on the logo opened the dialog, but the original timer
+  // kept running underneath — if typing the code took longer than the
+  // 5-8s hold, _navigate() fired and pushed OnboardIntro/Dashboard
+  // UNDER the still-open dialog, and by the time a correct code was
+  // entered, _navigated was already true so _debugEntry bailed and did
+  // nothing. Symptom: "the dialog opens, but I don't have time to type
+  // the password, so it just goes to the onboarding funnel."
+  //
+  // Canceling this ticker (e.g. while the dialog is open) now genuinely
+  // pauses the hold, not just the on-screen number. Resuming just
+  // restarts this same timer; it picks up from whatever _secondsElapsed
+  // already reached, it doesn't reset.
   void _startDisplayTicker() {
     _displayTicker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
+      final total = _totalHoldSeconds;
+      if (total != null && _secondsElapsed + 1 >= total) {
+        _displayTicker?.cancel();
+        setState(() => _secondsElapsed = total);
+        _navigate();
+        return;
+      }
       setState(() => _secondsElapsed++);
     });
   }
@@ -121,10 +140,9 @@ class _SplashPageState extends State<SplashPage> {
     return remaining.clamp(0, total - _orientationSeconds);
   }
 
-  Future<void> _navigate(int holdSeconds) async {
+  Future<void> _navigate() async {
     final state = AppState();
 
-    await Future.delayed(Duration(seconds: holdSeconds));
     if (!mounted || _navigated) return;
 
     // Clear stale debug state.
@@ -189,16 +207,23 @@ class _SplashPageState extends State<SplashPage> {
   }
 
   /// Long-press on the splash logo — the only remaining way to reach
-  /// the debug access-code prompt, independent of run count. Wrong,
-  /// blank, or dismissed entry just closes the dialog; the normal
-  /// timed navigation continues underneath if it hasn't already fired.
+  /// the debug access-code prompt, independent of run count.
+  ///
+  /// Stops the hold timer the instant the dialog opens (see
+  /// _startDisplayTicker — canceling it pauses both the visible
+  /// countdown and the auto-navigate trigger together) so a slow typer
+  /// never gets yanked into the funnel mid-entry. If the code turns out
+  /// wrong/blank/dismissed, the timer resumes from wherever it left
+  /// off rather than restarting from zero.
   Future<void> _debugEntry() async {
+    if (_navigated) return;
+    _displayTicker?.cancel();
+
     final entered = await _promptAccessCode();
     if (!mounted || _navigated) return;
 
     if (entered == _accessCode) {
       _navigated = true;
-      _displayTicker?.cancel();
       OnboardingAnswers.instance.reset();
       MixpanelService.instance.track(
         'SpOn_Splash_Route',
@@ -208,8 +233,13 @@ class _SplashPageState extends State<SplashPage> {
         context,
         MaterialPageRoute(builder: (_) => const SplashNavigatingPage()),
       );
+      return;
     }
-    // Wrong/blank/dismissed: do nothing, let normal routing proceed.
+
+    // Wrong/blank/dismissed: resume the paused timer from where it
+    // left off — normal routing proceeds once it reaches the hold
+    // duration, same as if the dialog had never opened.
+    if (!_navigated) _startDisplayTicker();
   }
 
   /// Shows a modal asking for the access code. Returns the entered

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
@@ -7,21 +8,50 @@ import 'app_state_persistence.dart';
 import 'mixpanel_service.dart';
 
 // ─────────────────────────────────────────────────────────────────
-// Product IDs — must match App Store Connect exactly
+// Product IDs
+//
+// iOS values must match App Store Connect exactly (mixed-case,
+// already live there — do not change these). Google Play product
+// IDs cannot contain any uppercase letters at all (Play Console
+// rejects them outright at creation time), so Android gets its own
+// lowercase-only IDs below — same underlying product, a different
+// ID string per store. Everything else in this file just uses these
+// constants and never needs to branch on platform itself.
 // ─────────────────────────────────────────────────────────────────
-const String kProductSevenDay = 'SafePrepSevenDay'; // $4.99 — 7 days
-const String kProductFourteenDay = 'SafePrepFourteenDay'; // $8.99 — 14 days
-const String kProductUnlockApp = 'SafePrepUnlock'; // $9.99 — lifetime
+final String kProductSevenDay = Platform.isAndroid
+    ? 'android_sp_sevenday'
+    : 'SafePrepSevenDay'; // $4.99 — 7 days
+final String kProductFourteenDay = Platform.isAndroid
+    ? 'android_sp_fourteenday'
+    : 'SafePrepFourteenDay'; // $8.99 — 14 days
+final String kProductUnlockApp = Platform.isAndroid
+    ? 'android_sp_unlock'
+    : 'SafePrepUnlock'; // $9.99 — lifetime
 const String kProductUpgrade =
-    'com.geraldmiller.safeprep.upgrade'; // $4.99 — upgrade to lifetime
-const String kProductRenewal =
-    'SafePrepRenewalWeek'; // $2.99 — +7 days, existing purchasers only
-// TODO: confirm this product ID has actually been created in App
-// Store Connect before shipping — buyRenewal() will resolve
-// productNotFound until it exists there. IMPORTANT: must be created
-// as a CONSUMABLE product type, not non-consumable — it's meant to
-// be bought repeatedly, and _purchase() below now routes it through
-// buyConsumable() specifically because of that.
+    'com.geraldmiller.safeprep.upgrade'; // $4.99 — upgrade to lifetime — already lowercase, same ID works on both stores
+final String kProductRenewal = Platform.isAndroid
+    ? 'android_sp_renewalweek'
+    : 'SafePrepRenewalWeek'; // $2.99 — +7 days, existing purchasers only (iOS)
+
+// Android-only replacement for the day-5 renewal offer above. Rather
+// than a repeatable +7-day extension (which relies on the app calling
+// Play Billing's consume API correctly — see the long discussion this
+// replaced), this grants LIFETIME access outright for a one-time,
+// non-consumable purchase, same simple pattern as kProductUnlockApp /
+// kProductUpgrade. iOS keeps its real, live $2.99 renewal
+// (kProductRenewal / SafePrepRenewalWeek) untouched — this constant is
+// never queried or purchased on iOS. Deliberately no price baked into
+// the ID (just "lifetime", not "lifetime299") so the price can change
+// in Play Console later without the ID looking stale.
+const String kProductLifetimeOfferAndroid = 'android_sp_lifetime';
+// TODO: confirm both the iOS and Android versions of this product ID
+// have actually been created in their respective stores before
+// shipping — buyRenewal() will resolve productNotFound until they
+// exist. IMPORTANT: must be created as a CONSUMABLE product type (Google
+// Play: a one-time product that "can be used and re-purchased"), not
+// durable/non-consumable — it's meant to be bought repeatedly, and
+// _purchase() below now routes it through buyConsumable() specifically
+// because of that.
 
 // How long a buy* call will wait for StoreKit to resolve (purchased,
 // canceled, or errored) before giving up and returning IAPResult.timeout.
@@ -45,9 +75,19 @@ class IAPService {
   ProductDetails? _unlockProduct;
   ProductDetails? _upgradeProduct;
   ProductDetails? _renewalProduct;
+  ProductDetails? _lifetimeOfferProduct;
 
   bool _available = false;
   bool get isAvailable => _available;
+
+  // TEMP DEBUG (Aug 2026) — Android purchases are failing with
+  // productNotFound and we have no way to see the real Play Billing
+  // error without a USB-connected debug session, which has been a
+  // dead end on this machine. Surfaces the raw response.error / the
+  // actual list of IDs Play couldn't find, so it can be shown on
+  // screen instead of just debugPrint'd into the void. Remove once
+  // Android purchases are confirmed working.
+  String? lastLoadDiagnostic;
 
   // Tracks in-flight purchases so _onPurchaseUpdate can resolve the
   // Future that the calling buy* method is awaiting. Keyed by product ID
@@ -105,30 +145,43 @@ class IAPService {
       kProductUnlockApp,
       kProductUpgrade,
       kProductRenewal,
+      if (Platform.isAndroid) kProductLifetimeOfferAndroid,
     });
 
     if (response.error != null) {
+      lastLoadDiagnostic =
+          'queryProductDetails error — source: ${response.error!.source}, '
+          'code: ${response.error!.code}, message: ${response.error!.message}';
       debugPrint('IAP product load error: ${response.error}');
       return;
     }
 
+    if (response.notFoundIDs.isNotEmpty) {
+      lastLoadDiagnostic =
+          'Play could not find these product IDs: ${response.notFoundIDs.join(', ')} '
+          '(requested ${response.productDetails.length + response.notFoundIDs.length} total, '
+          'found ${response.productDetails.length})';
+    } else {
+      lastLoadDiagnostic = null;
+    }
+
+    // NOTE: was a switch on p.id — switch case labels must be
+    // compile-time constants in Dart, and kProduct* are no longer
+    // const (they're platform-dependent at runtime now, see the
+    // declarations above), so this is an if/else chain instead.
     for (final p in response.productDetails) {
-      switch (p.id) {
-        case kProductSevenDay:
-          _sevenDayProduct = p;
-          break;
-        case kProductFourteenDay:
-          _fourteenDayProduct = p;
-          break;
-        case kProductUnlockApp:
-          _unlockProduct = p;
-          break;
-        case kProductUpgrade:
-          _upgradeProduct = p;
-          break;
-        case kProductRenewal:
-          _renewalProduct = p;
-          break;
+      if (p.id == kProductSevenDay) {
+        _sevenDayProduct = p;
+      } else if (p.id == kProductFourteenDay) {
+        _fourteenDayProduct = p;
+      } else if (p.id == kProductUnlockApp) {
+        _unlockProduct = p;
+      } else if (p.id == kProductUpgrade) {
+        _upgradeProduct = p;
+      } else if (p.id == kProductRenewal) {
+        _renewalProduct = p;
+      } else if (p.id == kProductLifetimeOfferAndroid) {
+        _lifetimeOfferProduct = p;
       }
     }
 
@@ -253,20 +306,23 @@ class IAPService {
     state.hasUnlockedApp = true;
     state.purchaseDate = DateTime.now();
 
-    switch (purchase.productID) {
-      case kProductSevenDay:
-        state.purchaseType = PurchaseType.sevenDay;
-        break;
-      case kProductFourteenDay:
-        state.purchaseType = PurchaseType.fourteenDay;
-        break;
-      case kProductUnlockApp:
-        state.purchaseType = PurchaseType.lifetime;
-        break;
-      case kProductUpgrade:
-        // Upgrade — keep purchase date, just elevate to lifetime
-        state.purchaseType = PurchaseType.lifetime;
-        break;
+    // NOTE: was a switch on purchase.productID — same reason as the
+    // one in _loadProducts above, kProduct* aren't compile-time
+    // constants anymore.
+    if (purchase.productID == kProductSevenDay) {
+      state.purchaseType = PurchaseType.sevenDay;
+    } else if (purchase.productID == kProductFourteenDay) {
+      state.purchaseType = PurchaseType.fourteenDay;
+    } else if (purchase.productID == kProductUnlockApp) {
+      state.purchaseType = PurchaseType.lifetime;
+    } else if (purchase.productID == kProductUpgrade) {
+      // Upgrade — keep purchase date, just elevate to lifetime
+      state.purchaseType = PurchaseType.lifetime;
+    } else if (purchase.productID == kProductLifetimeOfferAndroid) {
+      // Android's day-5 offer — a straight lifetime unlock, not an
+      // extension, so no special expiry math needed (unlike
+      // kProductRenewal above).
+      state.purchaseType = PurchaseType.lifetime;
     }
 
     await AppStatePersistence.save();
@@ -340,6 +396,12 @@ class IAPService {
   Future<IAPResult> buyRenewal() =>
       _purchase(() => _renewalProduct, isConsumable: true);
 
+  // Android-only. Non-consumable — same call pattern as buyUnlockApp /
+  // buyUpgrade, since this is a one-time-forever purchase, not a
+  // repeatable one.
+  Future<IAPResult> buyLifetimeOffer() =>
+      _purchase(() => _lifetimeOfferProduct);
+
   // ── Restore ─────────────────────────────────────────────────
   // NOTE: restorePurchases() only restores non-consumables (Apple
   // doesn't track consumable purchase history for restore) — the
@@ -360,6 +422,7 @@ class IAPService {
   String get unlockPrice => _unlockProduct?.price ?? '\$9.99';
   String get upgradePrice => _upgradeProduct?.price ?? '\$4.99';
   String get renewalPrice => _renewalProduct?.price ?? '\$2.99';
+  String get lifetimeOfferPrice => _lifetimeOfferProduct?.price ?? '\$2.99';
 }
 
 // ── Result enum ──────────────────────────────────────────────

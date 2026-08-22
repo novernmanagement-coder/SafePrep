@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'constants.dart';
 import 'app_state.dart';
@@ -8,6 +9,7 @@ import 'dashboard_page.dart';
 import 'rapid_fire_page.dart';
 import 'onboard/onboard_paywall.dart';
 import 'renew_page.dart';
+import 'lifetime_offer_page.dart';
 
 class SafePrepNavBar extends StatefulWidget {
   final bool isDashboardPage;
@@ -109,15 +111,23 @@ class _SafePrepNavBarState extends State<SafePrepNavBar> {
     }
   }
 
-  // Renew opens its own dedicated page (RenewPage) rather than
-  // purchasing directly from the nav bar — that page handles the
-  // real $2.99 buyRenewal() flow, shows FSME's readiness/date copy,
-  // and gives the user a clean back-out. Just navigation here, no
-  // purchase logic duplicated in this file.
+  // Renew opens its own dedicated page rather than purchasing directly
+  // from the nav bar — that page handles the real $2.99 purchase flow,
+  // shows FSME's readiness copy, and gives the user a clean back-out.
+  // Just navigation here, no purchase logic duplicated in this file.
+  //
+  // Android gets LifetimeOfferPage (one-time $2.99 lifetime unlock,
+  // kProductLifetimeOfferAndroid) instead of RenewPage (repeatable
+  // $2.99 7-day extension, kProductRenewal / SafePrepRenewalWeek) —
+  // iOS's real, live renewal is untouched. See iap_service.dart's
+  // kProductLifetimeOfferAndroid doc comment for why.
   Future<void> _goRenew(BuildContext context) async {
     final renewed = await Navigator.push<bool>(
       context,
-      MaterialPageRoute(builder: (_) => const RenewPage()),
+      MaterialPageRoute(
+        builder: (_) =>
+            Platform.isAndroid ? const LifetimeOfferPage() : const RenewPage(),
+      ),
     );
     if (renewed == true && mounted) {
       setState(() {}); // refresh nav bar state (daysRemaining, showRenew)
