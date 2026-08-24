@@ -233,8 +233,9 @@ class _FinalStepExamPageState extends State<FinalStepExamPage> {
 
     final missedIds = <String>[];
     for (int i = 0; i < _questions.length; i++) {
-      if (_selectedAnswers[i] != _questions[i].correctAnswer)
+      if (_selectedAnswers[i] != _questions[i].correctAnswer) {
         missedIds.add(_questions[i].id);
+      }
     }
 
     _state.missedFinalExamQuestionIds = missedIds;
@@ -297,13 +298,15 @@ class _FinalStepExamPageState extends State<FinalStepExamPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_loaded)
+    if (!_loaded) {
       return const Scaffold(
         backgroundColor: Color(0xFFE3F0F9),
         body: Center(child: CircularProgressIndicator()),
       );
-    if (_questions.isEmpty)
+    }
+    if (_questions.isEmpty) {
       return const Scaffold(body: Center(child: Text('No questions found.')));
+    }
 
     final q = _questions[_currentIndex];
     final hasSelected = _selectedAnswers[_currentIndex] != -1;

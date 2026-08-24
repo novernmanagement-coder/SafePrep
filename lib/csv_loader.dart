@@ -22,6 +22,39 @@ const List<String> _remoteFiles = [
   'ScenarioDrills.csv',
 ];
 
+// Every SafePrep sibling app (Manager, Alcohol, Español, Refresher) is
+// built from this same shared codebase and downloads the exact same
+// filenames via the exact same getApplicationDocumentsDirectory() call
+// below. On Android/iOS that's harmless — each app's documents
+// directory is sandboxed per package/bundle ID by the OS. On Windows
+// desktop it is NOT sandboxed at all: getApplicationDocumentsDirectory()
+// there just resolves to the real Windows "Documents" folder, shared
+// by every app running under that Windows user account. Running two
+// sibling apps' Windows builds on the same dev machine — even at
+// different times — makes them silently overwrite each other's cached
+// CSVs and csv_version.json, with no error and no signal that it
+// happened (this is exactly how English SafePrep Manager ended up
+// showing Spanish ServSafeCurriculum.csv content after Español had
+// been run on the same PC — confirmed Aug 2026). Namespacing under a
+// per-app subfolder isolates each sibling app's cache even on Windows.
+//
+// Each SafePrep app's copy of this file should set its own value here
+// — same pattern as MixpanelService._appPrefix:
+//   SafePrep Manager   → 'SafePrepManager'
+//   SafePrep Alcohol    → 'SafePrepAlcohol'
+//   SafePrep Español    → 'SafePrepEspanol'
+//   SafePrep Refresher  → 'SafePrepRefresher'
+const String _contentSubfolder = 'SafePrepManager';
+
+Future<Directory> _contentDir() async {
+  final docs = await getApplicationDocumentsDirectory();
+  final dir = Directory('${docs.path}/$_contentSubfolder');
+  if (!await dir.exists()) {
+    await dir.create(recursive: true);
+  }
+  return dir;
+}
+
 // ─────────────────────────────────────────────────────────────────
 // CSV UPDATER
 // ─────────────────────────────────────────────────────────────────
@@ -61,7 +94,7 @@ class CsvUpdater {
 
       if (response.statusCode != 200) return false;
 
-      final dir = await getApplicationDocumentsDirectory();
+      final dir = await _contentDir();
       final file = File('${dir.path}/$fileName');
       await file.writeAsString(response.body, encoding: utf8);
       debugPrint('CSV updated: $fileName');
@@ -74,7 +107,7 @@ class CsvUpdater {
 
   static Future<Map<String, dynamic>> _loadLocalVersion() async {
     try {
-      final dir = await getApplicationDocumentsDirectory();
+      final dir = await _contentDir();
       final file = File('${dir.path}/csv_version.json');
       if (!await file.exists()) return {};
       final content = await file.readAsString();
@@ -86,7 +119,7 @@ class CsvUpdater {
 
   static Future<void> _saveLocalVersion(Map<String, dynamic> version) async {
     try {
-      final dir = await getApplicationDocumentsDirectory();
+      final dir = await _contentDir();
       final file = File('${dir.path}/csv_version.json');
       await file.writeAsString(jsonEncode(version));
     } catch (_) {}
@@ -98,7 +131,7 @@ class CsvUpdater {
 // ─────────────────────────────────────────────────────────────────
 Future<List<String>> readCsvLines(String fileName) async {
   try {
-    final dir = await getApplicationDocumentsDirectory();
+    final dir = await _contentDir();
     final file = File('${dir.path}/$fileName');
     if (await file.exists()) {
       final content = await file.readAsString(encoding: utf8);

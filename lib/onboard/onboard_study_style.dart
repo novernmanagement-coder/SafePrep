@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../constants.dart';
 import '../mixpanel_service.dart';
 import 'onboard_answers.dart';
 import 'onboard_paywall.dart';

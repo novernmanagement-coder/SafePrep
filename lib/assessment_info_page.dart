@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'constants.dart';
 import 'home_page.dart';
 import 'csv_loader.dart';
-import 'app_state.dart';
 import 'assessment_page_v2.dart';
 import 'safe_prep_nav_bar.dart';
 
@@ -31,10 +30,6 @@ class _AssessmentInfoPageState extends State<AssessmentInfoPage> {
 
   @override
   Widget build(BuildContext context) {
-    final questionCount = AppState().hasUnlockedApp
-        ? AppConstants.diagnosticQuestionsFull
-        : AppConstants.diagnosticQuestions;
-
     return Scaffold(
       backgroundColor: AppColors.servSafeBlue,
       body: SafeArea(

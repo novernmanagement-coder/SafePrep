@@ -8,7 +8,6 @@ import 'mixpanel_service.dart';
 import 'dashboard_page.dart';
 import 'splash_navigating_page.dart';
 import 'onboard/onboard_intro.dart';
-import 'onboard/onboard_paywall.dart';
 import 'onboard/onboard_answers.dart';
 
 // BUILD 29 — Splash routing, revised so casual/free-info visitors

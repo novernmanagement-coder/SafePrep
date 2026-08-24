@@ -19,14 +19,18 @@ class FinalExamGradePage extends StatelessWidget {
   }
 
   String _scoreBandMessage(int score) {
-    if (score <= 50)
+    if (score <= 50) {
       return "We've adjusted your study plan and made it intuitive. Let's get to work.";
-    if (score <= 65)
+    }
+    if (score <= 65) {
       return "Your results are very encouraging. You have the basics — we've created a personalized study plan just for you.";
-    if (score <= 84)
+    }
+    if (score <= 84) {
       return "You mastered the basics. Now let's fine tune your knowledge — your personalized compact study plan is ready.";
-    if (score <= 99)
+    }
+    if (score <= 99) {
       return "You're good to go. Come back and review anytime you like, we've added that option on the 60-Second Refresh.";
+    }
     return "You're ready for the ServSafe® exam. The 60-Second Refresh will be waiting whenever you're ready.";
   }
 

@@ -126,10 +126,11 @@ class _InstructorTipsPageState extends State<InstructorTipsPage> {
   }
 
   Widget _buildTipsList() {
-    if (_tips.isEmpty)
+    if (_tips.isEmpty) {
       return const Center(
         child: CircularProgressIndicator(color: AppColors.primaryButton),
       );
+    }
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       itemCount: _tips.length,

@@ -23,15 +23,23 @@ class MixpanelService {
   static const String _appPrefix = 'SP';
 
   Future<void> init() async {
-    _mixpanel = await Mixpanel.init(_token, trackAutomaticEvents: true);
+    try {
+      _mixpanel = await Mixpanel.init(_token, trackAutomaticEvents: true);
 
-    // Super property — attached automatically to every event (including
-    // Mixpanel's own auto-tracked events like "App Session" and "First
-    // App Open") without needing to pass app_name at every call site.
-    // This is a belt-and-suspenders companion to the event-name prefix
-    // above: the prefix fixes the event LIST, this fixes the PROPERTY,
-    // so app_name is reliable even on events we didn't hand-instrument.
-    _mixpanel?.registerSuperProperties({'app_name': _appPrefix});
+      // Super property — attached automatically to every event (including
+      // Mixpanel's own auto-tracked events like "App Session" and "First
+      // App Open") without needing to pass app_name at every call site.
+      // This is a belt-and-suspenders companion to the event-name prefix
+      // above: the prefix fixes the event LIST, this fixes the PROPERTY,
+      // so app_name is reliable even on events we didn't hand-instrument.
+      _mixpanel?.registerSuperProperties({'app_name': _appPrefix});
+    } catch (e) {
+      // Silent fail — never crash the app over analytics. In particular,
+      // mixpanel_flutter has no native implementation on desktop
+      // platforms (Windows/macOS/Linux), so this throws a
+      // MissingPluginException there; _mixpanel stays null and every
+      // track()/identify()/reset() call below becomes a no-op.
+    }
   }
 
   void track(String event, {Map<String, dynamic>? properties}) {
@@ -45,12 +53,16 @@ class MixpanelService {
   void identify(String userId) {
     try {
       _mixpanel?.identify(userId);
-    } catch (e) {}
+    } catch (e) {
+      // Silent fail — never crash the app over analytics
+    }
   }
 
   void reset() {
     try {
       _mixpanel?.reset();
-    } catch (e) {}
+    } catch (e) {
+      // Silent fail — never crash the app over analytics
+    }
   }
 }

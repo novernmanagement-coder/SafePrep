@@ -427,6 +427,34 @@ class IAPService {
     await _iap.restorePurchases();
   }
 
+  // UI-facing convenience for a "Restore Purchases" button. Fires the
+  // restore, then waits for the purchase stream to redeliver any
+  // already-owned purchase and for _handleSuccess (above) to process
+  // it — restorePurchases() itself only submits the request, it
+  // doesn't report an outcome. This is also the recovery path for the
+  // Play Billing "item already owned" scenario: a purchase that
+  // charged the user and is already owned on the store's side, but
+  // whose _onPurchaseUpdate delivery was missed locally (e.g. an app
+  // kill between the purchase completing and AppStatePersistence.save()
+  // writing to disk) — buying again just returns
+  // PurchaseStatus.error(ITEM_ALREADY_OWNED) from the store, but this
+  // re-syncs local state with what the store already has on record.
+  // Returns true if the account is unlocked afterward — either this
+  // restore found something, or it already was unlocked.
+  Future<bool> restoreAndWait({
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
+    if (AppState().hasUnlockedApp) return true;
+    if (!_available) return false;
+    await restorePurchases();
+    final deadline = DateTime.now().add(timeout);
+    while (DateTime.now().isBefore(deadline)) {
+      if (AppState().hasUnlockedApp) return true;
+      await Future.delayed(const Duration(milliseconds: 300));
+    }
+    return AppState().hasUnlockedApp;
+  }
+
   // ── Price strings ────────────────────────────────────────────
   String get sevenDayPrice => _sevenDayProduct?.price ?? '\$4.99';
   String get fourteenDayPrice => _fourteenDayProduct?.price ?? '\$8.99';

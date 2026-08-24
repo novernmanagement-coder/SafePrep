@@ -42,7 +42,6 @@ class _ComputingCurriculumPageState extends State<ComputingCurriculumPage>
     with TickerProviderStateMixin {
   static const Color _gold = Color(0xFFD4AF37);
   static const Color _darkBg = Color(0xFF0A0A0F);
-  static const Color _cardBg = Color(0xFF13130F);
   static const Color _mutedWhite = Color(0x99F0EDE8);
 
   late AnimationController _progressController;

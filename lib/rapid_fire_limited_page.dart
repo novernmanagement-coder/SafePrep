@@ -168,7 +168,6 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
   String _answerBText = '';
   int _correctSlot = 0;
   bool _answered = false;
-  bool? _wasCorrect;
 
   // Answer button colors (real tool uses slate-blue idle, green/red/grey
   // on reveal).
@@ -940,7 +939,6 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
       _answerAText = slot == 0 ? correctText : wrongs[0];
       _answerBText = slot == 1 ? correctText : wrongs[0];
       _answered = false;
-      _wasCorrect = null;
       _showingLimit = false;
       _colorA = const Color(0xFF4A6FA5);
       _colorB = const Color(0xFF4A6FA5);
@@ -990,7 +988,6 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
 
     setState(() {
       _answered = true;
-      _wasCorrect = isCorrect;
       _totalAnswered++;
       if (isCorrect) {
         _totalCorrect++;

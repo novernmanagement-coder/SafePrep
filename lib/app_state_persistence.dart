@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'app_state.dart';
 
@@ -12,7 +13,7 @@ class AppStatePersistence {
       final json = jsonEncode(_state.toJson());
       await prefs.setString(_key, json);
     } catch (e) {
-      print('AppState save failed: $e');
+      debugPrint('AppState save failed: $e');
     }
   }
 
@@ -21,13 +22,13 @@ class AppStatePersistence {
       final prefs = await SharedPreferences.getInstance();
       final json = prefs.getString(_key);
       if (json == null) {
-        print('No save file found — fresh install');
+        debugPrint('No save file found — fresh install');
         return;
       }
       _state.fromJson(jsonDecode(json));
-      print('AppState loaded — user: ${_state.userName}');
+      debugPrint('AppState loaded — user: ${_state.userName}');
     } catch (e) {
-      print('AppState load failed: $e');
+      debugPrint('AppState load failed: $e');
     }
   }
 
@@ -35,9 +36,9 @@ class AppStatePersistence {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_key);
-      print('Save file deleted');
+      debugPrint('Save file deleted');
     } catch (e) {
-      print('AppState delete failed: $e');
+      debugPrint('AppState delete failed: $e');
     }
   }
 }

@@ -58,10 +58,11 @@ class _ScenarioDrillsPageState extends State<ScenarioDrillsPage> {
   bool _showIntro = true;
 
   String get _instructorImage {
-    if (_wasCorrect == null)
+    if (_wasCorrect == null) {
       return _phase == _Phase.scenario
           ? 'Assets/instructor_asking.png'
           : 'Assets/instructor_waiting.png';
+    }
     if (_isExplaining) return 'Assets/instructor_explaining.png';
     return _wasCorrect!
         ? 'Assets/instructor_correct.png'
@@ -70,8 +71,9 @@ class _ScenarioDrillsPageState extends State<ScenarioDrillsPage> {
 
   String? get _studentImage {
     if (_phase == _Phase.scenario) return null;
-    if (_wasCorrect == null)
+    if (_wasCorrect == null) {
       return _choicesOpacity > 0 ? 'Assets/student_thinking.png' : null;
+    }
     if (_isExplaining) return 'Assets/student_listening.png';
     return _wasCorrect!
         ? 'Assets/student_correct.png'
@@ -287,8 +289,9 @@ class _ScenarioDrillsPageState extends State<ScenarioDrillsPage> {
   Color _choiceColor(int oneBased) {
     if (_wasCorrect == null) return AppColors.primaryButton;
     if (oneBased == _current!.correctChoice) return const Color(0xFF3BA776);
-    if (oneBased == _selectedChoice && !_wasCorrect!)
+    if (oneBased == _selectedChoice && !_wasCorrect!) {
       return const Color(0xFFE05C5C);
+    }
     return const Color(0xFF999999);
   }
 

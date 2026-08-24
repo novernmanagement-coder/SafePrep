@@ -61,7 +61,6 @@ class _PeaceOfMindPageState extends State<PeaceOfMindPage> {
   String _displayedText = '';
   EyeMood _mood = EyeMood.idle;
   Color _textColor = _davGold;
-  bool _greetingDone = false;
 
   static const Duration _holdDuration = Duration(milliseconds: 2600);
 
@@ -89,7 +88,6 @@ class _PeaceOfMindPageState extends State<PeaceOfMindPage> {
       // tool, instead of leaving the eyes in whatever the last line's
       // mood happened to be.
       setState(() {
-        _greetingDone = true;
         _mood = EyeMood.serious;
       });
       return;

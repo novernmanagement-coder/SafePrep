@@ -123,7 +123,6 @@ class _FsmePopupState extends State<FsmePopup> with TickerProviderStateMixin {
   final List<_RenderLine> _revealed = [];
 
   Timer? _inTimer;
-  bool _disposed = false;
 
   int _gazeTarget = 0;
   double _gazeCurrent = 0.0;
@@ -233,7 +232,6 @@ class _FsmePopupState extends State<FsmePopup> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-    _disposed = true;
     _inTimer?.cancel();
     _gazeTimer?.cancel();
     _blinkTimer?.cancel();

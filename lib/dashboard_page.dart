@@ -461,8 +461,9 @@ class _DashboardPageState extends State<DashboardPage> {
       pulseCategories = failingCategories.take(2).toList();
     } else if (failingCategories.length == 1) {
       pulseCategories = [failingCategories[0]];
-      if (untestedCategories.isNotEmpty)
+      if (untestedCategories.isNotEmpty) {
         pulseCategories.add(untestedCategories[0]);
+      }
     } else {
       pulseCategories = untestedCategories.take(2).toList();
     }

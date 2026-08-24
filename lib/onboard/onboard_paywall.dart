@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants.dart';
 import '../app_state.dart';
@@ -8,7 +7,6 @@ import '../iap_service.dart';
 import '../fsme_popup.dart';
 import '../fsme_post_purchase_landing.dart';
 import 'onboard_answers.dart';
-import 'onboard_knowledge_level.dart';
 import '../rapid_fire_limited_intro.dart';
 
 /// Onboarding paywall — redesigned for the self-report funnel.
@@ -46,6 +44,7 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
   static const String _price = '\$4.99';
 
   bool _purchasing = false;
+  bool _restoring = false;
 
   /// FSME's one-line reaction, keyed to the self-reported knowledge
   /// level. Draft copy — only the "confident" line has been confirmed
@@ -132,6 +131,51 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
           ),
         );
       }
+    }
+  }
+
+  // Recovery path for the Play Billing "already owned" scenario: a
+  // purchase that charged the user's card and is already recorded as
+  // owned on the store's side, but whose success never got processed
+  // locally (e.g. the app was killed between the purchase completing
+  // and AppStatePersistence.save() writing to disk, or a transient
+  // stream error). Buying again just returns "item already owned"
+  // from the store with no way forward, so this is the only escape
+  // hatch for someone in that state — always visible, not just shown
+  // after an error, since Apple/Play guidelines expect a restore
+  // option to be discoverable up front, and the person in this state
+  // never sees a purchase error on THIS attempt to know to look for one.
+  Future<void> _restorePurchases() async {
+    if (_restoring || _purchasing) return;
+    setState(() => _restoring = true);
+
+    MixpanelService.instance.track(
+      'SpOn_Pay_Restore',
+      properties: {'app_name': 'SP'},
+    );
+
+    final unlocked = await IAPService.instance.restoreAndWait();
+
+    if (!mounted) return;
+    setState(() => _restoring = false);
+
+    if (unlocked) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const FsmePostPurchaseLanding()),
+        (_) => false,
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "We couldn't find a previous purchase for this account. "
+            'If you were charged, please contact support.',
+          ),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 8),
+        ),
+      );
     }
   }
 
@@ -281,6 +325,31 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
                     ),
                   ),
                 ),
+
+              GestureDetector(
+                onTap: _restorePurchases,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: _restoring
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: _gold,
+                          ),
+                        )
+                      : Text(
+                          'Already purchased? Restore Purchases',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: _softWhite.withValues(alpha: 0.5),
+                          ),
+                        ),
+                ),
+              ),
             ],
           ),
         ),

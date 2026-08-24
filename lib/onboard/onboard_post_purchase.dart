@@ -27,7 +27,6 @@ class _OnboardPostPurchaseState extends State<OnboardPostPurchase> {
   static const Color _gold = Color(0xFFD4AF37);
   static const Color _darkBg = Color(0xFF0A0A0F);
   static const Color _softWhite = Color(0xFFF0EDE8);
-  static const Color _cardBg = Color(0xFF13130F);
 
   static const int _maxEstimateMinutes = 240;
 
