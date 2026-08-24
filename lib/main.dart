@@ -17,9 +17,17 @@ void main() async {
   // Load persisted user state first
   await AppStatePersistence.load();
 
-  // Init trial timer for non-unlocked users
+  // Init trial timer for non-unlocked users. Guarded like every other
+  // startup call above/below — this reads from the iOS Keychain (via
+  // flutter_secure_storage), and a Keychain access failure here would
+  // otherwise be an unguarded way to crash on launch instead of just
+  // losing the trial-timer feature for that session.
   if (!AppState().hasUnlockedApp) {
-    await TrialTimerService.instance.init();
+    try {
+      await TrialTimerService.instance.init();
+    } catch (e) {
+      debugPrint('TrialTimerService init failed: $e');
+    }
   }
 
   // Sync CSVs from GitHub in the background.
