@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'constants.dart';
@@ -36,6 +37,16 @@ import 'onboard/onboard_answers.dart';
 // was previously the run-count trigger itself), so a long-press on
 // the splash logo now opens the same prompt directly, independent of
 // run count — this is the new/only way in.
+//
+// UPDATED — the long-press entry point is now hard-gated behind
+// kDebugMode (see _debugEntry below). Google Play's automated review
+// found this access-code screen in two separate release builds and
+// blocked "Missing sign in details" on submission, requiring either
+// real login credentials for reviewers or removal of the restricted
+// screen. Rather than hand Google (or anyone) the real backdoor code,
+// the entry point itself now compiles to a no-op in release builds —
+// nothing reachable, nothing to declare. Still fully usable via
+// `flutter run` (debug mode) for local testing.
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
 
@@ -208,6 +219,13 @@ class _SplashPageState extends State<SplashPage> {
   /// Long-press on the splash logo — the only remaining way to reach
   /// the debug access-code prompt, independent of run count.
   ///
+  /// GATED — compiles to a no-op in release builds (see kDebugMode
+  /// check below). Google Play's automated review flagged this screen
+  /// as a "missing sign in details" issue after finding it in two
+  /// release builds; rather than disclose the real access code to
+  /// reviewers, the entry point itself is now unreachable outside
+  /// local debug runs.
+  ///
   /// Stops the hold timer the instant the dialog opens (see
   /// _startDisplayTicker — canceling it pauses both the visible
   /// countdown and the auto-navigate trigger together) so a slow typer
@@ -215,6 +233,7 @@ class _SplashPageState extends State<SplashPage> {
   /// wrong/blank/dismissed, the timer resumes from wherever it left
   /// off rather than restarting from zero.
   Future<void> _debugEntry() async {
+    if (!kDebugMode) return; // release builds: no-op, nothing to find
     if (_navigated) return;
     _displayTicker?.cancel();
 
