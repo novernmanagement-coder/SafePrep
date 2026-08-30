@@ -126,6 +126,22 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
+  // Reuses the existing 'DiagnosticCompleted' / "Optimized Path Chosen"
+  // trophy (normally earned by completing the diagnostic Assessment,
+  // see assessment_page_v2.dart) for the mirror-image case: someone who
+  // skipped the Assessment entirely but still mastered every study
+  // category on their own found an efficient route too. Per Gerry's
+  // call — flag if this naming feels backwards, since the trophy ID
+  // literally says "DiagnosticCompleted" for a no-diagnostic path.
+  void _checkOptimizedPathTrophy() {
+    if (!_state.hasTakenAssessment &&
+        _state.masteredCategories.length == AppState.allCategories.length &&
+        !_state.earnedTrophyIds.contains('DiagnosticCompleted')) {
+      _state.addEarnedMilestone('DiagnosticCompleted', 'Optimized Path Chosen');
+      AppStatePersistence.save();
+    }
+  }
+
   Future<void> _loadFacts() async {
     final facts = await FactLoader.loadAll();
     if (mounted) {
@@ -139,6 +155,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final all = await MilestoneLoader.loadAll();
     if (mounted) {
       _checkUnlockTrophy();
+      _checkOptimizedPathTrophy();
       _state.readinessScore = ReadinessEngine.calculate(_state);
       _state.readinessCoachMessage = ReadinessEngine.coachMessage(
         _state,
