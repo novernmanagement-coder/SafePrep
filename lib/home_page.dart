@@ -94,7 +94,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       properties: {
         'is_unlocked': _state.hasUnlockedApp,
         'app_name': 'SP',
-        'readiness_score': _state.readinessScore,
         'days_remaining': _state.daysRemaining,
       },
     );
