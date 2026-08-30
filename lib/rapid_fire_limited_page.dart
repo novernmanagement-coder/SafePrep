@@ -7,8 +7,8 @@ import 'csv_loader.dart';
 import 'mixpanel_service.dart';
 import 'iap_service.dart';
 import 'fsme_eye.dart';
-import 'onboard_final_trust_page.dart'; // TODO(gerry): fix this path to wherever the file actually lives (e.g. 'onboarding/onboard_final_trust_page.dart') — guessed as a lib/-root sibling to match this file's own import style.
-import 'fsme_post_purchase_landing.dart'; // TODO(gerry): same path caveat as above.
+import 'onboard/onboard_final_trust_page.dart';
+import 'fsme_post_purchase_landing.dart';
 
 /// Limited Rapid Fire — the $4.99 decline path's free taste.
 ///
