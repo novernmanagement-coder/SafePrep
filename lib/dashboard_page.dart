@@ -10,6 +10,8 @@ import 'sixty_second_refresh_page.dart';
 import 'safe_prep_nav_bar.dart';
 import 'mixpanel_service.dart';
 import 'onboard/onboard_paywall.dart';
+import 'readiness_engine.dart'; // TODO(gerry): confirm this is the real filename/path for the ReadinessEngine class — guessed from the class name to match this project's file-naming convention.
+import 'review_prompt_dialog.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -102,10 +104,34 @@ class _DashboardPageState extends State<DashboardPage> {
       });
       return;
     }
+
+    // Readiness score, computed once per dashboard visit — feeds both
+    // the dashboard_viewed Mixpanel properties below (moved here from
+    // home_viewed, since users spend their time on the Dashboard, not
+    // the Home page) and the second review-prompt trigger (90%+
+    // readiness), which shares the exact same one-time-fire flag as
+    // FinalExamGradePage's 85%-final-exam-score trigger — whichever
+    // condition a user hits first asks; the other is skipped, since
+    // ReviewPromptDialog is assumed to set hasSeenReviewPrompt itself
+    // (mirrors the call pattern in FinalExamGradePage.build(), the only
+    // other real call site seen so far).
+    final int readiness = ReadinessEngine.calculate(_state);
+
     MixpanelService.instance.track(
       'dashboard_viewed',
-      properties: {'app_name': 'SP'},
+      properties: {
+        'app_name': 'SP',
+        'readiness_score': readiness,
+        'days_remaining': _state.daysRemaining,
+      },
     );
+
+    if (readiness >= 90 && !_state.hasSeenReviewPrompt) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) ReviewPromptDialog.show(context);
+      });
+    }
+
     _loadFacts();
     _startFactTimer();
   }
@@ -184,7 +210,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 Image.asset('Assets/splash.png', width: 36, height: 36),
                 const SizedBox(width: 6),
                 Text(
-                  'Prep\u2122',
+                  'Prep™',
                   style: TextStyle(
                     fontSize: AppFonts.header,
                     fontWeight: FontWeight.w600,
@@ -204,7 +230,7 @@ class _DashboardPageState extends State<DashboardPage> {
     final hasQuizScores = _state.categoryQuizScores.isNotEmpty;
 
     int latest = 0;
-    String overallText = '\u2014';
+    String overallText = '—';
     String deltaText = 'No test taken yet';
     String baselineText = '';
     Color overallColor = const Color(0xFF555555);
@@ -390,7 +416,7 @@ class _DashboardPageState extends State<DashboardPage> {
               hasTaken
                   ? '$score%'
                   : (_state.hasUnlockedApp
-                        ? '\u2014'
+                        ? '—'
                         : '${_nationalAverages[category] ?? 75}%'),
               style: TextStyle(
                 color: hasTaken ? _scoreColor(score) : const Color(0xFF6B7A8A),
@@ -421,7 +447,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                 ),
                 child: const Text(
-                  'Study \u2192',
+                  'Study →',
                   style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
                 ),
               ),
@@ -572,7 +598,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                 ),
                 Text(
-                  _masteredExpanded ? '\u25bc' : '\u25b6',
+                  _masteredExpanded ? '▼' : '▶',
                   style: const TextStyle(
                     color: Color(0xFF4DA3FF),
                     fontSize: 12,
@@ -663,7 +689,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               ),
               child: const Text(
-                'Study \u2192',
+                'Study →',
                 style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
               ),
             ),
@@ -677,8 +703,8 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget build(BuildContext context) {
     final userName = _state.userName;
     final dashTitle = userName.isNotEmpty
-        ? 'SafePrep\u2122 $userName\'s Dashboard'
-        : 'SafePrep\u2122 Dashboard';
+        ? 'SafePrep™ $userName\'s Dashboard'
+        : 'SafePrep™ Dashboard';
 
     return Scaffold(
       backgroundColor: AppColors.servSafeBlue,
@@ -749,9 +775,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                         ),
                                       ),
                                       Text(
-                                        _studyCategoriesExpanded
-                                            ? '\u25bc'
-                                            : '\u25b6',
+                                        _studyCategoriesExpanded ? '▼' : '▶',
                                         style: const TextStyle(
                                           color: Color(0xFF4DA3FF),
                                           fontSize: 12,
@@ -792,7 +816,7 @@ class _DashboardPageState extends State<DashboardPage> {
                             ),
                           ),
                         ),
-                        child: const Text('\u23f1 60-Second Refresh'),
+                        child: const Text('⏱ 60-Second Refresh'),
                       ),
                     ),
                     const SizedBox(height: 12),

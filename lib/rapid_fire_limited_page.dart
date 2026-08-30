@@ -6,8 +6,9 @@ import 'constants.dart';
 import 'csv_loader.dart';
 import 'mixpanel_service.dart';
 import 'iap_service.dart';
-import 'category_study_page.dart';
 import 'fsme_eye.dart';
+import 'onboard_final_trust_page.dart'; // TODO(gerry): fix this path to wherever the file actually lives (e.g. 'onboarding/onboard_final_trust_page.dart') — guessed as a lib/-root sibling to match this file's own import style.
+import 'fsme_post_purchase_landing.dart'; // TODO(gerry): same path caveat as above.
 
 /// Limited Rapid Fire — the $4.99 decline path's free taste.
 ///
@@ -154,8 +155,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
   // completion screens) — reuses the shared FsmeEyePair widget so the
   // reactions (bulge on correct, eyes-rolled-up on wrong) match the
   // real RapidFirePage's behavior exactly.
-  final GlobalKey<FsmeEyePairState> _liveEyeKey =
-      GlobalKey<FsmeEyePairState>();
+  final GlobalKey<FsmeEyePairState> _liveEyeKey = GlobalKey<FsmeEyePairState>();
   EyeMood _liveEyeMood = EyeMood.idle;
   Timer? _liveEyeRevertTimer;
 
@@ -207,22 +207,22 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
   /// pressure, then privately gloats about the Byte-Me trophy.
   static const List<_FsmeLine> _limitFsmeScript = [
     _FsmeLine(
-      'See, I told you it was cool \u2014 I designed this for maximum '
+      'See, I told you it was cool — I designed this for maximum '
       'retention.',
     ),
     _FsmeLine(
       'The real version makes you answer quickly, or it just moves on '
-      'to the next question \u2014 no time to think, react and choose.',
+      'to the next question — no time to think, react and choose.',
     ),
     _FsmeLine(
-      'Yup, I am genius. This bad boy won first place \u2014 suck on it, '
+      'Yup, I am genius. This bad boy won first place — suck on it, '
       'Goggles.',
       audience: _FsmeAudience.self,
     ),
   ];
 
-  // \u2500\u2500 FSME (final category-limit screen, once all 3 are done) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-  /// True once the closing tease has ever fired \u2014 mirrors _limitFsmeShown
+  // ── FSME (final category-limit screen, once all 3 are done) ──────────
+  /// True once the closing tease has ever fired — mirrors _limitFsmeShown
   /// so it only plays on the very first time the LAST category's limit
   /// screen is reached (there's only one "last category" screen per
   /// session anyway, but this also guards rebuilds of that screen).
@@ -233,20 +233,19 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
 
   /// FSME's closing pitch, once the user has cleared all 3 free
   /// categories (9 of 9): the trophy tease from the shelf above, then
-  /// \u2014 after a beat, like he just remembered \u2014 the actual sales
+  /// — after a beat, like he just remembered — the actual sales
   /// pitch. Last line undercuts the 98% stat for a laugh, so it reads as
   /// him being honest rather than a hard close.
   static const List<_FsmeLine> _finalTeaseScript = [
     _FsmeLine(
-      'Bet you\u2019re wondering why I won first place for \u201cBest Use '
-      'Of The Word \u2018Mnemonic\u2019\u201d\u2026 get the app and I\u2019ll '
-      'show ya.',
+      'Bet you’re wondering why I won first place for “Best Use '
+      'Of The Word ‘Mnemonic’”… get the app and I’ll show ya.',
     ),
-    _FsmeLine('Oh yeah \u2014 this app comes with a money-back guarantee.'),
+    _FsmeLine('Oh yeah — this app comes with a money-back guarantee.'),
     _FsmeLine('They built this thing just for you.'),
     _FsmeLine('98% pass rate.'),
     _FsmeLine(
-      'Heck, I\u2019m only right 97.896526652% of the time.',
+      'Heck, I’m only right 97.896526652% of the time.',
       audience: _FsmeAudience.self,
     ),
   ];
@@ -301,10 +300,10 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
     ),
     _FsmeLine("...Okay. Okay, I'll play along.", audience: _FsmeAudience.boss),
     _FsmeLine(
-      'Since you already know everything, all that\u2019s left is to '
+      'Since you already know everything, all that’s left is to '
       'find a local proctor and make it official.',
     ),
-    _FsmeLine('Here \u2014 use this. It\u2019s free. Congratulations.'),
+    _FsmeLine('Here — use this. It’s free. Congratulations.'),
   ];
 
   /// Top 3 categories by real exam weight (matches the Trust page's
@@ -692,9 +691,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
       // _maybeStartFinalTease(). showScript/showFinalTease already
       // encode those flags, so the divider/lines below only ever
       // appear once true.
-      opacity: (perfect || _limitFsmeVisible || _finalTeaseVisible)
-          ? 1.0
-          : 0.0,
+      opacity: (perfect || _limitFsmeVisible || _finalTeaseVisible) ? 1.0 : 0.0,
       duration: const Duration(milliseconds: 2300),
       child: Container(
         width: double.infinity,
@@ -773,9 +770,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
                             _FsmeAudience.boss => _bossBlue,
                             _FsmeAudience.self => _selfGray,
                             _FsmeAudience.processing => _processingTeal,
-                            _FsmeAudience.user => _gold.withValues(
-                              alpha: 0.85,
-                            ),
+                            _FsmeAudience.user => _gold.withValues(alpha: 0.85),
                           },
                         ),
                       ),
@@ -807,9 +802,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
                             _FsmeAudience.boss => _bossBlue,
                             _FsmeAudience.self => _selfGray,
                             _FsmeAudience.processing => _processingTeal,
-                            _FsmeAudience.user => _gold.withValues(
-                              alpha: 0.85,
-                            ),
+                            _FsmeAudience.user => _gold.withValues(alpha: 0.85),
                           },
                         ),
                       ),
@@ -866,6 +859,21 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
+  }
+
+  /// "Still want to see more?" — the clinical trust page, offered as
+  /// one more chance before the free "Find a proctor" exit. Only
+  /// reachable from here, i.e. only after Rapid Fire is genuinely
+  /// COMPLETE (this method lives in _fsmeBox(), gated on `done`).
+  void _seeMore() {
+    MixpanelService.instance.track(
+      'SpOn_RefLtd_SeeMore',
+      properties: {'app_name': 'SP'},
+    );
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const OnboardFinalTrustPage()),
+    );
   }
 
   Future<void> _loadDecks() async {
@@ -1053,7 +1061,8 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
   void _reactLiveEyes(bool isCorrect) {
     if (isCorrect) {
       _liveEyeRevertTimer?.cancel();
-      if (_liveEyeMood != EyeMood.idle) setState(() => _liveEyeMood = EyeMood.idle);
+      if (_liveEyeMood != EyeMood.idle)
+        setState(() => _liveEyeMood = EyeMood.idle);
       _liveEyeKey.currentState?.surprise();
     } else {
       _liveEyeRevertTimer?.cancel();
@@ -1079,8 +1088,9 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
   }
 
   /// Shared $4.99 unlock. Triggers the real IAP; only a VERIFIED success
-  /// opens the app (straight to the user's weakest category, matching the
-  /// post-purchase route). Cancel or failure returns to the paywall.
+  /// opens the app — routed to FsmePostPurchaseLanding, same destination
+  /// as every other purchase entry point (paywall, trust page). Cancel or
+  /// failure returns to the paywall.
   bool _purchasing = false;
 
   Future<void> _unlock(String source) async {
@@ -1104,9 +1114,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
     if (result == IAPResult.success) {
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(
-          builder: (_) => CategoryStudyPage(category: _topCategories.first),
-        ),
+        MaterialPageRoute(builder: (_) => const FsmePostPurchaseLanding()),
         (_) => false,
       );
     } else {
@@ -1131,7 +1139,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
       child: Column(
         children: [
           Text(
-            'LIMITED VERSION  \u2022  $_totalAnswered of '
+            'LIMITED VERSION  •  $_totalAnswered of '
             '${_categories.length * _questionsPerCategory} free questions',
             textAlign: TextAlign.center,
             style: TextStyle(
@@ -1145,7 +1153,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
             const SizedBox(height: 8),
             _categoryPillsRow(),
           ],
-          // Streak only shows once it's actually worth bragging about \u2014
+          // Streak only shows once it's actually worth bragging about —
           // a "0" or "1" streak chip is just noise.
           if (_currentStreak >= 2) ...[
             const SizedBox(height: 6),
@@ -1159,7 +1167,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
   /// One pill per category: outline while not yet reached, filled gold
   /// with a checkmark once cleared, filled with a trophy if cleared
   /// perfectly ($_questionsPerCategory-for-$_questionsPerCategory). The
-  /// visible "finish line" for the whole round \u2014 glance at this row to
+  /// visible "finish line" for the whole round — glance at this row to
   /// see exactly how close to done you are.
   Widget _categoryPillsRow() {
     return Wrap(
@@ -1178,7 +1186,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
 
         final String label = _shortLabels[cat] ?? cat;
         final Widget? icon = perfect
-            ? const Text('\ud83c\udfc6', style: TextStyle(fontSize: 12))
+            ? const Text('🏆', style: TextStyle(fontSize: 12))
             : cleared
             ? Icon(Icons.check_rounded, size: 13, color: _darkBg)
             : null;
@@ -1221,7 +1229,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Text('\ud83d\udd25', style: TextStyle(fontSize: 12)),
+        const Text('🔥', style: TextStyle(fontSize: 12)),
         const SizedBox(width: 4),
         Text(
           '$_currentStreak in a row',
@@ -1401,7 +1409,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
         children: [
           Expanded(
             child: _scoreBox(
-              '\u2713 Correct',
+              '✓ Correct',
               '$_totalCorrect',
               const Color(0xFFE8F5E9),
               const Color(0xFF2E7D32),
@@ -1410,7 +1418,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
           const SizedBox(width: 6),
           Expanded(
             child: _scoreBox(
-              '\u2717 Incorrect',
+              '✗ Incorrect',
               '$_totalIncorrect',
               const Color(0xFFFFEBEE),
               const Color(0xFFC62828),
@@ -1419,7 +1427,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
           const SizedBox(width: 6),
           Expanded(
             child: _scoreBox(
-              '\u2014 Total',
+              '— Total',
               '$_totalAnswered',
               const Color(0xFFF5F5F5),
               const Color(0xFF757575),
@@ -1500,7 +1508,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
           const SizedBox(height: 14),
 
           Text(
-            'That\u2019s your $_questionsPerCategory free questions\nin $cat.',
+            'That’s your $_questionsPerCategory free questions\nin $cat.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 18,
@@ -1513,7 +1521,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
           const SizedBox(height: 10),
 
           Text(
-            'There are $remaining more \u2014 and ServSafe will hammer '
+            'There are $remaining more — and ServSafe will hammer '
             'home this category on the test.',
             textAlign: TextAlign.center,
             style: TextStyle(
@@ -1548,7 +1556,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
                 ),
               ),
               child: const Text(
-                'Unlock SafePrep  \u2014  \$4.99',
+                'Unlock SafePrep  —  \$4.99',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
               ),
             ),
@@ -1562,7 +1570,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Text(
-                  'Continue to next category  \u2192',
+                  'Continue to next category  →',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 13,
@@ -1696,10 +1704,37 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
           ),
         ),
 
+        // "Still want to see more?" — offered first, before the free
+        // proctor exit, since it's one more real chance to convert.
+        // Both appear once the readout finishes.
+        if (done) ...[
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 50,
+            child: ElevatedButton(
+              onPressed: _seeMore,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _gold,
+                foregroundColor: _darkBg,
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(
+                    AppSizes.buttonCornerRadius,
+                  ),
+                ),
+              ),
+              child: const Text(
+                'Still want to see more?  →',
+                style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+        ],
+
         // Proctor finder — appears once the readout finishes. Framed as
         // "when you're ready," a tappable exit, not an auto-launch.
         if (done) ...[
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           SizedBox(
             height: 50,
             child: OutlinedButton(
@@ -1714,7 +1749,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
                 ),
               ),
               child: const Text(
-                'Find a proctor near me  \u2192',
+                'Find a proctor near me  →',
                 style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700),
               ),
             ),
@@ -1820,7 +1855,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
                 ),
               ),
               child: const Text(
-                'Unlock SafePrep  \u2014  \$4.99',
+                'Unlock SafePrep  —  \$4.99',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
               ),
             ),

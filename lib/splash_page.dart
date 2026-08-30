@@ -8,6 +8,8 @@ import 'app_state_persistence.dart';
 import 'mixpanel_service.dart';
 import 'dashboard_page.dart';
 import 'splash_navigating_page.dart';
+import 'readiness_engine.dart';
+import 'peace_of_mind_page.dart';
 import 'onboard/onboard_intro.dart';
 import 'onboard/onboard_answers.dart';
 
@@ -85,9 +87,39 @@ class _SplashPageState extends State<SplashPage> {
   // already taken the user down the debug path.
   bool _navigated = false;
 
+  // Whether to swap the generic "tell us where you stand" subhead for
+  // fine-tuning copy, AND route straight to Peace of Mind instead of
+  // the Dashboard on launch — true once someone has passed the final
+  // exam or their readiness score has crossed 85%. Computed fresh via
+  // ReadinessEngine rather than trusting AppState.readinessScore as-is:
+  // that field is only written by HomePage/DashboardPage's initState,
+  // and splash is the very first screen on a cold launch, so the
+  // cached value could still be stale from a previous session at this
+  // point.
+  //
+  // "Passed the final exam" uses 85%, not kPassMark (75%) — SafePrep's
+  // own internal passing bar, matching the real FinalExamGradePage
+  // review-prompt trigger and the App Manual's §4.5 Final Exam
+  // Override ("Score ≥ 85% → Readiness = 100%") and §8 ("SafePrep
+  // passing threshold 85% vs ServSafe® 75%"). The manual itself flags
+  // kPassMark=75% vs. this 85% figure as an unreconciled conflict
+  // elsewhere in the app (§19.3) — this file deliberately sides with
+  // 85%, consistent with Gerry's own "leave it at 85%" call on the
+  // review-prompt trigger earlier.
+  bool _fineTuning = false;
+
+  void _computeFineTuning() {
+    final state = AppState();
+    final readiness = ReadinessEngine.calculate(state);
+    final passedFinal =
+        state.finalExamScore != null && state.finalExamScore! >= 85;
+    _fineTuning = passedFinal || readiness >= 85;
+  }
+
   @override
   void initState() {
     super.initState();
+    _computeFineTuning();
     _initHoldDuration();
   }
 
@@ -178,15 +210,25 @@ class _SplashPageState extends State<SplashPage> {
 
     // ── Path 1: purchased and active → Dashboard ─────────────────────
     // Checked FIRST so a paying customer never sees the funnel again.
+    //
+    // Fine-tuning cohort (passed final exam or 85%+ readiness) skips
+    // Dashboard and lands straight on Peace of Mind (the 60-Second
+    // Trainers hub) instead — everyone else's routing is unchanged.
     if (state.hasUnlockedApp && !state.isExpired) {
       _navigated = true;
       MixpanelService.instance.track(
         'SpOn_Splash_Route',
-        properties: {'app_name': 'SP', 'path': 'purchased'},
+        properties: {
+          'app_name': 'SP',
+          'path': _fineTuning ? 'purchased_fine_tuning' : 'purchased',
+        },
       );
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const DashboardPage()),
+        MaterialPageRoute(
+          builder: (_) =>
+              _fineTuning ? const PeaceOfMindPage() : const DashboardPage(),
+        ),
       );
       return;
     }
@@ -336,7 +378,7 @@ class _SplashPageState extends State<SplashPage> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Pass the ServSafe\u00AE exam or your money back.\nWe will prepare you for the ServSafe exam.',
+                'Pass the ServSafe® exam or your money back.\nWe will prepare you for the ServSafe exam.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: AppColors.strongText,
@@ -349,8 +391,11 @@ class _SplashPageState extends State<SplashPage> {
               const SizedBox(height: 20),
 
               Text(
-                'Tell us where you stand \u2014 we\u2019ll build your plan '
-                'around it.',
+                _fineTuning
+                    ? 'Just fine tuning from here on out — we '
+                          'recommend the 60 Second Trainers.'
+                    : 'Tell us where you stand — we’ll build '
+                          'your plan around it.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: AppColors.subtleText,
@@ -367,7 +412,7 @@ class _SplashPageState extends State<SplashPage> {
                 duration: const Duration(milliseconds: 300),
                 child: Text(
                   showCountdown
-                      ? 'Initializing system $_countdownRemaining\u2026'
+                      ? 'Initializing system $_countdownRemaining…'
                       : ' ',
                   textAlign: TextAlign.center,
                   style: const TextStyle(
