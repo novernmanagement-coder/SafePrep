@@ -128,7 +128,13 @@ class _DashboardPageState extends State<DashboardPage> {
 
     if (readiness >= 90 && !_state.hasSeenReviewPrompt) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) ReviewPromptDialog.show(context);
+        if (mounted) {
+          ReviewPromptDialog.show(
+            context,
+            source: 'dashboard_readiness',
+            triggerValue: readiness,
+          );
+        }
       });
     }
 

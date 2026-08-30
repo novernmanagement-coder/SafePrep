@@ -83,7 +83,13 @@ class FinalExamGradePage extends StatelessWidget {
 
     if (score >= 85 && !state.hasSeenReviewPrompt) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) ReviewPromptDialog.show(context);
+        if (context.mounted) {
+          ReviewPromptDialog.show(
+            context,
+            source: 'final_exam_grade',
+            triggerValue: score,
+          );
+        }
       });
     }
 

@@ -5,6 +5,7 @@ import 'package:in_app_review/in_app_review.dart';
 import 'app_state.dart';
 import 'app_state_persistence.dart';
 import 'constants.dart';
+import 'mixpanel_service.dart';
 
 /// FSME's post-Final-Exam-pass review ask.
 ///
@@ -16,15 +17,33 @@ import 'constants.dart';
 /// Shown once ever (governed by AppState.hasSeenReviewPrompt), fired
 /// from FinalExamGradePage on a first Final Exam pass at 85%+.
 class ReviewPromptDialog extends StatefulWidget {
-  const ReviewPromptDialog({super.key});
+  const ReviewPromptDialog({
+    super.key,
+    required this.source,
+    this.triggerValue,
+  });
+
+  /// Which trigger site fired this — e.g. 'final_exam_grade' (85%+ Final
+  /// Exam score) or 'dashboard_readiness' (90%+ readiness). Tracked on
+  /// show so we can tell the two paths apart in Mixpanel.
+  final String source;
+
+  /// The score/readiness value that satisfied the trigger, if the caller
+  /// has one handy — purely informational for analytics.
+  final int? triggerValue;
 
   /// Convenience launcher — call this instead of showDialog directly.
-  static void show(BuildContext context) {
+  static void show(
+    BuildContext context, {
+    required String source,
+    int? triggerValue,
+  }) {
     showDialog(
       context: context,
       barrierDismissible: false,
       barrierColor: Colors.black.withValues(alpha: 0.6),
-      builder: (_) => const ReviewPromptDialog(),
+      builder: (_) =>
+          ReviewPromptDialog(source: source, triggerValue: triggerValue),
     );
   }
 
@@ -56,6 +75,21 @@ class _ReviewPromptDialogState extends State<ReviewPromptDialog>
   @override
   void initState() {
     super.initState();
+
+    // Fired the moment this dialog actually renders — i.e. the review ask
+    // was shown to the user — regardless of which trigger site called
+    // show(). Note this only tells us the ask was presented, not what the
+    // user did with Apple's native star picker afterward (Apple doesn't
+    // report that back to us at all — see _dismiss()).
+    MixpanelService.instance.track(
+      'review_prompt_shown',
+      properties: {
+        'app_name': 'SP',
+        'source': widget.source,
+        if (widget.triggerValue != null) 'trigger_value': widget.triggerValue,
+      },
+    );
+
     _blinkController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 180),
