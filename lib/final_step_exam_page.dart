@@ -243,7 +243,7 @@ class _FinalStepExamPageState extends State<FinalStepExamPage> {
 
     // BUG FIX: finalExamScore was declared on AppState and read by
     // ReadinessEngine.calculate() (score >= 85 => readiness forced to
-    // 100) and by FinalExamGradePage'''s review-prompt check, but nothing
+    // 100) and by FinalExamGradePage's review-prompt check, but nothing
     // in this file ever actually SET it — so that override never fired
     // for anyone, no matter how well they scored on the Final Exam.
     _state.finalExamScore = result.overallScore;
@@ -252,9 +252,14 @@ class _FinalStepExamPageState extends State<FinalStepExamPage> {
     // every category — all trophies awarded — even if the user jumped
     // straight to the Final Exam without ever touching individual
     // category quizzes. Deliberately NOT touching studiedCategories/
-    // curriculumProgress here: per Gerry, acing the exam proves
-    // mastery, it doesn'''t mean they walked through the curriculum, so
-    // that stays exactly as earned.
+    // curriculumProgress here directly: per Gerry, acing the exam proves
+    // mastery, it doesn't mean they walked through the curriculum. Note
+    // this still lights up the matching CURRICULUM trophies too, the
+    // same way the diagnostic Assessment path already does — via
+    // AppState.reconcileMasteredStudied() running on next state load,
+    // which marks every mastered category as studied so there's never a
+    // mismatched Mastered-without-Curriculum trophy or a stale "go
+    // study this" coach nag. Confirmed intentional/kept as-is per Gerry.
     if (result.overallScore >= 90) {
       for (final category in AppState.allCategories) {
         _state.saveCategoryQuizScore(category, 100);

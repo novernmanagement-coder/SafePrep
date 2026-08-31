@@ -1,3 +1,4 @@
+import 'constants.dart';
 import 'csv_loader.dart';
 
 enum TestType { diagnostic, finalExam }
@@ -114,7 +115,12 @@ class AppState {
 
   DateTime? get expiryDate {
     if (!isTimeLimited || purchaseDate == null) return null;
-    final days = purchaseType == PurchaseType.sevenDay ? 7 : 14;
+    // sevenDay's real length now lives in AppConstants.trialDurationDays
+    // (7 on iOS, 60 on an Android closed-testing build) so switching
+    // platforms never means hunting for a hardcoded number here.
+    final days = purchaseType == PurchaseType.sevenDay
+        ? AppConstants.trialDurationDays
+        : 14;
     return purchaseDate!.add(Duration(days: days));
   }
 
