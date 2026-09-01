@@ -94,6 +94,14 @@ class AppState {
   PurchaseType purchaseType = PurchaseType.none;
   DateTime? purchaseDate;
 
+  /// True when access came from a free instructor redeem code (see
+  /// RedeemCodeService) instead of a real $4.99 IAP purchase. Kept
+  /// separate from purchaseType so revenue/Mixpanel purchase-funnel
+  /// reports aren't polluted by these free grants — access mechanics
+  /// (expiryDate/isExpired/daysRemaining below) are unaffected since
+  /// those only read purchaseType/purchaseDate.
+  bool isRedeemedAccess = false;
+
   bool get hasFullAccess => hasUnlockedApp;
   bool get hasUpgraded => hasUnlockedApp;
   bool get isLifetime => purchaseType == PurchaseType.lifetime;
@@ -560,6 +568,7 @@ class AppState {
     final savedHasUnlocked = hasUnlockedApp;
     final savedPurchaseType = purchaseType;
     final savedPurchaseDate = purchaseDate;
+    final savedIsRedeemedAccess = isRedeemedAccess;
     final savedTrialStarted = trialStarted;
     final savedFsmeEnabled = fsmeEnabled;
     final savedHasSeenRenewalExplainer = hasSeenRenewalExplainer;
@@ -572,6 +581,7 @@ class AppState {
     hasUnlockedApp = false;
     purchaseType = PurchaseType.none;
     purchaseDate = null;
+    isRedeemedAccess = false;
     trialStarted = false;
     readinessScore = 0;
     readinessCoachMessage =
@@ -606,6 +616,7 @@ class AppState {
     hasUnlockedApp = savedHasUnlocked;
     purchaseType = savedPurchaseType;
     purchaseDate = savedPurchaseDate;
+    isRedeemedAccess = savedIsRedeemedAccess;
     trialStarted = savedTrialStarted;
     fsmeEnabled = savedFsmeEnabled;
     hasSeenRenewalExplainer = savedHasSeenRenewalExplainer;
@@ -621,6 +632,7 @@ class AppState {
     'hasUnlockedApp': hasUnlockedApp,
     'purchaseType': purchaseType.name,
     'purchaseDate': purchaseDate?.toIso8601String(),
+    'isRedeemedAccess': isRedeemedAccess,
     'trialStarted': trialStarted,
     'fsmeEnabled': fsmeEnabled,
     'hasSeenRenewalExplainer': hasSeenRenewalExplainer,
@@ -681,6 +693,7 @@ class AppState {
     purchaseDate = json['purchaseDate'] != null
         ? DateTime.parse(json['purchaseDate'])
         : null;
+    isRedeemedAccess = json['isRedeemedAccess'] ?? false;
     trialStarted = json['trialStarted'] ?? false;
     fsmeEnabled = json['fsmeEnabled'] ?? true;
     hasSeenRenewalExplainer = json['hasSeenRenewalExplainer'] ?? false;

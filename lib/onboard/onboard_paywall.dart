@@ -6,6 +6,7 @@ import '../mixpanel_service.dart';
 import '../iap_service.dart';
 import '../fsme_popup.dart';
 import '../fsme_post_purchase_landing.dart';
+import '../redeem_code_service.dart';
 import 'onboard_answers.dart';
 import '../rapid_fire_limited_intro.dart';
 
@@ -45,6 +46,7 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
 
   bool _purchasing = false;
   bool _restoring = false;
+  bool _redeeming = false;
 
   /// FSME's one-line reaction, keyed to the self-reported knowledge
   /// level. Draft copy — only the "confident" line has been confirmed
@@ -177,6 +179,119 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
         ),
       );
     }
+  }
+
+  // Entry point for a student who bought an in-person ServSafe class
+  // through Food Safety Made Easy / Indiana Safe Food and got a free
+  // unlock code from their instructor instead of buying the $4.99 IAP
+  // directly. See RedeemCodeService for the offline validation scheme.
+  Future<void> _showRedeemDialog() async {
+    final controller = TextEditingController();
+    String? errorText;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              backgroundColor: _darkBg,
+              title: const Text(
+                'Redeem a Code',
+                style: TextStyle(color: _softWhite),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Got a code from your instructor? Enter it below.',
+                    style: TextStyle(
+                      color: _softWhite.withValues(alpha: 0.7),
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: controller,
+                    autofocus: true,
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(color: _softWhite, fontSize: 18),
+                    decoration: InputDecoration(
+                      hintText: '12345678',
+                      hintStyle: TextStyle(
+                        color: _softWhite.withValues(alpha: 0.3),
+                      ),
+                      errorText: errorText,
+                      enabledBorder: const UnderlineInputBorder(
+                        borderSide: BorderSide(color: _gold),
+                      ),
+                      focusedBorder: const UnderlineInputBorder(
+                        borderSide: BorderSide(color: _gold, width: 2),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: _redeeming
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(color: _softWhite.withValues(alpha: 0.6)),
+                  ),
+                ),
+                TextButton(
+                  onPressed: _redeeming
+                      ? null
+                      : () async {
+                          setDialogState(() => errorText = null);
+                          setState(() => _redeeming = true);
+                          final success = await RedeemCodeService.redeem(
+                            controller.text,
+                          );
+                          setState(() => _redeeming = false);
+                          if (!mounted) return;
+                          if (success) {
+                            Navigator.of(dialogContext).pop();
+                            Navigator.pushAndRemoveUntil(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const FsmePostPurchaseLanding(),
+                              ),
+                              (_) => false,
+                            );
+                          } else {
+                            setDialogState(
+                              () => errorText = "That code didn't work.",
+                            );
+                          }
+                        },
+                  child: _redeeming
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: _gold,
+                          ),
+                        )
+                      : const Text(
+                          'Redeem',
+                          style: TextStyle(
+                            color: _gold,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   void _showMeMore() {
@@ -348,6 +463,22 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
                             color: _softWhite.withValues(alpha: 0.5),
                           ),
                         ),
+                ),
+              ),
+
+              GestureDetector(
+                onTap: _showRedeemDialog,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Text(
+                    'Have a code from your instructor? Redeem it',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: _softWhite.withValues(alpha: 0.5),
+                    ),
+                  ),
                 ),
               ),
             ],
