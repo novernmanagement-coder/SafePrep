@@ -72,5 +72,7 @@
     <string>microsoft-edge-https</string>
     <string>firefox</string>
 </array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>
