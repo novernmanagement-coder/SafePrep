@@ -89,6 +89,11 @@ class FsmeEyePairState extends State<FsmeEyePair>
   // eye up, not a vertical flatten) ────────────────────────────────
   late final AnimationController _bulgeController;
 
+  // ── Wink (separate from the shared lid — this only ever drives the
+  // SECOND rendered eye, so it can close one eye while the other
+  // keeps its normal gaze/blink going) ─────────────────────────────
+  late final AnimationController _winkController;
+
   // Guards ambient blink from firing mid-one-shot.
   bool _oneShotActive = false;
 
@@ -114,6 +119,11 @@ class FsmeEyePairState extends State<FsmeEyePair>
       duration: const Duration(milliseconds: 300),
     );
 
+    _winkController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 150),
+    );
+
     _applyMood(_mood);
   }
 
@@ -132,6 +142,7 @@ class FsmeEyePairState extends State<FsmeEyePair>
     _gazeAnim.dispose();
     _lidController.dispose();
     _bulgeController.dispose();
+    _winkController.dispose();
     super.dispose();
   }
 
@@ -341,6 +352,38 @@ class FsmeEyePairState extends State<FsmeEyePair>
     }
   }
 
+  /// Playful one-shot: closes just the SECOND rendered eye (the one
+  /// on the right) and reopens it — a wink, not a blink. The other
+  /// eye's own gaze keeps moving underneath, unaffected — suppresses
+  /// the shared ambient blink briefly so the two don't fire at once
+  /// and read as a normal blink instead. Hands control back to
+  /// whatever mood was active before once it resolves.
+  Future<void> wink() async {
+    if (_oneShotActive) return;
+    _oneShotActive = true;
+    _blinkTimer?.cancel();
+
+    await _winkController.animateTo(
+      1.0,
+      duration: const Duration(milliseconds: 120),
+      curve: Curves.easeIn,
+    );
+    await Future.delayed(const Duration(milliseconds: 200));
+    if (!mounted) return;
+    await _winkController.animateTo(
+      0.0,
+      duration: const Duration(milliseconds: 150),
+      curve: Curves.easeOut,
+    );
+
+    if (!mounted) return;
+    _oneShotActive = false;
+    final range = _blinkRangeFor(_mood);
+    if (_mood != EyeMood.typing) {
+      _scheduleBlink(minMs: range.$1, maxMs: range.$2);
+    }
+  }
+
   // Static closed-lid shape for the asleep/off state — no gradient
   // eyeball, no pupil, no animation at all. A flat rounded bar reads
   // clearly as "closed" at small sizes without needing a full
@@ -422,17 +465,20 @@ class FsmeEyePairState extends State<FsmeEyePair>
         _gazeAnim,
         _lidController,
         _bulgeController,
+        _winkController,
       ]),
       builder: (context, _) {
         final lidScaleY = 1.0 - _lidController.value * 0.92;
         final bulgeScale = 1.0 + _bulgeController.value * 0.25;
+        final winkScaleY = 1.0 - _winkController.value * 0.92;
 
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             _eyeVisual(lidScaleY, bulgeScale),
             SizedBox(width: widget.spacing),
-            _eyeVisual(lidScaleY, bulgeScale),
+            // Second eye only — this is the one `wink()` closes.
+            _eyeVisual(lidScaleY * winkScaleY, bulgeScale),
           ],
         );
       },

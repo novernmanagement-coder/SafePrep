@@ -4,7 +4,6 @@ import '../constants.dart';
 import '../app_state.dart';
 import '../mixpanel_service.dart';
 import '../iap_service.dart';
-import '../fsme_popup.dart';
 import '../fsme_post_purchase_landing.dart';
 import '../redeem_code_service.dart';
 import 'onboard_answers.dart';
@@ -12,25 +11,50 @@ import 'onboard_trust.dart';
 import '../rapid_fire_limited_intro.dart';
 
 /// Onboarding paywall — redesigned for the self-report funnel, then
-/// redesigned again to add a personalized recap.
+/// redesigned again to add a personalized recap, then redesigned a
+/// third time (Sept 2026) into this long-form version.
 ///
 /// One product now ($4.99, 7 days full access) since the Refresher
 /// tier has been eliminated entirely — there's nothing to price-game
 /// toward, so the screen is a single clean ask rather than two priced
 /// options.
 ///
+/// LONG-FORM EXPERIMENT (Sept 2026): the short version of this screen
+/// (recap card straight into the price) is the one confirmed real leak
+/// in the whole funnel (~50-63% of viewers never convert to purchase-
+/// intent). Working theory: by this point the funnel has built real
+/// momentum, and a short paywall kills it rather than protecting it —
+/// people arrive ready to buy and the short version doesn't fully make
+/// the case for what they're paying for, so they hesitate. This
+/// version stacks the full picture (what unlocks, why it works, what's
+/// included) before asking, deliberately trading screen length for a
+/// more complete pitch. Price is intentionally still withheld until
+/// this screen (see [[safeprep-onboarding]] — a deliberate momentum
+/// strategy, not an oversight); the App Store listing's own "less than
+/// a cup of coffee" line is the current fix for anyone who'd otherwise
+/// be surprised by a price existing at all (see [[safeprep-marketing]]).
+/// Gerry's call: leave the CONTENT recap row in for this test (a
+/// separate, still-unresolved theory about that row alone is parked,
+/// not merged into this experiment) — ship this whole page as one
+/// bundled test, watch Pay_Viewed→Purchase, and revert the page
+/// entirely if it doesn't move the number rather than iterating on it
+/// piecemeal.
+///
 /// The recap card confirms the user's own exam-date, study-style, and
 /// content-preference answers back to them (read-only — no inline
-/// editing; see [_recapCard] for why). FSME gets one reaction line
-/// below it, keyed to the content-preference choice (Full Curriculum /
-/// Hot Topics / Refresher) — copy only, never a different product or
-/// different curriculum. There is no longer a knowledge-level/test-
+/// editing; see [_recapCard] for why). FSME does NOT appear on this
+/// screen (removed Sept 2026, along with his content-preference
+/// reaction line, as part of the long-form redesign below — he was
+/// the one non-gold visual accent on an otherwise disciplined page,
+/// and stood out more once the page got longer). There is no longer
+/// a knowledge-level/test-
 /// history question anywhere in the funnel — it was cut entirely
 /// (see [[safeprep-onboarding]]) since it was seen as a real drop-off
 /// risk: people may not answer it truthfully, and there was no way to
-/// tell. "Something not right? Start over" is the one correction path,
-/// re-running the actual questions rather than letting people fix
-/// answers in place here.
+/// tell. "Adjust setup" (formerly "Start over") is the one correction
+/// path, re-running the actual questions rather than letting people
+/// fix answers in place here — same underlying mechanism, just
+/// relabeled to fit this screen's tone.
 ///
 /// "Show me more first" routes to the Rapid Fire preview as a taste
 /// of the tool before a second ask, rather than a hard decline exit.
@@ -57,30 +81,6 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
   bool _purchasing = false;
   bool _restoring = false;
   bool _redeeming = false;
-
-  /// FSME's reaction line, keyed to the content-preference choice
-  /// from the Content Preference onboarding screen — a direct
-  /// callback to what the user picked, reinforcing that choice right
-  /// before the purchase ask.
-  String _contentLineFor(ContentPreference? preference) {
-    switch (preference) {
-      case ContentPreference.fullCurriculum:
-        return "Full Curriculum, nice — we've got 500+ questions, "
-            'unlimited quizzes, and some fantastic 60-second trainers '
-            'to keep it all top of mind.';
-      case ContentPreference.hotTopics:
-        return 'Hot Topics it is — study only what you need, we '
-            "won't waste your time re-covering what you've already "
-            'mastered.';
-      case ContentPreference.refresher:
-        return "Refresher, my friend? You've come to the right place "
-            '— my 60-second trainers are exactly what you asked '
-            'for, fast hits to reinforce what you already know.';
-      case null:
-        return "Whatever you're focused on, we've got the tools to "
-            'back it up.';
-    }
-  }
 
   /// One read-only recap row on the paywall - confirms an answer back
   /// to the user, no interactivity. Deliberately not editable: an
@@ -158,7 +158,7 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            "WE'RE READY FOR YOU",
+            'Your personalized ServSafe curriculum is ready',
             style: TextStyle(
               fontSize: 10.5,
               fontWeight: FontWeight.w700,
@@ -169,18 +169,113 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
           const SizedBox(height: 12),
           _recapRow(
             icon: Icons.schedule,
-            label: 'YOUR EXAM',
+            label: 'EXAM',
             value: examWindow?.label ?? 'Not set',
           ),
           _recapRow(
             icon: Icons.star,
-            label: 'STUDY BEST',
+            label: 'LEARNING STYLE',
             value: studyStyle?.label ?? 'Not set',
           ),
           _recapRow(
             icon: Icons.explore,
-            label: 'CONTENT',
+            label: 'FOCUS',
             value: contentPreference?.label ?? 'Not set',
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Small centered section eyebrow used to break up the long-form
+  /// layout below the recap card — "WHAT YOU'LL UNLOCK NEXT", "WHY
+  /// THIS WORKS", "YOUR ACCESS", "THE COST".
+  Widget _sectionTitle(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: 10.5,
+          letterSpacing: 1.6,
+          fontWeight: FontWeight.w700,
+          color: _gold,
+        ),
+      ),
+    );
+  }
+
+  /// One row in the "What you'll unlock next" list — icon badge, a
+  /// bold title, and a one-line description. Purely informational,
+  /// same content everyone sees regardless of their content-preference
+  /// answer (that answer drives routing after purchase, not what's
+  /// shown here).
+  Widget _unlockItem({
+    required IconData icon,
+    required String title,
+    required String description,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: _gold.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(9),
+              border: Border.all(color: _gold.withValues(alpha: 0.3)),
+            ),
+            child: Icon(icon, size: 15, color: _gold),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: _softWhite,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  description,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    height: 1.4,
+                    color: _softWhite.withValues(alpha: 0.45),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// One checked line in the "Your access" list — plain confirmation,
+  /// no icons/descriptions needed like the unlock list above since
+  /// these are single facts, not features to explain.
+  Widget _accessRow(String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Row(
+        children: [
+          const Icon(Icons.check, size: 14, color: _gold),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(fontSize: 12.5, color: _softWhite),
+            ),
           ),
         ],
       ),
@@ -191,7 +286,9 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
   /// exam-date/study-style/knowledge questions from the Trust screen
   /// rather than offering per-field inline editing on the paywall
   /// itself (rejected earlier as "too much for them to decide on"
-  /// right before the purchase ask).
+  /// right before the purchase ask). Labeled "Adjust setup" on screen
+  /// (Sept 2026 long-form redesign) rather than "Start over" — same
+  /// mechanism, softer framing to match this screen's tone.
   void _startOver() {
     MixpanelService.instance.track(
       'SpOn_Pay_StartOver',
@@ -446,8 +543,6 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
 
   @override
   Widget build(BuildContext context) {
-    final contentPreference = OnboardingAnswers.instance.contentPreference;
-
     return Scaffold(
       backgroundColor: _darkBg,
       body: SafeArea(
@@ -456,27 +551,31 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                'WE GOT YOU',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 11,
-                  letterSpacing: 1.8,
-                  fontWeight: FontWeight.w500,
-                  color: _gold,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(5, (i) {
+                  return Container(
+                    width: 22,
+                    height: 3,
+                    margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                    decoration: BoxDecoration(
+                      color: _gold,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  );
+                }),
               ),
 
-              const SizedBox(height: 12),
+              const SizedBox(height: 22),
 
               Text(
-                "Let's get you ready\nto pass the ServSafe exam.",
+                'Your study plan is ready',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 21,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w700,
                   color: _softWhite,
-                  height: 1.35,
+                  height: 1.3,
                 ),
               ),
 
@@ -491,7 +590,7 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   child: Text(
-                    'Something not right? Start over',
+                    'Adjust setup  →',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 12,
@@ -504,7 +603,42 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
                 ),
               ),
 
-              const SizedBox(height: 8),
+              const SizedBox(height: 28),
+
+              _sectionTitle("WHAT YOU'LL UNLOCK NEXT"),
+
+              _unlockItem(
+                icon: Icons.dashboard_rounded,
+                title: 'Personal Dashboard',
+                description: 'Your study hub — readiness score, progress, '
+                    'and what to focus on next.',
+              ),
+              _unlockItem(
+                icon: Icons.bolt,
+                title: '60-Second Trainer',
+                description:
+                    'A fast primer that hits the core ServSafe concepts.',
+              ),
+              _unlockItem(
+                icon: Icons.quiz,
+                title: 'Personalized Quiz Sets',
+                description: 'Adaptive questions based on your weak areas.',
+              ),
+              _unlockItem(
+                icon: Icons.fact_check,
+                title: 'Full 90-Question Exam',
+                description: 'A complete ServSafe-aligned simulation.',
+              ),
+              _unlockItem(
+                icon: Icons.all_inclusive,
+                title: 'Unlimited Randomized Quizzes',
+                description:
+                    'No limits. No repeats unless you want them.',
+              ),
+
+              const SizedBox(height: 14),
+
+              _sectionTitle('WHY THIS WORKS'),
 
               Container(
                 padding: const EdgeInsets.all(12),
@@ -558,23 +692,33 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
                 ),
               ),
 
-              const SizedBox(height: 14),
+              const SizedBox(height: 28),
 
-              Text(
-                'Unlimited quizzes  ·  500+ questions  ·  '
-                'full 90-question exam',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 11.5,
-                  color: _softWhite.withValues(alpha: 0.45),
+              _sectionTitle('YOUR ACCESS'),
+
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: _cardBg,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _softWhite.withValues(alpha: 0.08)),
+                ),
+                child: Column(
+                  children: [
+                    _accessRow('7 days full access'),
+                    _accessRow('500+ aligned questions'),
+                    _accessRow('Adaptive progress tracking'),
+                    _accessRow('Exam-weighted study flow'),
+                  ],
                 ),
               ),
 
-              const SizedBox(height: 18),
+              const SizedBox(height: 28),
 
-              FsmePopup(lines: [FsmeLine(_contentLineFor(contentPreference))]),
-
-              const SizedBox(height: 20),
+              _sectionTitle('THE COST'),
 
               SizedBox(
                 height: 58,
@@ -603,7 +747,7 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              'Unlock SafePrep \u2014 $_price',
+                              'Unlock Your Plan \u2014 $_price',
                               style: const TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,

@@ -12,9 +12,9 @@ import 'onboard_study_style.dart';
 /// The band still feeds pacing language downstream (deadline framing,
 /// per-day study estimates).
 ///
-/// Same tap-until-confident interaction as the knowledge-level screen:
-/// selecting doesn't lock in or auto-advance; Continue only appears
-/// after the first tap.
+/// Same tap-until-confident interaction as the content-preference
+/// screen: selecting doesn't lock in or auto-advance; Continue only
+/// appears after the first tap.
 class OnboardExamDate extends StatefulWidget {
   const OnboardExamDate({super.key});
 
@@ -22,13 +22,51 @@ class OnboardExamDate extends StatefulWidget {
   State<OnboardExamDate> createState() => _OnboardExamDateState();
 }
 
-class _OnboardExamDateState extends State<OnboardExamDate> {
+class _OnboardExamDateState extends State<OnboardExamDate>
+    with SingleTickerProviderStateMixin {
   static const Color _gold = Color(0xFFD4AF37);
   static const Color _darkBg = Color(0xFF0A0A0F);
   static const Color _softWhite = Color(0xFFF0EDE8);
   static const Color _cardBg = Color(0xFF13130F);
 
   ExamWindow? _selected;
+
+  // Thumbs-up micro-interaction (Sept 2026): a small one-shot burst on
+  // top of whichever row was just tapped -- floats up and fades, purely
+  // a moment of positive reinforcement, no dialogue/FSME involvement.
+  // Re-tapping the same or a different row simply replays it.
+  late final AnimationController _thumbsUpController;
+  late final Animation<double> _thumbsUpOffset;
+  late final Animation<double> _thumbsUpOpacity;
+  ExamWindow? _burstWindow;
+
+  @override
+  void initState() {
+    super.initState();
+    _thumbsUpController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
+    _thumbsUpOffset = Tween<double>(begin: 0, end: -34).animate(
+      CurvedAnimation(parent: _thumbsUpController, curve: Curves.easeOut),
+    );
+    _thumbsUpOpacity = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: 1.0), weight: 15),
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.0), weight: 45),
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.0), weight: 40),
+    ]).animate(_thumbsUpController);
+    _thumbsUpController.addStatusListener((status) {
+      if (status == AnimationStatus.completed && mounted) {
+        setState(() => _burstWindow = null);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _thumbsUpController.dispose();
+    super.dispose();
+  }
 
   static String _bandTag(ExamWindow w) {
     switch (w) {
@@ -44,7 +82,11 @@ class _OnboardExamDateState extends State<OnboardExamDate> {
   }
 
   void _choose(ExamWindow window) {
-    setState(() => _selected = window);
+    setState(() {
+      _selected = window;
+      _burstWindow = window;
+    });
+    _thumbsUpController.forward(from: 0);
 
     OnboardingAnswers.instance.examWindow = window;
 
@@ -115,43 +157,76 @@ class _OnboardExamDateState extends State<OnboardExamDate> {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => _choose(window),
-          borderRadius: BorderRadius.circular(10),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 16),
-            decoration: BoxDecoration(
-              color: isSelected ? _gold.withValues(alpha: 0.12) : _cardBg,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => _choose(window),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: isSelected ? _gold : _gold.withValues(alpha: 0.3),
-                width: isSelected ? 1.5 : 1,
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w600,
-                      color: _softWhite,
-                    ),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 15,
+                  horizontal: 16,
+                ),
+                decoration: BoxDecoration(
+                  color: isSelected ? _gold.withValues(alpha: 0.12) : _cardBg,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isSelected ? _gold : _gold.withValues(alpha: 0.3),
+                    width: isSelected ? 1.5 : 1,
                   ),
                 ),
-                Icon(
-                  isSelected ? Icons.check : Icons.chevron_right,
-                  size: 18,
-                  color: isSelected ? _gold : _gold.withValues(alpha: 0.6),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w600,
+                          color: _softWhite,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      isSelected ? Icons.check : Icons.chevron_right,
+                      size: 18,
+                      color: isSelected ? _gold : _gold.withValues(alpha: 0.6),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
-        ),
+          if (_burstWindow == window)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: AnimatedBuilder(
+                  animation: _thumbsUpController,
+                  builder: (context, child) {
+                    return Align(
+                      alignment: Alignment.center,
+                      child: Transform.translate(
+                        offset: Offset(0, _thumbsUpOffset.value),
+                        child: Opacity(
+                          opacity: _thumbsUpOpacity.value,
+                          child: child,
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Icon(
+                    Icons.thumb_up,
+                    color: _gold,
+                    size: 22,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
