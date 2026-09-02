@@ -8,23 +8,32 @@ import '../fsme_popup.dart';
 import '../fsme_post_purchase_landing.dart';
 import '../redeem_code_service.dart';
 import 'onboard_answers.dart';
+import 'onboard_trust.dart';
 import '../rapid_fire_limited_intro.dart';
 
-/// Onboarding paywall — redesigned for the self-report funnel.
+/// Onboarding paywall — redesigned for the self-report funnel, then
+/// redesigned again to add a personalized recap.
 ///
 /// One product now ($4.99, 7 days full access) since the Refresher
 /// tier has been eliminated entirely — there's nothing to price-game
 /// toward, so the screen is a single clean ask rather than two priced
-/// options. The subline and FSME's one-line reaction both key off the
-/// knowledge level the user self-reported earlier in the funnel
-/// (Confident / Prepared / Almost ready / New to ServSafe) — copy
-/// only, never a different product or different curriculum.
+/// options.
+///
+/// The recap card confirms the user's own exam-date, study-style, and
+/// content-preference answers back to them (read-only — no inline
+/// editing; see [_recapCard] for why). FSME gets one reaction line
+/// below it, keyed to the content-preference choice (Full Curriculum /
+/// Hot Topics / Refresher) — copy only, never a different product or
+/// different curriculum. There is no longer a knowledge-level/test-
+/// history question anywhere in the funnel — it was cut entirely
+/// (see [[safeprep-onboarding]]) since it was seen as a real drop-off
+/// risk: people may not answer it truthfully, and there was no way to
+/// tell. "Something not right? Start over" is the one correction path,
+/// re-running the actual questions rather than letting people fix
+/// answers in place here.
 ///
 /// "Show me more first" routes to the Rapid Fire preview as a taste
 /// of the tool before a second ask, rather than a hard decline exit.
-///
-/// FSME's role here is deliberately minimal — one reactive line via
-/// the shared [FsmePopup] widget, no authored multi-beat script.
 ///
 /// On purchase success, routes to [FsmePostPurchaseLanding] — the
 /// one-time FSME cluster tour — rather than the old terminal-style
@@ -41,6 +50,7 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
   static const Color _gold = Color(0xFFD4AF37);
   static const Color _darkBg = Color(0xFF0A0A0F);
   static const Color _softWhite = Color(0xFFF0EDE8);
+  static const Color _cardBg = Color(0xFF13130F);
 
   static const String _price = '\$4.99';
 
@@ -48,28 +58,151 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
   bool _restoring = false;
   bool _redeeming = false;
 
-  /// FSME's one-line reaction, keyed to the self-reported knowledge
-  /// level. Draft copy — only the "confident" line has been confirmed
-  /// against the mockup; the other three are proposed and open to
-  /// editing.
-  String _fsmeLineFor(KnowledgeLevel? level) {
-    switch (level) {
-      case KnowledgeLevel.confident:
-        return "You said confident \u2014 good. This\u2019ll keep you "
-            'sharp, not slow you down. That\u2019s the whole design.';
-      case KnowledgeLevel.prepared:
-        return "Prepared\u2019s a good spot to be. This tightens up "
-            'whatever\u2019s left before you walk in.';
-      case KnowledgeLevel.almostReady:
-        return 'Almost there \u2014 this closes the gaps fast, not '
-            'from scratch.';
-      case KnowledgeLevel.newToServSafe:
-        return 'Starting fresh? This is built to get you all the way '
-            'there, step by step.';
+  /// FSME's reaction line, keyed to the content-preference choice
+  /// from the Content Preference onboarding screen — a direct
+  /// callback to what the user picked, reinforcing that choice right
+  /// before the purchase ask.
+  String _contentLineFor(ContentPreference? preference) {
+    switch (preference) {
+      case ContentPreference.fullCurriculum:
+        return "Full Curriculum, nice — we've got 500+ questions, "
+            'unlimited quizzes, and some fantastic 60-second trainers '
+            'to keep it all top of mind.';
+      case ContentPreference.hotTopics:
+        return 'Hot Topics it is — study only what you need, we '
+            "won't waste your time re-covering what you've already "
+            'mastered.';
+      case ContentPreference.refresher:
+        return "Refresher, my friend? You've come to the right place "
+            '— my 60-second trainers are exactly what you asked '
+            'for, fast hits to reinforce what you already know.';
       case null:
-        return "This is built to get you exam-ready, whatever you're "
-            'starting from.';
+        return "Whatever you're focused on, we've got the tools to "
+            'back it up.';
     }
+  }
+
+  /// One read-only recap row on the paywall - confirms an answer back
+  /// to the user, no interactivity. Deliberately not editable: an
+  /// earlier draft let people tap to change answers right here, but
+  /// that turned the paywall into a second round of decisions right
+  /// before the purchase ask, which is exactly what this redesign is
+  /// trying to remove. The one correction path is "Start over" below,
+  /// which re-runs the actual questions instead.
+  Widget _recapRow({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 22,
+            height: 22,
+            margin: const EdgeInsets.only(top: 1),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: _gold.withValues(alpha: 0.12),
+              border: Border.all(color: _gold.withValues(alpha: 0.4)),
+            ),
+            child: Icon(icon, size: 12, color: _gold),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    letterSpacing: 0.05,
+                    color: _softWhite.withValues(alpha: 0.4),
+                  ),
+                ),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: _gold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// The "we already did the work" reinforcement card. Pure
+  /// confirmation of what the user already told the app on the exam-
+  /// date, study-style, and content-preference screens.
+  Widget _recapCard() {
+    final examWindow = OnboardingAnswers.instance.examWindow;
+    final studyStyle = OnboardingAnswers.instance.studyStyle;
+    final contentPreference = OnboardingAnswers.instance.contentPreference;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      decoration: BoxDecoration(
+        color: _cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _softWhite.withValues(alpha: 0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "WE'RE READY FOR YOU",
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.1,
+              color: _softWhite.withValues(alpha: 0.4),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _recapRow(
+            icon: Icons.schedule,
+            label: 'YOUR EXAM',
+            value: examWindow?.label ?? 'Not set',
+          ),
+          _recapRow(
+            icon: Icons.star,
+            label: 'STUDY BEST',
+            value: studyStyle?.label ?? 'Not set',
+          ),
+          _recapRow(
+            icon: Icons.explore,
+            label: 'CONTENT',
+            value: contentPreference?.label ?? 'Not set',
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Sole correction path for the recap card above - re-runs the
+  /// exam-date/study-style/knowledge questions from the Trust screen
+  /// rather than offering per-field inline editing on the paywall
+  /// itself (rejected earlier as "too much for them to decide on"
+  /// right before the purchase ask).
+  void _startOver() {
+    MixpanelService.instance.track(
+      'SpOn_Pay_StartOver',
+      properties: {'app_name': 'SP'},
+    );
+    OnboardingAnswers.instance.reset();
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const OnboardTrust()),
+      (_) => false,
+    );
   }
 
   @override
@@ -79,8 +212,8 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
       'SpOn_Pay_Viewed',
       properties: {
         'app_name': 'SP',
-        'knowledge_level':
-            OnboardingAnswers.instance.knowledgeLevel?.tag ?? 'unknown',
+        'content_preference':
+            OnboardingAnswers.instance.contentPreference?.tag ?? 'unknown',
       },
     );
     _recordOnboardingRun();
@@ -106,8 +239,8 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
         'app_name': 'SP',
         'source': 'paywall',
         'price': _price,
-        'knowledge_level':
-            OnboardingAnswers.instance.knowledgeLevel?.tag ?? 'unknown',
+        'content_preference':
+            OnboardingAnswers.instance.contentPreference?.tag ?? 'unknown',
       },
     );
 
@@ -249,12 +382,12 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
                       : () async {
                           setDialogState(() => errorText = null);
                           setState(() => _redeeming = true);
-                          final success = await RedeemCodeService.redeem(
+                          final result = await RedeemCodeService.redeem(
                             controller.text,
                           );
                           setState(() => _redeeming = false);
                           if (!mounted) return;
-                          if (success) {
+                          if (result == RedeemResult.success) {
                             Navigator.of(dialogContext).pop();
                             Navigator.pushAndRemoveUntil(
                               context,
@@ -265,7 +398,13 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
                             );
                           } else {
                             setDialogState(
-                              () => errorText = "That code didn't work.",
+                              () => errorText = switch (result) {
+                                RedeemResult.expired =>
+                                  "That code's expired — ask your instructor for a new one.",
+                                RedeemResult.alreadyRedeemed =>
+                                  "That code's already been redeemed.",
+                                _ => "That code didn't work.",
+                              },
                             );
                           }
                         },
@@ -307,7 +446,7 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
 
   @override
   Widget build(BuildContext context) {
-    final level = OnboardingAnswers.instance.knowledgeLevel;
+    final contentPreference = OnboardingAnswers.instance.contentPreference;
 
     return Scaffold(
       backgroundColor: _darkBg,
@@ -318,7 +457,7 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'YOUR PLAN IS READY',
+                'WE GOT YOU',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 11,
@@ -331,7 +470,7 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
               const SizedBox(height: 12),
 
               Text(
-                'One plan.\nEverything included.',
+                "Let's get you ready\nto pass the ServSafe exam.",
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 21,
@@ -341,34 +480,99 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
                 ),
               ),
 
-              const SizedBox(height: 10),
+              const SizedBox(height: 20),
 
-              Text(
-                'Built from what you told us.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontStyle: FontStyle.italic,
-                  color: _gold.withValues(alpha: 0.7),
+              _recapCard(),
+
+              const SizedBox(height: 4),
+
+              GestureDetector(
+                onTap: _startOver,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Text(
+                    'Something not right? Start over',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: _softWhite.withValues(alpha: 0.4),
+                      decoration: TextDecoration.underline,
+                      decorationColor: _softWhite.withValues(alpha: 0.4),
+                    ),
+                  ),
                 ),
               ),
 
               const SizedBox(height: 8),
 
-              Text(
-                'Unlimited quizzes, 500+ questions,\n'
-                'a full 90-question exam.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  color: _softWhite.withValues(alpha: 0.45),
-                  height: 1.5,
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _gold.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _gold.withValues(alpha: 0.25)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 30,
+                      height: 30,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _darkBg,
+                        border: Border.all(color: _gold),
+                      ),
+                      child: const Icon(
+                        Icons.verified,
+                        size: 15,
+                        color: _gold,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: RichText(
+                        text: TextSpan(
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.4,
+                            color: _softWhite.withValues(alpha: 0.75),
+                          ),
+                          children: const [
+                            TextSpan(text: 'Every question written by '),
+                            TextSpan(
+                              text: 'a certified ServSafe instructor with '
+                                  '20+ years in the classroom',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: _softWhite,
+                              ),
+                            ),
+                            TextSpan(text: ' - not scraped, not generic.'),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
-              const SizedBox(height: 22),
+              const SizedBox(height: 14),
 
-              FsmePopup(lines: [FsmeLine(_fsmeLineFor(level))]),
+              Text(
+                'Unlimited quizzes  ·  500+ questions  ·  '
+                'full 90-question exam',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: _softWhite.withValues(alpha: 0.45),
+                ),
+              ),
+
+              const SizedBox(height: 18),
+
+              FsmePopup(lines: [FsmeLine(_contentLineFor(contentPreference))]),
 
               const SizedBox(height: 20),
 
