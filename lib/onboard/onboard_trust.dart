@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import '../constants.dart';
 import '../mixpanel_service.dart';
-import 'onboard_knowledge_level.dart';
+import 'onboard_content_preference.dart';
 
 /// Onboarding screen 2 of the new flow — the trust page.
 ///
-/// Sits between the credential-based Intro screen and "When's your
-/// exam?". Where Intro earns trust through credentials (20+ years,
+/// Sits between the credential-based Intro screen and Content
+/// Preference. Where Intro earns trust through credentials (20+ years,
 /// certifications, FSME's greeting), this screen earns trust through
 /// capability — a plain, concrete statement of what the app actually
 /// does: unlimited randomized quizzes, a real question bank, a full
@@ -306,7 +306,7 @@ class OnboardTrust extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const OnboardKnowledgeLevel(),
+                        builder: (_) => const OnboardContentPreference(),
                       ),
                     );
                   },

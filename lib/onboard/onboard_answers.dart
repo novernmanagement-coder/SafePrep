@@ -6,28 +6,33 @@
 /// study plan are built from in-app activity after purchase.
 library;
 
-/// How ready the user says they feel walking in. Self-reported,
-/// captured on the knowledge-level screen. Flat, equal-weight options —
-/// no tier/scope language — since there's only one product to buy, so
-/// there's nothing to price-game toward. Drives paywall subline copy
-/// and FSME's one-line reaction only; does NOT change the underlying
-/// curriculum, pacing, or which category starts first.
+/// ServSafe test history, captured on the knowledge-level screen.
+/// Replaces an earlier self-assessed-confidence version of this
+/// question (Confident / Prepared / Almost ready / New to ServSafe) —
+/// that framing risked social-desirability bias (people overstating
+/// readiness to avoid admitting low knowledge, even with no one
+/// watching), which meant the plan built from it could feel wrong to
+/// them right at the paywall. Asking about test HISTORY instead of
+/// self-assessed competence is a plain fact, not a judgment call, so
+/// there's nothing to feel awkward about answering honestly. Flat,
+/// equal-weight options — no tier/scope language — since there's only
+/// one product to buy, so there's nothing to price-game toward. Drives
+/// paywall subline copy and FSME's one-line reaction only; does NOT
+/// change the underlying curriculum, pacing, or which category starts
+/// first.
 enum KnowledgeLevel {
-  confident,
-  prepared,
-  almostReady,
-  newToServSafe;
+  firstTime,
+  takenBefore,
+  takenMultiple;
 
   String get tag {
     switch (this) {
-      case KnowledgeLevel.confident:
-        return 'confident';
-      case KnowledgeLevel.prepared:
-        return 'prepared';
-      case KnowledgeLevel.almostReady:
-        return 'almost_ready';
-      case KnowledgeLevel.newToServSafe:
-        return 'new_to_servsafe';
+      case KnowledgeLevel.firstTime:
+        return 'first_time';
+      case KnowledgeLevel.takenBefore:
+        return 'taken_before';
+      case KnowledgeLevel.takenMultiple:
+        return 'taken_multiple';
     }
   }
 }
@@ -71,6 +76,22 @@ enum ExamWindow {
         return null;
     }
   }
+
+  /// Display text matching exactly what the user tapped on the exam-date
+  /// screen (see OnboardExamDate) — used to recap their own answer back
+  /// to them on the paywall, so it must read the same both places.
+  String get label {
+    switch (this) {
+      case ExamWindow.oneToThree:
+        return '1–2 days';
+      case ExamWindow.fourToTen:
+        return '3–4 days';
+      case ExamWindow.tenPlus:
+        return '5+ days';
+      case ExamWindow.notScheduled:
+        return 'Not scheduled yet';
+    }
+  }
 }
 
 /// How the user wants questions presented. Chosen on screen 5.
@@ -104,6 +125,70 @@ enum StudyStyle {
 
   /// True only when a per-question explanation should appear.
   bool get showsExplanations => this == StudyStyle.explanations;
+
+  /// Display text matching exactly what the user tapped on the study-
+  /// style screen (see OnboardStudyStyle) — used to recap their own
+  /// answer back to them on the paywall.
+  String get label {
+    switch (this) {
+      case StudyStyle.explanations:
+        return 'Answers and explanations';
+      case StudyStyle.answersOnly:
+        return 'Answers only';
+      case StudyStyle.quizFormat:
+        return 'Quiz format';
+    }
+  }
+}
+
+/// Where the user wants to start. Chosen on screen 6, the last
+/// question before the paywall.
+///
+/// This is a ROUTING choice, not a content-tiering one — no new
+/// content gets authored for any of the three options. Each just
+/// points at something that already exists in the app: [fullCurriculum]
+/// lands on Dashboard & Study with no assessment required, [hotTopics]
+/// suggests taking the Assessment first (it already surfaces weak
+/// areas and builds a focused plan), and [refresher] suggests Trainers
+/// (already the fast, 60-second reinforcement tool). Nothing is
+/// gated by this choice, consistent with the app's existing "you do
+/// you" philosophy — it only sets a default starting point and the
+/// paywall recap copy, never what someone is allowed to access.
+///
+/// This answer is captured, shown back on the paywall recap, and
+/// drives a second FSME reaction line on the paywall itself (see
+/// OnboardPaywall._contentLineFor). It is NOT YET wired into the
+/// post-purchase FSME landing page's routing/callback line — that's a
+/// separate follow-up.
+enum ContentPreference {
+  fullCurriculum,
+  hotTopics,
+  refresher;
+
+  String get tag {
+    switch (this) {
+      case ContentPreference.fullCurriculum:
+        return 'full_curriculum';
+      case ContentPreference.hotTopics:
+        return 'hot_topics';
+      case ContentPreference.refresher:
+        return 'refresher';
+    }
+  }
+
+  /// Display text matching exactly what the user tapped on the
+  /// content-preference screen (see OnboardContentPreference) — used
+  /// to recap their own answer back to them on the paywall.
+  String get label {
+    switch (this) {
+      case ContentPreference.fullCurriculum:
+        return 'Full Curriculum';
+      case ContentPreference.hotTopics:
+        return 'Hot Topics';
+      case ContentPreference.refresher:
+        return 'Refresher';
+    }
+  }
 }
 
 /// SharedPreferences key holding how many times the user has completed
@@ -128,10 +213,12 @@ class OnboardingAnswers {
   KnowledgeLevel? knowledgeLevel;
   ExamWindow? examWindow;
   StudyStyle? studyStyle;
+  ContentPreference? contentPreference;
 
   void reset() {
     knowledgeLevel = null;
     examWindow = null;
     studyStyle = null;
+    contentPreference = null;
   }
 }

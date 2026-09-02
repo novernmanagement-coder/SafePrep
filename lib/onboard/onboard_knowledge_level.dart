@@ -4,16 +4,20 @@ import '../mixpanel_service.dart';
 import 'onboard_answers.dart';
 import 'onboard_exam_date.dart';
 
-/// Onboarding screen 3 of the new flow — self-reported knowledge level.
+/// Onboarding screen 3 of the new flow — ServSafe test history.
 ///
-/// Replaces the diagnostic quiz entirely. The user tells the app how
-/// ready they feel; nothing here is scored or graded. Four flat,
-/// equal-weight options — no tier language, no scope language ("full
-/// curriculum" vs "tune-up") — since there's only one product to buy,
-/// there's nothing to price-game toward. Selection only affects
-/// paywall subline copy and (optionally, later) a brief FSME reaction;
-/// it does NOT change the underlying curriculum, pacing, or which
-/// category starts first.
+/// Replaces the diagnostic quiz entirely. Originally this asked the
+/// user to self-assess their confidence (Confident / Prepared / Almost
+/// ready / New to ServSafe) — that framing was dropped because it's a
+/// judgment call, not a fact, and some people will round up rather
+/// than admit low knowledge, even with no one watching. Asking about
+/// test HISTORY instead is a plain fact nobody needs to feel awkward
+/// answering honestly. Three flat, equal-weight options — no tier
+/// language, no scope language ("full curriculum" vs "tune-up") —
+/// since there's only one product to buy, there's nothing to
+/// price-game toward. Selection only affects paywall subline copy and
+/// a brief FSME reaction; it does NOT change the underlying
+/// curriculum, pacing, or which category starts first.
 ///
 /// Tap-until-confident interaction: selecting an option doesn't lock
 /// it in or auto-advance — the user can freely re-select. The Continue
@@ -39,24 +43,19 @@ class _OnboardKnowledgeLevelState extends State<OnboardKnowledgeLevel> {
 
   static const List<_LevelOption> _options = [
     _LevelOption(
-      level: KnowledgeLevel.confident,
-      label: 'Confident',
-      subtitle: 'I know this material well',
+      level: KnowledgeLevel.firstTime,
+      label: 'First time test taker',
+      subtitle: 'This is my first attempt',
     ),
     _LevelOption(
-      level: KnowledgeLevel.prepared,
-      label: 'Prepared',
-      subtitle: 'I\u2019ve studied, feeling solid',
+      level: KnowledgeLevel.takenBefore,
+      label: 'Taken the test before',
+      subtitle: 'I\u2019ve taken it once before',
     ),
     _LevelOption(
-      level: KnowledgeLevel.almostReady,
-      label: 'Almost ready',
-      subtitle: 'Some gaps I want to close',
-    ),
-    _LevelOption(
-      level: KnowledgeLevel.newToServSafe,
-      label: 'New to ServSafe',
-      subtitle: 'Starting from the beginning',
+      level: KnowledgeLevel.takenMultiple,
+      label: 'Taken it more than once',
+      subtitle: 'I\u2019ve taken it a few times',
     ),
   ];
 
@@ -199,12 +198,12 @@ class _OnboardKnowledgeLevelState extends State<OnboardKnowledgeLevel> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _header(3, 5),
+              _header(3, 6),
 
               const SizedBox(height: 26),
 
               Text(
-                'MY SERVSAFE KNOWLEDGE LEVEL',
+                'SERVSAFE TEST HISTORY',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 11,
@@ -217,7 +216,7 @@ class _OnboardKnowledgeLevelState extends State<OnboardKnowledgeLevel> {
               const SizedBox(height: 14),
 
               Text(
-                'How ready do you\nfeel right now?',
+                'Have you taken\nthis exam before?',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 20,

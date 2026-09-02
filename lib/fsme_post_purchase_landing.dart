@@ -5,10 +5,23 @@ import 'constants.dart';
 import 'mixpanel_service.dart';
 import 'cluster_info_page.dart';
 import 'home_page.dart';
+import 'dashboard_page.dart';
+import 'assessment_info_page.dart';
+import 'sixty_second_refresh_page.dart';
+import 'onboard/onboard_answers.dart';
 
 /// The one-time post-purchase FSME landing page. Full FSME voice —
 /// buddy, ally, overconfident — as opposed to the clinical tone of
 /// [ClusterInfoPage], which this page opens for each cluster.
+///
+/// Also shows a "your starting point" callout, personalized to the
+/// content-preference choice from onboarding (see [ContentPreference])
+/// — Full Curriculum routes to [DashboardPage], Hot Topics to
+/// [AssessmentInfoPage], Refresher to [SixtySecondRefreshPage]. This is
+/// the actual "go straight there" shortcut, separate from and always
+/// visible alongside the cluster-tour explainer below it — the tour
+/// stays the full "here's everything" walkthrough for anyone who wants
+/// it, nothing is gated behind the starting-point choice.
 ///
 /// User-paced reveal: FSME types an intro line, then a thin "Continue"
 /// control appears below the speech box. Tapping it types the next
@@ -27,6 +40,21 @@ class FsmePostPurchaseLanding extends StatefulWidget {
   @override
   State<FsmePostPurchaseLanding> createState() =>
       _FsmePostPurchaseLandingState();
+}
+
+/// Static content for the personalized "your starting point" callout —
+/// label, icon, and one-line explanation. The actual destination page
+/// is resolved separately (see _FsmePostPurchaseLandingState._goToStartingPoint)
+/// since a Widget isn't a compile-time constant here.
+class _StartingPoint {
+  final String label;
+  final IconData icon;
+  final String explanation;
+  const _StartingPoint({
+    required this.label,
+    required this.icon,
+    required this.explanation,
+  });
 }
 
 class _ClusterStop {
@@ -60,6 +88,81 @@ class _FsmePostPurchaseLandingState extends State<FsmePostPurchaseLanding>
       "Great. Want to hit one of my 60-second trainers right out the "
       "gate? Excellent. Want to narrow your study curriculum? Take "
       "the assessment.";
+
+  /// Content, icon, and explanation for the "your starting point"
+  /// callout — keyed to the content-preference choice from onboarding.
+  /// Falls back to Dashboard & Study when no preference was recorded
+  /// (shouldn't happen in the normal funnel, but the field is
+  /// nullable so this stays defensive).
+  _StartingPoint get _startingPoint {
+    switch (OnboardingAnswers.instance.contentPreference) {
+      case ContentPreference.hotTopics:
+        return const _StartingPoint(
+          label: 'The Assessment',
+          icon: Icons.fact_check_outlined,
+          explanation:
+              "You picked Hot Topics, so that's where we're starting "
+              "you — it finds your weak spots first, then builds "
+              'your plan around them.',
+        );
+      case ContentPreference.refresher:
+        return const _StartingPoint(
+          label: '60-Second Trainers',
+          icon: Icons.bolt_outlined,
+          explanation:
+              "You picked Refresher, so we're sending you straight "
+              'to the Trainers — quick hits to reinforce what '
+              "you already know.",
+        );
+      case ContentPreference.fullCurriculum:
+        return const _StartingPoint(
+          label: 'Dashboard & Study',
+          icon: Icons.dashboard_customize_outlined,
+          explanation:
+              "You picked Full Curriculum, so we're starting you on "
+              "the Dashboard — everything's loaded and ready to "
+              'go.',
+        );
+      case null:
+        return const _StartingPoint(
+          label: 'Dashboard & Study',
+          icon: Icons.dashboard_customize_outlined,
+          explanation:
+              "Here's your Dashboard — everything's loaded and "
+              'ready to go.',
+        );
+    }
+  }
+
+  /// The real, functional destination page for [_startingPoint] — as
+  /// opposed to [ClusterInfoPage], which only explains a cluster.
+  Widget _startingPointDestination() {
+    switch (OnboardingAnswers.instance.contentPreference) {
+      case ContentPreference.hotTopics:
+        return const AssessmentInfoPage();
+      case ContentPreference.refresher:
+        return const SixtySecondRefreshPage();
+      case ContentPreference.fullCurriculum:
+      case null:
+        return const DashboardPage();
+    }
+  }
+
+  void _goToStartingPoint() {
+    MixpanelService.instance.track(
+      'post_purchase_landing_start_here',
+      properties: {
+        'content_preference':
+            OnboardingAnswers.instance.contentPreference?.tag ?? 'unknown',
+        'app_name': 'SP',
+      },
+    );
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => _startingPointDestination()),
+      (route) => false,
+    );
+  }
 
   static const String _wrapUpLine =
       "If you want a complete breakdown of each cluster, just select "
@@ -150,7 +253,11 @@ class _FsmePostPurchaseLandingState extends State<FsmePostPurchaseLanding>
 
     MixpanelService.instance.track(
       'post_purchase_landing_viewed',
-      properties: {'app_name': 'SP'},
+      properties: {
+        'app_name': 'SP',
+        'content_preference':
+            OnboardingAnswers.instance.contentPreference?.tag ?? 'unknown',
+      },
     );
 
     _gazeAnim = AnimationController(
@@ -366,6 +473,7 @@ class _FsmePostPurchaseLandingState extends State<FsmePostPurchaseLanding>
                 ),
               ),
               if (_showContinue && !_finished) _thinContinue(),
+              _startingPointCard(),
               const SizedBox(height: 16),
               Column(
                 spacing: 8,
@@ -405,6 +513,87 @@ class _FsmePostPurchaseLandingState extends State<FsmePostPurchaseLanding>
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// The "your starting point" callout — always visible right below
+  /// the speech box, independent of tour progress. This is the actual
+  /// "go straight there" shortcut: a real navigation to the functional
+  /// page (Dashboard, Assessment, or Trainers), not just an
+  /// explanation of the cluster. The tour below remains the optional
+  /// full walkthrough for anyone who wants to see everything first.
+  Widget _startingPointCard() {
+    final point = _startingPoint;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _gold.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(point.icon, size: 18, color: _gold),
+              const SizedBox(width: 8),
+              Text(
+                'YOUR STARTING POINT',
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                  color: _softWhite.withValues(alpha: 0.5),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            point.label,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: _softWhite,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            point.explanation,
+            style: TextStyle(
+              fontSize: 12,
+              color: _softWhite.withValues(alpha: 0.6),
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 44,
+            child: ElevatedButton(
+              onPressed: _goToStartingPoint,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _gold,
+                foregroundColor: _darkBg,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(
+                    AppSizes.buttonCornerRadius,
+                  ),
+                ),
+              ),
+              child: Text(
+                'Take me to ${point.label}',
+                style: const TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
