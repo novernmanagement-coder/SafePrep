@@ -48,8 +48,16 @@ class _LifetimeOfferPageState extends State<LifetimeOfferPage> {
 
   Future<void> _handleUnlock() async {
     setState(() => _purchasing = true);
-    final result = await IAPService.instance.buyLifetimeOffer();
+    var result = await IAPService.instance.buyLifetimeOffer();
     if (!mounted) return;
+
+    // See IAPService.waitForLateUnlock — a timeout doesn't necessarily
+    // mean the purchase failed, just that confirmation arrived late.
+    if (result == IAPResult.timeout) {
+      final unlockedLate = await IAPService.instance.waitForLateUnlock();
+      if (!mounted) return;
+      if (unlockedLate) result = IAPResult.success;
+    }
 
     if (result == IAPResult.success) {
       Navigator.of(context).pop(true); // caller can react to the unlock

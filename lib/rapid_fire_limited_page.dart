@@ -1107,8 +1107,17 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
       },
     );
 
-    final result = await IAPService.instance.buySevenDay();
+    var result = await IAPService.instance.buySevenDay();
     if (!mounted) return;
+
+    // See IAPService.waitForLateUnlock — a timeout doesn't necessarily
+    // mean the purchase failed, just that confirmation arrived late.
+    if (result == IAPResult.timeout) {
+      final unlockedLate = await IAPService.instance.waitForLateUnlock();
+      if (!mounted) return;
+      if (unlockedLate) result = IAPResult.success;
+    }
+
     setState(() => _purchasing = false);
 
     if (result == IAPResult.success) {

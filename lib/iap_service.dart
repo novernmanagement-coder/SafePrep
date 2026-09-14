@@ -455,6 +455,66 @@ class IAPService {
     return AppState().hasUnlockedApp;
   }
 
+  // ── Late-confirmation recovery ──────────────────────────────
+  // A buy* call above can come back as IAPResult.timeout if StoreKit/
+  // Play Billing's confirmation doesn't arrive within _purchaseTimeout.
+  // That does NOT mean the purchase failed or was lost — _onPurchaseUpdate
+  // keeps listening in the background and will still run _handleSuccess()
+  // whenever the confirmation eventually shows up, unlocking and
+  // persisting normally. The gap was that nothing told the CALLER this
+  // happened after it already gave up and showed an error, so someone
+  // who genuinely paid could be stuck on an error message with no way
+  // in — this is what Apple's Sept 2026 rejection of 1.16.2 described
+  // ("did not receive a receipt after purchase"), most likely because
+  // App Review's own sandbox is slower than production and outlasted
+  // the 90-second window.
+  //
+  // Call one of these two after a timeout (or any non-success,
+  // non-canceled result) and treat `true` as success before finally
+  // giving up — see onboard_paywall.dart, safe_prep_nav_bar.dart,
+  // rapid_fire_limited_page.dart, lifetime_offer_page.dart, and
+  // renew_page.dart for the call sites.
+
+  // Covers every one-time-unlock product (seven day, fourteen day,
+  // unlock, upgrade, and Android's lifetime offer) — anything that
+  // sets AppState().hasUnlockedApp on success.
+  Future<bool> waitForLateUnlock({
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
+    if (AppState().hasUnlockedApp) return true;
+    final deadline = DateTime.now().add(timeout);
+    while (DateTime.now().isBefore(deadline)) {
+      if (AppState().hasUnlockedApp) return true;
+      await Future.delayed(const Duration(milliseconds: 300));
+    }
+    return AppState().hasUnlockedApp;
+  }
+
+  // The renewal purchase can't be detected with waitForLateUnlock above —
+  // hasUnlockedApp is already true for anyone eligible to renew. Instead
+  // the caller passes the expiryDate it observed right before starting
+  // the purchase, and this waits for that to actually move forward
+  // (per _handleSuccess's "currentExpiry + 7" anchor logic above).
+  Future<bool> waitForLateRenewal(
+    DateTime? previousExpiry, {
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
+    bool renewed() {
+      final current = AppState().expiryDate;
+      if (current == null) return false;
+      if (previousExpiry == null) return true;
+      return current.isAfter(previousExpiry);
+    }
+
+    if (renewed()) return true;
+    final deadline = DateTime.now().add(timeout);
+    while (DateTime.now().isBefore(deadline)) {
+      if (renewed()) return true;
+      await Future.delayed(const Duration(milliseconds: 300));
+    }
+    return renewed();
+  }
+
   // ── Price strings ────────────────────────────────────────────
   String get sevenDayPrice => _sevenDayProduct?.price ?? '\$4.99';
   String get fourteenDayPrice => _fourteenDayProduct?.price ?? '\$8.99';

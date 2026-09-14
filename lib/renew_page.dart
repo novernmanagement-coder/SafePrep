@@ -72,8 +72,19 @@ class _RenewPageState extends State<RenewPage> {
 
   Future<void> _handleRenew() async {
     setState(() => _purchasing = true);
-    final result = await IAPService.instance.buyRenewal();
+    final previousExpiry = AppState().expiryDate;
+    var result = await IAPService.instance.buyRenewal();
     if (!mounted) return;
+
+    // See IAPService.waitForLateRenewal — a timeout doesn't necessarily
+    // mean the purchase failed, just that confirmation arrived late.
+    if (result == IAPResult.timeout) {
+      final renewedLate = await IAPService.instance.waitForLateRenewal(
+        previousExpiry,
+      );
+      if (!mounted) return;
+      if (renewedLate) result = IAPResult.success;
+    }
 
     if (result == IAPResult.success) {
       Navigator.of(context).pop(true); // caller can react to renewal

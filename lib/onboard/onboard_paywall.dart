@@ -341,9 +341,22 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
       },
     );
 
-    final result = await IAPService.instance.buySevenDay();
+    var result = await IAPService.instance.buySevenDay();
 
     if (!mounted) return;
+
+    // A timeout doesn't necessarily mean the purchase failed — StoreKit's
+    // confirmation can simply arrive late (this is what caused Apple's
+    // Sept 2026 rejection of this exact screen). Keep watching a bit
+    // longer before treating it as a real failure; the spinner stays up
+    // the whole time since _purchasing doesn't flip off until we're sure
+    // either way.
+    if (result == IAPResult.timeout) {
+      final unlockedLate = await IAPService.instance.waitForLateUnlock();
+      if (!mounted) return;
+      if (unlockedLate) result = IAPResult.success;
+    }
+
     setState(() => _purchasing = false);
 
     if (result == IAPResult.success) {
