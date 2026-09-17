@@ -4,7 +4,7 @@ description: "SafePrep - Food Safety Exam Prep"
 
 publish_to: 'none'
 
-version: 1.17.0+2
+version: 1.17.0+25
 
 environment:
 
