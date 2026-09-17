@@ -121,6 +121,42 @@ class _SettingsPageState extends State<SettingsPage> {
     AppStatePersistence.save();
   }
 
+  // Reviewer/testing shortcut — NOT gated behind a debug flag, since
+  // App Review needs it to work on the real shipped build. Rolls the
+  // stored purchaseDate back just far enough that daysRemaining hits
+  // exactly 2, matching the real showRenew threshold in
+  // safe_prep_nav_bar.dart, so the Renew option (and RenewPage /
+  // buyRenewal()) becomes reachable immediately instead of waiting
+  // out the real day-5 window. Deliberately harmless for a real
+  // customer who stumbles onto it — it only pulls their OWN access
+  // window closer to needing a renewal, never extends anything or
+  // grants free access. Long-press the Version row in "About
+  // SafePrep™" to trigger it; documented for App Review in the
+  // submission notes.
+  void _debugFastForwardRenewWindow() {
+    if (!_state.hasUnlockedApp ||
+        !_state.isTimeLimited ||
+        _state.purchaseDate == null) {
+      return;
+    }
+    final durationDays = _state.purchaseType == PurchaseType.sevenDay
+        ? AppConstants.trialDurationDays
+        : 14;
+    setState(() {
+      _state.purchaseDate = DateTime.now().subtract(
+        Duration(days: durationDays - 2),
+      );
+    });
+    AppStatePersistence.save();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Access fast-forwarded — Renew is now available in the nav bar.',
+        ),
+      ),
+    );
+  }
+
   void _openCluster(AppCluster cluster) {
     Navigator.push(
       context,
@@ -439,7 +475,10 @@ class _SettingsPageState extends State<SettingsPage> {
                     _buildSectionCard(
                       title: 'About SafePrep™',
                       children: [
-                        _buildInfoRow('Version', '1.3.7'),
+                        GestureDetector(
+                          onLongPress: _debugFastForwardRenewWindow,
+                          child: _buildInfoRow('Version', '1.3.7'),
+                        ),
                         _buildInfoRow('Build', 'June 2026'),
                         _buildInfoRow('Platform', 'Flutter'),
                         const SizedBox(height: 4),
