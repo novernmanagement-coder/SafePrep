@@ -1,4 +1,3 @@
-import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 
 class AppColors {
@@ -140,16 +139,12 @@ class AppStrings {
 
 class AppConstants {
   // ── Trial / Access ─────────────────────────────────────────
-  // The real, live number for paying customers is 7 days (matches
-  // the $4.99 initial-purchase / $2.99-per-week-renewal model). For
-  // an Android closed-testing build, testers need to stay opted in
-  // well past 7 days without hitting the paywall, so this resolves
-  // automatically by platform instead of being a value someone has
-  // to remember to flip back before shipping a real iOS build.
-  //
-  // To change what testers get during closed testing, edit the
-  // Android-side number below — nothing else needs to change.
-  static final int trialDurationDays = Platform.isAndroid ? 60 : 7;
+  // Paid access window: 7 days on every platform (matches the
+  // $4.99 initial-purchase / $2.99-per-week-renewal model).
+  // Sept 2026: the Android-only 60-day value used during Google
+  // Play closed testing was removed now that SafePrep is public on
+  // Play — it would have given paying Android customers 60 days.
+  static const int trialDurationDays = 7;
 
   // Exam Engine
   static const int totalQuestions = 91;
