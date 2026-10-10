@@ -543,15 +543,18 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
     );
   }
 
-  void _showMeMore() {
+  Future<void> _showMeMore() async {
     MixpanelService.instance.track(
       'SpOn_Pay_ShowMeMore',
       properties: {'app_name': 'SP'},
     );
-    Navigator.push(
+    final result = await Navigator.push<String>(
       context,
       MaterialPageRoute(builder: (_) => const RapidFireLimitedIntro()),
     );
+    // The used-up-rounds screen's "why not ready" sheet can send back
+    // 'unlock' — run the normal paywall purchase from here.
+    if (mounted && result == 'unlock') _purchase();
   }
 
   @override
@@ -781,11 +784,9 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
 
               const SizedBox(height: 10),
 
-              // Hidden once both free "show me more" rounds are spent \u2014
-              // no dead-end tap on an offer that's already used up. See
-              // AppState.hasLimitedRapidFireRoundsLeft; rounds are
-              // consumed in rapid_fire_limited_intro.dart on Start.
-              if (AppState().hasLimitedRapidFireRoundsLeft)
+              // Always shown. If both free rounds are already spent, the
+              // Rapid Fire intro shows its "used both rounds" screen.
+              // Rounds are consumed in rapid_fire_limited_intro.dart on Start.
                 GestureDetector(
                   onTap: _showMeMore,
                   child: Padding(

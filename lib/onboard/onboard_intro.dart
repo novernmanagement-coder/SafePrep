@@ -68,9 +68,7 @@ class _OnboardIntroState extends State<OnboardIntro>
   // line is now a proper user-audience line in this same list (typed
   // out, gold), not a separate special-cased static line.
   static const List<_FsmeLine> _beatTwoScript = [
-    _FsmeLine(
-      '\u2014 oops. Didn\u2019t see you come in.',
-    ),
+    _FsmeLine('\u2014 oops. Didn\u2019t see you come in.'),
     _FsmeLine(
       '\u2026Ahem \u2014 \u201CWelcome to SafePrep. We will prepare you '
       'for the ServSafe exam.\u201D',
@@ -278,7 +276,7 @@ class _OnboardIntroState extends State<OnboardIntro>
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      'Student pass rate exceeds 95%.',
+                      '100% classroom pass rate for 10+ years.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 12.5,
@@ -305,9 +303,7 @@ class _OnboardIntroState extends State<OnboardIntro>
 
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) => const OnboardTrust(),
-                      ),
+                      MaterialPageRoute(builder: (_) => const OnboardTrust()),
                     );
                   },
                   style: ElevatedButton.styleFrom(

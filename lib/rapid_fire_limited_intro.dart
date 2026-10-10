@@ -6,6 +6,7 @@ import '../app_state.dart';
 import '../app_state_persistence.dart';
 import '../mixpanel_service.dart';
 import 'rapid_fire_limited_page.dart';
+import 'not_ready_sheet.dart';
 
 /// Intro screen for the limited Rapid Fire — positioned between the
 /// paywall decline and the actual tool. Its job is to make a free
@@ -317,6 +318,20 @@ class _RapidFireLimitedIntroState extends State<RapidFireLimitedIntro>
     );
   }
 
+  /// Same "why not ready" sheet as the Rapid Fire lock screen. This
+  /// screen has no purchase logic of its own, so Unlock and Back both
+  /// return to the paywall — Unlock passes 'unlock' back so the paywall
+  /// starts its normal purchase.
+  Future<void> _openNotReady(BuildContext context) async {
+    final action = await showNotReadySheet(
+      context,
+      source: 'rapid_fire_exhausted',
+      backLabel: 'Back to my plan',
+    );
+    if (!mounted || action == null) return;
+    Navigator.pop(context, action.startsWith('unlock:') ? 'unlock' : null);
+  }
+
   /// Shown instead of the normal offer if this screen is somehow
   /// reached with 0 rounds left (the entry point in onboard_paywall.dart
   /// hides the "Try this first" link once rounds run out, so this is a
@@ -378,6 +393,22 @@ class _RapidFireLimitedIntroState extends State<RapidFireLimitedIntro>
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                GestureDetector(
+                  onTap: () => _openNotReady(context),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      'Not ready? Let us know why  \u2192',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: _gold,
                       ),
                     ),
                   ),

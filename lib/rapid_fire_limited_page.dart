@@ -9,6 +9,7 @@ import 'iap_service.dart';
 import 'fsme_eye.dart';
 import 'onboard/onboard_final_trust_page.dart';
 import 'fsme_post_purchase_landing.dart';
+import 'not_ready_sheet.dart';
 
 /// Limited Rapid Fire — the $4.99 decline path's free taste.
 ///
@@ -234,7 +235,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
   /// FSME's closing pitch, once the user has cleared all 3 free
   /// categories (9 of 9): the trophy tease from the shelf above, then
   /// — after a beat, like he just remembered — the actual sales
-  /// pitch. Last line undercuts the 98% stat for a laugh, so it reads as
+  /// pitch. Last line undercuts the 100% classroom stat for a laugh, so it reads as
   /// him being honest rather than a hard close.
   static const List<_FsmeLine> _finalTeaseScript = [
     _FsmeLine(
@@ -243,7 +244,10 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
     ),
     _FsmeLine('Oh yeah — this app comes with a money-back guarantee.'),
     _FsmeLine('They built this thing just for you.'),
-    _FsmeLine('98% pass rate.'),
+    _FsmeLine(
+      'Same curriculum that’s had a 100% pass rate in the classroom '
+      'for 10+ years.',
+    ),
     _FsmeLine(
       'Heck, I’m only right 97.896526652% of the time.',
       audience: _FsmeAudience.self,
@@ -1138,6 +1142,25 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
     }
   }
 
+  /// Opens the "why not ready" question. The sheet returns what the
+  /// user chose to do after FSME's rebuttal: 'unlock' → real IAP,
+  /// 'back' → leave the limited tool and return to the paywall/plan.
+  /// Dismissing the sheet (swipe/tap outside) just closes it.
+  Future<void> _showNotReadySheet() async {
+    final action = await showNotReadySheet(
+      context,
+      source: 'rapid_fire',
+      backLabel: 'Back to my plan',
+    );
+    if (!mounted || action == null) return;
+
+    if (action.startsWith('unlock:')) {
+      _unlock('not_ready_${action.substring(7)}');
+    } else if (action == 'back') {
+      if (Navigator.canPop(context)) Navigator.pop(context);
+    }
+  }
+
   // ── Build methods ───────────────────────────────────────────────
 
   Widget _limitedBanner() {
@@ -1572,6 +1595,26 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
           ),
 
           const SizedBox(height: 14),
+
+          // Last category = no "continue" exit. Give a non-buyer a way
+          // to tell us why, get an FSME rebuttal, and leave gracefully
+          // instead of hitting a dead end.
+          if (!hasMoreCategories)
+            GestureDetector(
+              onTap: _purchasing ? null : _showNotReadySheet,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  'Not ready? Let us know why  \u2192',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: _gold,
+                  ),
+                ),
+              ),
+            ),
 
           if (hasMoreCategories)
             GestureDetector(
