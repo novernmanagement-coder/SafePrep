@@ -12,6 +12,30 @@ import 'readiness_engine.dart';
 import 'peace_of_mind_page.dart';
 import 'onboard/onboard_intro.dart';
 import 'onboard/onboard_answers.dart';
+import 'home_page.dart';
+
+// TESTING BUILD ONLY — set via
+//   flutter build ... --dart-define=TESTING_BUILD=true
+// for the specific build uploaded to a closed-testing service (e.g.
+// Testers Community). When true, Path 2 below (everyone who hasn't
+// purchased) skips OnboardIntro and lands straight on HomePage instead.
+//
+// WHY: closed-testing testers typically do one brief, low-effort pass —
+// open the app, poke around a little, done. If that pass has to happen
+// inside a multi-step onboarding funnel, a tester who doesn't push all
+// the way through it never reaches any real screen, which reads to
+// Google's production-access review as "opted in, never really used the
+// app." Sending testers straight to real content instead gives even a
+// short session a real shot at registering as genuine engagement.
+//
+// Defaults to false, so every build that doesn't pass this dart-define
+// — the real App Store build, the real production Play Store build —
+// is completely unaffected and keeps routing through OnboardIntro exactly
+// as before. Path 1 (purchased) is untouched either way.
+const bool kTestingBuild = bool.fromEnvironment(
+  'TESTING_BUILD',
+  defaultValue: false,
+);
 
 // BUILD 29 — Splash routing, revised so casual/free-info visitors
 // never hit the access-code wall.
@@ -244,6 +268,21 @@ class _SplashPageState extends State<SplashPage> {
     // in OnboardPaywall.initState purely as an analytics signal — it no
     // longer gates anything here.
     _navigated = true;
+
+    // TESTING BUILD: bypass the funnel entirely — see kTestingBuild above.
+    if (kTestingBuild) {
+      MixpanelService.instance.track(
+        'SpOn_Splash_Route',
+        properties: {'app_name': 'SP', 'path': 'testing_build_direct_home'},
+      );
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomePage()),
+      );
+      return;
+    }
+
     OnboardingAnswers.instance.reset();
     final prefs = await SharedPreferences.getInstance();
     final runs = prefs.getInt(kOnboardingRunsKey) ?? 0;
