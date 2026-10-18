@@ -9,12 +9,13 @@ import '../redeem_code_service.dart';
 import 'onboard_answers.dart';
 import 'onboard_trust.dart';
 import '../rapid_fire_limited_intro.dart';
+import '../not_ready_sheet.dart';
 
 /// Onboarding paywall — redesigned for the self-report funnel, then
 /// redesigned again to add a personalized recap, then redesigned a
 /// third time (Sept 2026) into this long-form version.
 ///
-/// One product now ($4.99, 7 days full access) since the Refresher
+/// One product now (7 days full access) since the Refresher
 /// tier has been eliminated entirely — there's nothing to price-game
 /// toward, so the screen is a single clean ask rather than two priced
 /// options.
@@ -76,7 +77,11 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
   static const Color _softWhite = Color(0xFFF0EDE8);
   static const Color _cardBg = Color(0xFF13130F);
 
-  static const String _price = '\$4.99';
+  /// Live price from the App Store / Play Store (localized, includes the
+  /// currency symbol). Changing the price in App Store Connect or Play
+  /// Console now updates this button with no new build. Falls back to
+  /// IAPService's default only if store products haven't loaded yet.
+  String get _price => IAPService.instance.sevenDayPrice;
 
   bool _purchasing = false;
   bool _restoring = false;
@@ -426,7 +431,7 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
 
   // Entry point for a student who bought an in-person ServSafe class
   // through Food Safety Made Easy / Indiana Safe Food and got a free
-  // unlock code from their instructor instead of buying the $4.99 IAP
+  // unlock code from their instructor instead of buying the IAP
   // directly. See RedeemCodeService for the offline validation scheme.
   Future<void> _showRedeemDialog() async {
     final controller = TextEditingController();
@@ -543,18 +548,27 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
     );
   }
 
-  Future<void> _showMeMore() async {
+  /// Paywall version of the "why not ready" sheet. Unlock runs the
+  /// normal paywall purchase; Close just leaves them on the paywall.
+  Future<void> _openNotReady() async {
+    final action = await showNotReadySheet(
+      context,
+      source: 'paywall',
+      backLabel: 'Close',
+    );
+    if (!mounted || action == null) return;
+    if (action.startsWith('unlock:')) _purchase();
+  }
+
+  void _showMeMore() {
     MixpanelService.instance.track(
       'SpOn_Pay_ShowMeMore',
       properties: {'app_name': 'SP'},
     );
-    final result = await Navigator.push<String>(
+    Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const RapidFireLimitedIntro()),
     );
-    // The used-up-rounds screen's "why not ready" sheet can send back
-    // 'unlock' — run the normal paywall purchase from here.
-    if (mounted && result == 'unlock') _purchase();
   }
 
   @override
@@ -626,7 +640,8 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
               _unlockItem(
                 icon: Icons.dashboard_rounded,
                 title: 'Personal Dashboard',
-                description: 'Your study hub — readiness score, progress, '
+                description:
+                    'Your study hub — readiness score, progress, '
                     'and what to focus on next.',
               ),
               _unlockItem(
@@ -648,8 +663,7 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
               _unlockItem(
                 icon: Icons.all_inclusive,
                 title: 'Unlimited Randomized Quizzes',
-                description:
-                    'No limits. No repeats unless you want them.',
+                description: 'No limits. No repeats unless you want them.',
               ),
 
               const SizedBox(height: 14),
@@ -674,11 +688,7 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
                         color: _darkBg,
                         border: Border.all(color: _gold),
                       ),
-                      child: const Icon(
-                        Icons.verified,
-                        size: 15,
-                        color: _gold,
-                      ),
+                      child: const Icon(Icons.verified, size: 15, color: _gold),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -692,7 +702,8 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
                           children: const [
                             TextSpan(text: 'Every question written by '),
                             TextSpan(
-                              text: 'a certified ServSafe instructor with '
+                              text:
+                                  'a certified ServSafe instructor with '
                                   '20+ years in the classroom',
                               style: TextStyle(
                                 fontWeight: FontWeight.w700,
@@ -784,15 +795,36 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
 
               const SizedBox(height: 10),
 
-              // Always shown. If both free rounds are already spent, the
-              // Rapid Fire intro shows its "used both rounds" screen.
-              // Rounds are consumed in rapid_fire_limited_intro.dart on Start.
+              // Hidden once both free "show me more" rounds are spent \u2014
+              // no dead-end tap on an offer that's already used up. See
+              // AppState.hasLimitedRapidFireRoundsLeft; rounds are
+              // consumed in rapid_fire_limited_intro.dart on Start.
+              if (AppState().hasLimitedRapidFireRoundsLeft)
                 GestureDetector(
                   onTap: _showMeMore,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     child: Text(
                       'Not ready to commit yet? Try this first  \u2192',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: _gold,
+                      ),
+                    ),
+                  ),
+                ),
+
+              // Free rounds spent → same spot becomes the "why not ready"
+              // question with FSME's rebuttals, instead of disappearing.
+              if (!AppState().hasLimitedRapidFireRoundsLeft)
+                GestureDetector(
+                  onTap: _purchasing ? null : _openNotReady,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Text(
+                      'Not ready yet? Let us know why  \u2192',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 13,

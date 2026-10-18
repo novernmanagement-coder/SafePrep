@@ -11,7 +11,7 @@ import 'onboard/onboard_final_trust_page.dart';
 import 'fsme_post_purchase_landing.dart';
 import 'not_ready_sheet.dart';
 
-/// Limited Rapid Fire — the $4.99 decline path's free taste.
+/// Limited Rapid Fire — the paywall decline path's free taste.
 ///
 /// This is a SELLING PAGE that happens to be a working tool. It runs a
 /// capped version of Rapid Fire (3 weakest categories × 5 questions each
@@ -1091,7 +1091,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
     _loadQuestion();
   }
 
-  /// Shared $4.99 unlock. Triggers the real IAP; only a VERIFIED success
+  /// Shared seven-day unlock. Triggers the real IAP; only a VERIFIED success
   /// opens the app — routed to FsmePostPurchaseLanding, same destination
   /// as every other purchase entry point (paywall, trust page). Cancel or
   /// failure returns to the paywall.
@@ -1107,7 +1107,7 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
         'app_name': 'SP',
         'tier': 'sp',
         'source': source,
-        'price': '\$4.99',
+        'price': IAPService.instance.sevenDayPrice,
       },
     );
 
@@ -1587,9 +1587,12 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
                   ),
                 ),
               ),
-              child: const Text(
-                'Unlock SafePrep  —  \$4.99',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              child: Text(
+                'Unlock SafePrep  —  ${IAPService.instance.sevenDayPrice}',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ),
@@ -1906,9 +1909,12 @@ class _RapidFireLimitedPageState extends State<RapidFireLimitedPage>
                   ),
                 ),
               ),
-              child: const Text(
-                'Unlock SafePrep  —  \$4.99',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              child: Text(
+                'Unlock SafePrep  —  ${IAPService.instance.sevenDayPrice}',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ),

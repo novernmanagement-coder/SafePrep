@@ -73,7 +73,9 @@ class _OnboardFinalTrustPageState extends State<OnboardFinalTrustPage> {
   static const Duration _beatHold = Duration(seconds: 4);
 
   static const int _yearsTeaching = 20; // TODO(gerry): confirm vs. 25
-  static const String _price = '\$4.99';
+  /// Live store price (App Store / Play Store) — changes with the store,
+  /// no build needed. See OnboardPaywall._price.
+  String get _price => IAPService.instance.sevenDayPrice;
 
   // Real ally-bit sequence. Mood choices map onto the ACTUAL EyeMood
   // enum from fsme_eye.dart rather than inventing states that don't

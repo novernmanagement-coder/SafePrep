@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'constants.dart';
 import 'mixpanel_service.dart';
 import 'fsme_eye.dart';
+import 'iap_service.dart';
 
 /// Shared "Not ready? Let us know why" sheet — used on the last Rapid
 /// Fire lock screen and on the main paywall once the free rounds are
@@ -66,8 +67,8 @@ class _NotReadySheetState extends State<NotReadySheet> {
     _NotReadyReason(
       'price',
       'The price',
-      'Let\u2019s do the math. \$4.99 \u2014 less than a cup from that '
-          'bougie coffee shop you hit every morning. Does that coffee come '
+      'Let\u2019s do the math. One week of that bougie coffee shop you '
+          'hit every morning costs more than this. Does that coffee come '
           'with a money-back guarantee if you don\u2019t pass? Didn\u2019t '
           'think so.',
     ),
@@ -193,8 +194,11 @@ class _NotReadySheetState extends State<NotReadySheet> {
                   ),
                 ),
               ),
-              Icon(Icons.chevron_right_rounded,
-                  size: 20, color: _gold.withValues(alpha: 0.7)),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                color: _gold.withValues(alpha: 0.7),
+              ),
             ],
           ),
         ),
@@ -258,85 +262,89 @@ class _NotReadySheetState extends State<NotReadySheet> {
         // Buttons show immediately — no waiting on FSME to finish
         // typing at the moment someone's deciding whether to buy.
         Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: () {
-                          MixpanelService.instance.track(
-                            'SpOn_NotReady_Unlock',
-                            properties: {
-                              'app_name': 'SP',
-        'source': widget.source,
-                              'reason': r.key,
-                              'pick_number': _pickCount,
-                              'reasons_seen': _seen.join(','),
-                            },
-                          );
-                          Navigator.pop(context, 'unlock:${r.key}');
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _gold,
-                    foregroundColor: _darkBg,
-                    disabledBackgroundColor: _gold,
-                    disabledForegroundColor: _darkBg,
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.circular(AppSizes.buttonCornerRadius),
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              height: 50,
+              child: ElevatedButton(
+                onPressed: () {
+                  MixpanelService.instance.track(
+                    'SpOn_NotReady_Unlock',
+                    properties: {
+                      'app_name': 'SP',
+                      'source': widget.source,
+                      'reason': r.key,
+                      'pick_number': _pickCount,
+                      'reasons_seen': _seen.join(','),
+                    },
+                  );
+                  Navigator.pop(context, 'unlock:${r.key}');
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _gold,
+                  foregroundColor: _darkBg,
+                  disabledBackgroundColor: _gold,
+                  disabledForegroundColor: _darkBg,
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(
+                      AppSizes.buttonCornerRadius,
                     ),
                   ),
-                  child: const Text(
-                    'Unlock SafePrep  \u2014  \$4.99',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                ),
+                child: Text(
+                  'Unlock SafePrep  \u2014  ${IAPService.instance.sevenDayPrice}',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
-              const SizedBox(height: 6),
-              Text(
-                'Full access for 7 days. No limits.',
-                textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Full access for 7 days. No limits.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11.5,
+                color: _softWhite.withValues(alpha: 0.45),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextButton(
+              onPressed: () {
+                MixpanelService.instance.track(
+                  'SpOn_NotReady_Back',
+                  properties: {
+                    'app_name': 'SP',
+                    'source': widget.source,
+                    'reason': r.key,
+                    'pick_number': _pickCount,
+                    'reasons_seen': _seen.join(','),
+                  },
+                );
+                Navigator.pop(context, 'back');
+              },
+              child: Text(
+                widget.backLabel,
                 style: TextStyle(
-                  fontSize: 11.5,
-                  color: _softWhite.withValues(alpha: 0.45),
+                  fontSize: 13,
+                  color: _softWhite.withValues(alpha: 0.55),
                 ),
               ),
-              const SizedBox(height: 10),
-              TextButton(
-                onPressed: () {
-                        MixpanelService.instance.track(
-                          'SpOn_NotReady_Back',
-                          properties: {
-                            'app_name': 'SP',
-        'source': widget.source,
-                            'reason': r.key,
-                            'pick_number': _pickCount,
-                            'reasons_seen': _seen.join(','),
-                          },
-                        );
-                        Navigator.pop(context, 'back');
-                      },
-                child: Text(
-                  widget.backLabel,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: _softWhite.withValues(alpha: 0.55),
-                  ),
+            ),
+            TextButton(
+              onPressed: _backToReasons,
+              child: Text(
+                '\u2190  See the other reasons',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: _gold.withValues(alpha: 0.8),
                 ),
               ),
-              TextButton(
-                onPressed: _backToReasons,
-                child: Text(
-                  '\u2190  See the other reasons',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    color: _gold.withValues(alpha: 0.8),
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
+        ),
       ],
     );
   }
@@ -366,13 +374,14 @@ class _NotReadySheetState extends State<NotReadySheet> {
               foregroundColor: _darkBg,
               elevation: 4,
               shape: RoundedRectangleBorder(
-                borderRadius:
-                    BorderRadius.circular(AppSizes.buttonCornerRadius),
+                borderRadius: BorderRadius.circular(
+                  AppSizes.buttonCornerRadius,
+                ),
               ),
             ),
-            child: const Text(
-              'Unlock SafePrep  \u2014  \$4.99',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+            child: Text(
+              'Unlock SafePrep  \u2014  ${IAPService.instance.sevenDayPrice}',
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
             ),
           ),
         ),
@@ -398,47 +407,45 @@ class _NotReadySheetState extends State<NotReadySheet> {
         decoration: BoxDecoration(
           color: _darkBg,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-          border: Border(
-            top: BorderSide(color: _gold.withValues(alpha: 0.3)),
-          ),
+          border: Border(top: BorderSide(color: _gold.withValues(alpha: 0.3))),
         ),
         child: SingleChildScrollView(
           child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: _softWhite.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(2),
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: _softWhite.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              _picked == null
-                  ? 'Let us know why you\u2019re not ready'
-                  : _picked!.label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-                color: _softWhite,
+              const SizedBox(height: 18),
+              Text(
+                _picked == null
+                    ? 'Let us know why you\u2019re not ready'
+                    : _picked!.label,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  color: _softWhite,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            if (_picked == null) ...[
-              ..._reasons.map(_reasonTile),
-              const SizedBox(height: 6),
-              // Sheet covers the paywall's own button, so keep a way to
-              // buy without having to pick a reason first.
-              _unlockButton('none'),
-            ] else
-              _rebuttalView(),
-          ],
+              const SizedBox(height: 16),
+              if (_picked == null) ...[
+                ..._reasons.map(_reasonTile),
+                const SizedBox(height: 6),
+                // Sheet covers the paywall's own button, so keep a way to
+                // buy without having to pick a reason first.
+                _unlockButton('none'),
+              ] else
+                _rebuttalView(),
+            ],
           ),
         ),
       ),
