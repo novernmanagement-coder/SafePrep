@@ -20,13 +20,13 @@ import 'mixpanel_service.dart';
 // ─────────────────────────────────────────────────────────────────
 final String kProductSevenDay = Platform.isAndroid
     ? 'android_sp_sevenday'
-    : 'SafePrepSevenDay'; // $19.99 — 7 days (price set in the stores)
+    : 'SafePrepSevenDay'; // 7 days (legacy first purchase; price set in the stores)
 final String kProductFourteenDay = Platform.isAndroid
     ? 'android_sp_fourteenday'
     : 'SafePrepFourteenDay'; // $8.99 — 14 days
 final String kProductUnlockApp = Platform.isAndroid
     ? 'android_sp_unlock'
-    : 'SafePrepUnlock'; // $9.99 — lifetime
+    : 'SafePrepUnlock'; // $19.99 — lifetime (paywall product since Oct 2026; price set in the stores)
 const String kProductUpgrade =
     'com.geraldmiller.safeprep.upgrade'; // $4.99 — upgrade to lifetime — already lowercase, same ID works on both stores
 final String kProductRenewal = Platform.isAndroid
@@ -518,7 +518,7 @@ class IAPService {
   // ── Price strings ────────────────────────────────────────────
   String get sevenDayPrice => _sevenDayProduct?.price ?? '\$19.99';
   String get fourteenDayPrice => _fourteenDayProduct?.price ?? '\$8.99';
-  String get unlockPrice => _unlockProduct?.price ?? '\$9.99';
+  String get unlockPrice => _unlockProduct?.price ?? '\$19.99';
   String get upgradePrice => _upgradeProduct?.price ?? '\$4.99';
   String get renewalPrice => _renewalProduct?.price ?? '\$2.99';
   String get lifetimeOfferPrice => _lifetimeOfferProduct?.price ?? '\$2.99';
