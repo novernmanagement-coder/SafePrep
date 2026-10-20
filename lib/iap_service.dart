@@ -316,6 +316,8 @@ class IAPService {
 
     state.hasUnlockedApp = true;
     state.purchaseDate = DateTime.now();
+    // A real purchase replaces any timed redeem-code access length.
+    state.redeemAccessDays = null;
 
     // NOTE: was a switch on purchase.productID — same reason as the
     // one in _loadProducts above, kProduct* aren't compile-time

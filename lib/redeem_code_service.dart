@@ -140,20 +140,36 @@ class RedeemCodeService {
     return DateTime.now().difference(issued).inDays > _codeMaxAgeDays;
   }
 
+  /// Asks redeem-check.php about this code: already redeemed, past its
+  /// redeem-by date, and how many days of access it grants.
+  ///
   /// Fail-open by design (matches CsvLoader's sync-check pattern):
   /// if the request errors, times out, or the endpoint is unreachable,
-  /// this returns false (treat as "not used") rather than blocking a
-  /// legitimate redemption on SafePrep having no real backend.
-  static Future<bool> _checkAlreadyUsed(String digitsOnly) async {
+  /// this returns the defaults (not used, not expired, lifetime) rather
+  /// than blocking a legitimate redemption on SafePrep having no real
+  /// backend.
+  static Future<_ServerCheck> _checkServer(String digitsOnly) async {
     try {
       final response = await http
           .get(Uri.parse('$_checkUrl?code=$digitsOnly'))
           .timeout(const Duration(seconds: 4));
-      if (response.statusCode != 200) return false;
+      if (response.statusCode != 200) return const _ServerCheck();
       final data = jsonDecode(response.body);
-      return data is Map && data['used'] == true;
+      if (data is! Map) return const _ServerCheck();
+      final expired = data['expired'] == true;
+      // Older server versions only send "used"; newer ones also send
+      // "redeemed" and set "used" for expired codes too.
+      final redeemed = data.containsKey('redeemed')
+          ? data['redeemed'] == true
+          : data['used'] == true;
+      final days = data['access_days'];
+      return _ServerCheck(
+        redeemed: redeemed,
+        expired: expired,
+        accessDays: (days is int && days > 0) ? days : null,
+      );
     } catch (_) {
-      return false;
+      return const _ServerCheck();
     }
   }
 
@@ -171,8 +187,8 @@ class RedeemCodeService {
   }
 
   /// Attempts to redeem [rawCode] (dashes/spaces tolerated — only the
-  /// digits are checked). On success, unlocks the app with the same
-  /// 7-day access window a real purchase grants. On failure, state is
+  /// digits are checked). On success, unlocks the app for the access
+  /// length set on the code (30/60 days, or lifetime by default). On failure, state is
   /// left untouched and the specific [RedeemResult] tells the caller
   /// why, so the UI can show an accurate message instead of a generic
   /// failure.
@@ -198,7 +214,21 @@ class RedeemCodeService {
       return RedeemResult.expired;
     }
 
-    if (await _checkAlreadyUsed(digitsOnly)) {
+    final check = await _checkServer(digitsOnly);
+
+    if (check.expired) {
+      MixpanelService.instance.track(
+        'redeem_code_attempt',
+        properties: {
+          'app_name': 'SP',
+          'valid': true,
+          'reason': 'redeem_window_passed',
+        },
+      );
+      return RedeemResult.expired;
+    }
+
+    if (check.redeemed) {
       MixpanelService.instance.track(
         'redeem_code_attempt',
         properties: {
@@ -225,7 +255,17 @@ class RedeemCodeService {
       state.hasSeenIntro = false;
     }
     state.hasUnlockedApp = true;
-    state.purchaseType = PurchaseType.sevenDay;
+    // The code's rules decide the access length: 30 or 60 days, or
+    // lifetime when the code has no length set (or the server couldn't
+    // be reached). Timed codes reuse the sevenDay type so the existing
+    // countdown, renew and upgrade-to-lifetime paths all apply.
+    if (check.accessDays != null) {
+      state.purchaseType = PurchaseType.sevenDay;
+      state.redeemAccessDays = check.accessDays;
+    } else {
+      state.purchaseType = PurchaseType.lifetime;
+      state.redeemAccessDays = null;
+    }
     state.purchaseDate = DateTime.now();
     state.isRedeemedAccess = true;
     await AppStatePersistence.save();
@@ -234,8 +274,25 @@ class RedeemCodeService {
 
     MixpanelService.instance.track(
       'redeem_code_success',
-      properties: {'app_name': 'SP'},
+      properties: {
+        'app_name': 'SP',
+        'access_days': check.accessDays ?? 'lifetime',
+      },
     );
     return RedeemResult.success;
   }
+}
+
+/// What redeem-check.php said about a code. Defaults are the fail-open
+/// answer: not redeemed, not expired, lifetime access.
+class _ServerCheck {
+  const _ServerCheck({
+    this.redeemed = false,
+    this.expired = false,
+    this.accessDays,
+  });
+
+  final bool redeemed;
+  final bool expired;
+  final int? accessDays;
 }

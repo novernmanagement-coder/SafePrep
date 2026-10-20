@@ -102,6 +102,12 @@ class AppState {
   /// those only read purchaseType/purchaseDate.
   bool isRedeemedAccess = false;
 
+  /// Access length a redeem code granted, in days (30 or 60), set from the
+  /// code's rules on redeem-check.php. null = not a timed code (lifetime
+  /// redeem, or a regular purchase). When set, it overrides the normal
+  /// 7-day length in [expiryDate] below.
+  int? redeemAccessDays;
+
   bool get hasFullAccess => hasUnlockedApp;
   bool get hasUpgraded => hasUnlockedApp;
   bool get isLifetime => purchaseType == PurchaseType.lifetime;
@@ -126,9 +132,11 @@ class AppState {
     // sevenDay's real length now lives in AppConstants.trialDurationDays
     // (7 on iOS, 60 on an Android closed-testing build) so switching
     // platforms never means hunting for a hardcoded number here.
-    final days = purchaseType == PurchaseType.sevenDay
-        ? AppConstants.trialDurationDays
-        : 14;
+    final days = (isRedeemedAccess && redeemAccessDays != null)
+        ? redeemAccessDays!
+        : purchaseType == PurchaseType.sevenDay
+            ? AppConstants.trialDurationDays
+            : 14;
     return purchaseDate!.add(Duration(days: days));
   }
 
@@ -569,6 +577,7 @@ class AppState {
     final savedPurchaseType = purchaseType;
     final savedPurchaseDate = purchaseDate;
     final savedIsRedeemedAccess = isRedeemedAccess;
+    final savedRedeemAccessDays = redeemAccessDays;
     final savedTrialStarted = trialStarted;
     final savedFsmeEnabled = fsmeEnabled;
     final savedHasSeenRenewalExplainer = hasSeenRenewalExplainer;
@@ -582,6 +591,7 @@ class AppState {
     purchaseType = PurchaseType.none;
     purchaseDate = null;
     isRedeemedAccess = false;
+    redeemAccessDays = null;
     trialStarted = false;
     readinessScore = 0;
     readinessCoachMessage =
@@ -617,6 +627,7 @@ class AppState {
     purchaseType = savedPurchaseType;
     purchaseDate = savedPurchaseDate;
     isRedeemedAccess = savedIsRedeemedAccess;
+    redeemAccessDays = savedRedeemAccessDays;
     trialStarted = savedTrialStarted;
     fsmeEnabled = savedFsmeEnabled;
     hasSeenRenewalExplainer = savedHasSeenRenewalExplainer;
@@ -633,6 +644,7 @@ class AppState {
     'purchaseType': purchaseType.name,
     'purchaseDate': purchaseDate?.toIso8601String(),
     'isRedeemedAccess': isRedeemedAccess,
+    'redeemAccessDays': redeemAccessDays,
     'trialStarted': trialStarted,
     'fsmeEnabled': fsmeEnabled,
     'hasSeenRenewalExplainer': hasSeenRenewalExplainer,
@@ -694,6 +706,7 @@ class AppState {
         ? DateTime.parse(json['purchaseDate'])
         : null;
     isRedeemedAccess = json['isRedeemedAccess'] ?? false;
+    redeemAccessDays = json['redeemAccessDays'] as int?;
     trialStarted = json['trialStarted'] ?? false;
     fsmeEnabled = json['fsmeEnabled'] ?? true;
     hasSeenRenewalExplainer = json['hasSeenRenewalExplainer'] ?? false;
