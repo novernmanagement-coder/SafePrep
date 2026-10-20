@@ -15,8 +15,9 @@ import '../not_ready_sheet.dart';
 /// redesigned again to add a personalized recap, then redesigned a
 /// third time (Sept 2026) into this long-form version.
 ///
-/// One product now (7 days full access) since the Refresher
-/// tier has been eliminated entirely — there's nothing to price-game
+/// One product: lifetime access (SafePrepUnlock / android_sp_unlock),
+/// switched from the 7-day product in Oct 2026 when the price went to
+/// $19.99. The Refresher tier has been eliminated entirely — there's nothing to price-game
 /// toward, so the screen is a single clean ask rather than two priced
 /// options.
 ///
@@ -77,11 +78,12 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
   static const Color _softWhite = Color(0xFFF0EDE8);
   static const Color _cardBg = Color(0xFF13130F);
 
-  /// Live price from the App Store / Play Store (localized, includes the
-  /// currency symbol). Changing the price in App Store Connect or Play
-  /// Console now updates this button with no new build. Falls back to
-  /// IAPService's default only if store products haven't loaded yet.
-  String get _price => IAPService.instance.sevenDayPrice;
+  /// Live price of the lifetime unlock from the App Store / Play Store
+  /// (localized, includes the currency symbol). Changing the price in
+  /// App Store Connect or Play Console updates this button with no new
+  /// build. Falls back to IAPService's default only if store products
+  /// haven't loaded yet.
+  String get _price => IAPService.instance.unlockPrice;
 
   bool _purchasing = false;
   bool _restoring = false;
@@ -340,13 +342,14 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
       properties: {
         'app_name': 'SP',
         'source': 'paywall',
+        'product': 'lifetime',
         'price': _price,
         'content_preference':
             OnboardingAnswers.instance.contentPreference?.tag ?? 'unknown',
       },
     );
 
-    var result = await IAPService.instance.buySevenDay();
+    var result = await IAPService.instance.buyUnlockApp();
 
     if (!mounted) return;
 
@@ -735,7 +738,7 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
                 ),
                 child: Column(
                   children: [
-                    _accessRow('7 days full access'),
+                    _accessRow('Lifetime access'),
                     _accessRow('500+ aligned questions'),
                     _accessRow('Adaptive progress tracking'),
                     _accessRow('Exam-weighted study flow'),
@@ -781,7 +784,7 @@ class _OnboardPaywallState extends State<OnboardPaywall> {
                               ),
                             ),
                             Text(
-                              'Full access for 7 days. No limits.',
+                              'One-time purchase. Yours for good.',
                               style: TextStyle(
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.w400,
